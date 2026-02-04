@@ -14,6 +14,7 @@ func Normalize(p *Payload) {
 	p.EventID = clean(p.EventID)
 	p.Contract = clean(p.Contract)
 	p.OperGroup = clean(p.OperGroup)
+	p.Operator = clean(p.Operator)
 	p.MainCaller = clean(p.MainCaller)
 	p.SecundaryCaller = clean(p.SecundaryCaller)
 	p.Cliente = clean(p.Cliente)

@@ -28,22 +28,21 @@ func Run(cfg config.RuntimeConfig) error {
 
 	// Resolve TAGs (Zabbix > Cliente(YAML) > Default(YAML))
 	contract := pickTag(p.Contract, pol.Tags.Contract, pf.Default.Tags.Contract)
-	log.Printf("[debug] contract resolved=%q len=%d bytes=%v\n", contract, len(contract), []byte(contract))
-
+	operator := pickTag(p.Operator, pol.Tags.Operator, pf.Default.Tags.Operator)
 	operGrp := pickTag(p.OperGroup, pol.Tags.OperGroup, pf.Default.Tags.OperGroup)
-	log.Printf("[debug] operGrp resolved=%q len=%d bytes=%v\n", operGrp, len(operGrp), []byte(operGrp))
 
 	mainCaller := pickTag(p.MainCaller, pol.Tags.MainCaller, pf.Default.Tags.MainCaller)
-	log.Printf("[debug] mainCaller resolved=%q len=%d bytes=%v\n", mainCaller, len(mainCaller), []byte(mainCaller))
 
 	secCaller := pickTag(p.SecundaryCaller, pol.Tags.SecundaryCaller, pf.Default.Tags.SecundaryCaller)
-	log.Printf("[debug] secCaller resolved=%q len=%d bytes=%v\n", secCaller, len(secCaller), []byte(secCaller))
 
 	// sanity checks (pra não criar ticket quebrado)
 	if strings.TrimSpace(mainCaller) == "" {
 		log.Printf("[app] WARN: mainCaller ficou vazio após resolução (cliente=%q)\n", p.Cliente)
 	}
 	if strings.TrimSpace(operGrp) == "" {
+		log.Printf("[app] WARN: oper_group ficou vazio após resolução (cliente=%q)\n", p.Cliente)
+	}
+	if strings.TrimSpace(operator) == "" {
 		log.Printf("[app] WARN: oper_group ficou vazio após resolução (cliente=%q)\n", p.Cliente)
 	}
 	if strings.TrimSpace(contract) == "" {
@@ -79,7 +78,7 @@ func Run(cfg config.RuntimeConfig) error {
 	switch {
 	case !exists && eventKind == "ProblemStart":
 		msgHTML := topdesk.CreateHTML(p, contract)
-		payload := buildCreatePayload(cfg.TicketName, msgHTML, p, pol, contract, operGrp, mainCaller, secCaller)
+		payload := buildCreatePayload(cfg.TicketName, msgHTML, p, pol, contract, operator, operGrp, mainCaller, secCaller)
 
 		created, err := td.CreateTicket(payload)
 		if err != nil {
@@ -118,7 +117,7 @@ func Run(cfg config.RuntimeConfig) error {
 }
 
 func buildCreatePayload(ticketName, msgHTML string, p rawdata.Payload, pol config.Policy,
-	contract, operGrp, mainCaller, secCaller string,
+	contract, operator, operGrp, mainCaller, secCaller string,
 ) map[string]any {
 	brief := ticketName
 	if len(brief) > 79 {
@@ -136,7 +135,7 @@ func buildCreatePayload(ticketName, msgHTML string, p rawdata.Payload, pol confi
 		"impact":           map[string]any{"name": pol.Impact},
 		"urgency":          map[string]any{"name": pol.Urgency},
 		"operatorGroup":    map[string]any{"id": operGrp},
-		"operator":         map[string]any{"id": "71853e6f-c50a-4600-82cd-24752449d803"},
+		"operator":         map[string]any{"id": operator},
 		"processingStatus": map[string]any{"name": "Registrado"},
 		"optionalFields2":  map[string]any{"memo2": secCaller},
 	}

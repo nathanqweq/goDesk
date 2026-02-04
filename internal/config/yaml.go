@@ -9,6 +9,7 @@ import (
 
 type TagsDefaults struct {
 	Contract        string `yaml:"contract"`
+	Operator        string `yaml:"operator"`
 	OperGroup       string `yaml:"oper_group"`
 	MainCaller      string `yaml:"main_caller"`
 	SecundaryCaller string `yaml:"secundary_caller"`
@@ -87,6 +88,9 @@ func mergePolicy(def Policy, over Policy) Policy {
 	// tags: só sobrescreve se cliente tiver valor
 	if strings.TrimSpace(over.Tags.Contract) != "" {
 		def.Tags.Contract = over.Tags.Contract
+	}
+	if strings.TrimSpace(over.Tags.Operator) != "" {
+		def.Tags.Operator = over.Tags.Operator
 	}
 	if strings.TrimSpace(over.Tags.OperGroup) != "" {
 		def.Tags.OperGroup = over.Tags.OperGroup

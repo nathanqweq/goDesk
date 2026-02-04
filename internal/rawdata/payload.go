@@ -12,6 +12,7 @@ type Payload struct {
 	EventID         string `json:"event_id"`
 	Contract        string `json:"contract"`
 	OperGroup       string `json:"oper_group"`
+	Operator        string `json:"operator"`
 	MainCaller      string `json:"main_caller"`
 	SecundaryCaller string `json:"secundary_caller"`
 	Cliente         string `json:"cliente"`
