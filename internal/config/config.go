@@ -1,0 +1,56 @@
+package config
+
+import (
+	"errors"
+	"os"
+	"strings"
+)
+
+type RuntimeConfig struct {
+	Domain     string
+	User       string
+	Pass       string
+	TicketName string
+	RawData    string
+	ZabbixURL  string
+	ZabbixKey  string
+
+	LogFile    string
+	ConfigFile string
+	TimeoutSec int
+}
+
+func FromArgs(argv []string) (RuntimeConfig, error) {
+	// DOMAIN USER PASS TICKET_NAME RAWDATA ZABBIX_URL ZABBIX_KEY
+	if len(argv) < 8 {
+		return RuntimeConfig{}, errors.New("parâmetros insuficientes: esperado 7 args (DOMAIN USER PASS TICKET_NAME RAWDATA ZABBIX_URL ZABBIX_KEY)")
+	}
+
+	cfg := RuntimeConfig{
+		Domain:     argv[1],
+		User:       argv[2],
+		Pass:       argv[3],
+		TicketName: argv[4],
+		RawData:    argv[5],
+		ZabbixURL:  argv[6],
+		ZabbixKey:  argv[7],
+
+		LogFile:    getenv("TOPDESK_LOG_FILE", "/tmp/topdesk_integration_go.log"),
+		ConfigFile: getenv("TOPDESK_CONFIG", "/etc/zabbix/topdesk.yaml"),
+		TimeoutSec: atoiDefault(getenv("TOPDESK_TIMEOUT_SEC", "15"), 15),
+	}
+
+	// sane
+	cfg.Domain = strings.TrimRight(cfg.Domain, "/")
+	cfg.ZabbixURL = strings.TrimRight(cfg.ZabbixURL, "/")
+
+	return cfg, nil
+}
+
+func getenv(k, def string) string {
+	v := strings.TrimSpace(os.Getenv(k))
+	if v == "" {
+		return def
+	}
+	return v
+}

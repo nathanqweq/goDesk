@@ -1,0 +1,19 @@
+default:
+  urgency: "Baixa"
+  impact: "Sem impacto"
+  autoclose: false
+  tags:
+    contract: "DEFAULT_CONTRACT"
+    oper_group: "DEFAULT_OPER_GROUP_ID"
+    main_caller: "monitoramento@teltec.com.br"
+    secundary_caller: ""
+
+clients:
+  Cresol:
+    autoclose: true
+    urgency: "Alta"
+    tags:
+      contract: "Cresol"
+      oper_group: "ID_OPER_GROUP_CRESOL"
+      main_caller: "noc@cresol.com.br"
+      secundary_caller: ""
