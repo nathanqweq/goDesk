@@ -6,16 +6,18 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
 func (c Client) TicketExists(ticketName string) (exists bool, ticketID string, status string, err error) {
-	q := fmt.Sprintf(`%s/tas/api/incidents?query=processingStatus.name!=Fechado;briefDescription=="%s"`,
-		strings.TrimRight(c.BaseURL, "/"),
-		escapeQuery(ticketName),
-	)
+	base := strings.TrimRight(c.BaseURL, "/")
+	q := fmt.Sprintf(`processingStatus.name!=Fechado;briefDescription=="%s"`, ticketName)
 
-	req, _ := http.NewRequest("GET", q, nil)
+	// URL encode do query inteiro
+	url := base + "/tas/api/incidents?query=" + url.QueryEscape(q)
+
+	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", c.authHeader())
 
