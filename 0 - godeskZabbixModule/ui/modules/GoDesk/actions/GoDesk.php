@@ -11,7 +11,7 @@ class GoDesk extends CController {
 	}
 
 	protected function doAction(): void {
-		$config_path = '/etc/zabbix/godesk.yaml';
+		$config_path = '/etc/zabbix/godesk-config.yaml';
 
 		$data = [
 			'config_path' => $config_path,
