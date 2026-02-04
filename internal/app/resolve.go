@@ -3,7 +3,7 @@ package app
 import "strings"
 
 // Regra: Zabbix > Cliente(YAML) > Default(YAML)
-// "UNKNOWN" (case-insensitive) conta como vazio
+// Considera vazio: "", "UNKNOWN", "*UNKNOWN*", "<UNKNOWN>", "(UNKNOWN)" etc (case-insensitive)
 func pickTag(zbxVal, clientVal, defVal string) string {
 	if v := normTag(zbxVal); v != "" {
 		return v
@@ -22,18 +22,26 @@ func normTag(s string) string {
 	if s == "" {
 		return ""
 	}
-	if strings.EqualFold(s, "UNKNOWN") {
-		return ""
-	}
 
-	// remove aspas literais
-	s = strings.Trim(s, `"'`)
+	// remove wrappers comuns que o Zabbix pode colocar
+	// ex: "*UNKNOWN*", "<UNKNOWN>", "\"UNKNOWN\""
+	s = strings.TrimSpace(strings.Trim(s, `"'*<>[](){} `))
 
-	// remove \r \n \t e espaços extras
+	// remove quebras
 	s = strings.ReplaceAll(s, "\r", "")
 	s = strings.ReplaceAll(s, "\n", "")
 	s = strings.ReplaceAll(s, "\t", "")
 	s = strings.TrimSpace(s)
+
+	// se ainda ficou vazio
+	if s == "" {
+		return ""
+	}
+
+	// unknown em qualquer variação
+	if strings.EqualFold(s, "UNKNOWN") {
+		return ""
+	}
 
 	return s
 }
