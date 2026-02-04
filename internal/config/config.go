@@ -35,8 +35,8 @@ func FromArgs(argv []string) (RuntimeConfig, error) {
 		ZabbixURL:  argv[6],
 		ZabbixKey:  argv[7],
 
-		LogFile:    getenv("TOPDESK_LOG_FILE", "/tmp/topdesk_integration_go.log"),
-		ConfigFile: getenv("TOPDESK_CONFIG", "/etc/zabbix/topdesk.yaml"),
+		LogFile:    getenv("TOPDESK_LOG_FILE", "/tmp/goDesk-integration.log"),
+		ConfigFile: getenv("TOPDESK_CONFIG", "/etc/zabbix/godesk-config.yaml"),
 		TimeoutSec: atoiDefault(getenv("TOPDESK_TIMEOUT_SEC", "15"), 15),
 	}
 
