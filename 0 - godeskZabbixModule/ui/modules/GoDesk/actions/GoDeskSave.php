@@ -12,7 +12,7 @@ class GoDeskSave extends CController {
 
 	protected function doAction(): void {
 		$yaml = $this->getInput('yaml', '');
-		$path = '/etc/zabbix/godesk.yaml';
+		$path = '/etc/zabbix/godesk-config.yaml';
 
 		if (trim($yaml) === '') {
 			$this->redirectError('Configuração vazia.');
