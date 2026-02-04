@@ -25,5 +25,15 @@ func normTag(s string) string {
 	if strings.EqualFold(s, "UNKNOWN") {
 		return ""
 	}
+
+	// remove aspas literais
+	s = strings.Trim(s, `"'`)
+
+	// remove \r \n \t e espaços extras
+	s = strings.ReplaceAll(s, "\r", "")
+	s = strings.ReplaceAll(s, "\n", "")
+	s = strings.ReplaceAll(s, "\t", "")
+	s = strings.TrimSpace(s)
+
 	return s
 }

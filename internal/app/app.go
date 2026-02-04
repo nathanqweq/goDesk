@@ -28,9 +28,16 @@ func Run(cfg config.RuntimeConfig) error {
 
 	// Resolve TAGs (Zabbix > Cliente(YAML) > Default(YAML))
 	contract := pickTag(p.Contract, pol.Tags.Contract, pf.Default.Tags.Contract)
+	log.Printf("[debug] contract resolved=%q len=%d bytes=%v\n", contract, len(contract), []byte(contract))
+
 	operGrp := pickTag(p.OperGroup, pol.Tags.OperGroup, pf.Default.Tags.OperGroup)
+	log.Printf("[debug] operGrp resolved=%q len=%d bytes=%v\n", operGrp, len(operGrp), []byte(operGrp))
+
 	mainCaller := pickTag(p.MainCaller, pol.Tags.MainCaller, pf.Default.Tags.MainCaller)
+	log.Printf("[debug] mainCaller resolved=%q len=%d bytes=%v\n", mainCaller, len(mainCaller), []byte(mainCaller))
+
 	secCaller := pickTag(p.SecundaryCaller, pol.Tags.SecundaryCaller, pf.Default.Tags.SecundaryCaller)
+	log.Printf("[debug] secCaller resolved=%q len=%d bytes=%v\n", secCaller, len(secCaller), []byte(secCaller))
 
 	// sanity checks (pra não criar ticket quebrado)
 	if strings.TrimSpace(mainCaller) == "" {
