@@ -19,7 +19,8 @@ class GoDeskSave extends CController {
 	}
 
 	protected function checkPermissions(): bool {
-		return $this->getUserType() >= USER_TYPE_ZABBIX_ADMIN;
+		$permit_user_types = [USER_TYPE_ZABBIX_ADMIN, USER_TYPE_SUPER_ADMIN];
+		return in_array($this->getUserType(), $permit_user_types);
 	}
 
 	protected function doAction(): void {
