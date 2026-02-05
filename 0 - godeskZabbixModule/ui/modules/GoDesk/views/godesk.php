@@ -1,15 +1,16 @@
 <?php
+
 $page = (new CHtmlPage())
-	->setTitle(_('GoDesk - Regras de Negócio'));
+	->setTitle(_('GoDesk - Config'));
 
-if ($data['error'] !== '') {
-	$page->addItem((new CMessageHelper())->setError($data['error']));
+if (!empty($data['error'])) {
+	$page->addItem(makeMessageBox(ZBX_STYLE_MSG_BAD, $data['error'], null, true));
 }
-elseif ($data['saved']) {
-	$page->addItem((new CMessageHelper())->setSuccess(_('Configuração salva com sucesso.')));
+elseif (!empty($data['saved'])) {
+	$page->addItem(makeMessageBox(ZBX_STYLE_MSG_GOOD, _('Configuração salva com sucesso.'), null, true));
 }
 
-$form = (new CForm('post', 'zabbix.php?action=godesk.rules.save'))
+$form = (new CForm('post', 'zabbix.php'))
 	->addVar('action', 'godesk.rules.save');
 
 $form->addItem(new CLabel(_('Arquivo: ').$data['config_path']));
@@ -17,7 +18,7 @@ $form->addItem(new CLabel(_('Arquivo: ').$data['config_path']));
 $form->addItem(
 	(new CTextArea('yaml', $data['yaml']))
 		->setWidth(ZBX_TEXTAREA_BIG_WIDTH)
-		->setRows(30)
+		->setRows(28)
 );
 
 $form->addItem(new CSubmit('save', _('Salvar')));
