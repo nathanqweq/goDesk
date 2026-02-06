@@ -11,23 +11,121 @@ $clients = $data['clients'] ?? [];
 function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 
 echo '<style>
-.gd-wrap{max-width:1200px}
-.gd-row{display:flex;gap:12px;flex-wrap:wrap}
-.gd-card{background:#fff;border:1px solid #dcdcdc;border-radius:8px;padding:14px;margin:12px 0;box-shadow:0 1px 3px rgba(0,0,0,.08)}
-.gd-card h2{margin:0 0 10px 0;font-size:18px}
-.gd-field{display:flex;flex-direction:column;gap:6px;min-width:260px;flex:1}
-.gd-field label{font-size:12px;color:#666}
-.gd-field input[type=text]{padding:8px;border:1px solid #ccc;border-radius:6px}
-.gd-banner{padding:10px 12px;border-radius:8px;margin:10px 0}
-.gd-ok{background:#e9f7ef;border:1px solid #b7e2c7}
-.gd-err{background:#fdecea;border:1px solid #f5c2c7}
-.gd-actions{display:flex;gap:10px;align-items:center;margin:12px 0}
-.gd-btn{padding:8px 12px;border:1px solid #888;border-radius:8px;background:#f6f6f6;cursor:pointer}
-.gd-btn:hover{background:#eee}
-.gd-client{border:1px dashed #c9c9c9}
-.gd-client-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
-.gd-small{font-size:12px;color:#666}
+
+.gd-wrap{
+	max-width:1200px;
+	margin:0 auto;
+}
+
+.gd-row{
+	display:flex;
+	gap:12px;
+	flex-wrap:wrap;
+	align-items:flex-end;
+}
+
+.gd-card{
+	background:#ffffff;
+	border:1px solid #dcdcdc;
+	border-radius:10px;
+	padding:18px;
+	margin:18px 0;
+	box-shadow:0 2px 6px rgba(0,0,0,.08);
+}
+
+.gd-card h2{
+	margin:0 0 15px 0;
+	font-size:20px;
+}
+
+.gd-field{
+	display:flex;
+	flex-direction:column;
+	gap:6px;
+	min-width:220px;
+	flex:1;
+}
+
+.gd-field label{
+	font-size:12px;
+	color:#666;
+}
+
+.gd-field input[type=text]{
+	padding:9px;
+	border:1px solid #cfcfcf;
+	border-radius:6px;
+	background:#fff;
+	color:#000;
+}
+
+.gd-banner{
+	padding:12px;
+	border-radius:8px;
+	margin:15px 0;
+	font-weight:600;
+}
+
+.gd-ok{
+	background:#e9f7ef;
+	border:1px solid #b7e2c7;
+	color:#1e7e34;
+}
+
+.gd-err{
+	background:#fdecea;
+	border:1px solid #f5c2c7;
+	color:#a30000;
+}
+
+.gd-actions{
+	display:flex;
+	gap:12px;
+	align-items:center;
+	justify-content:center;
+	margin-top:20px;
+}
+
+.gd-btn{
+	background:#f0f3f7 !important;
+	color:#222 !important;
+	border:1px solid #c2c8d0;
+	padding:10px 16px;
+	border-radius:8px;
+	font-weight:600;
+	font-size:14px;
+	cursor:pointer;
+	display:inline-flex;
+	align-items:center;
+	justify-content:center;
+	gap:6px;
+	min-width:120px;
+	transition:0.15s;
+}
+
+.gd-btn:hover{
+	background:#e4e9f0 !important;
+}
+
+.gd-client{
+	border:1px dashed #c9c9c9;
+	background:#fafafa;
+}
+
+.gd-client-head{
+	display:flex;
+	justify-content:space-between;
+	align-items:center;
+	margin-bottom:10px;
+}
+
+.gd-small{
+	font-size:12px;
+	color:#666;
+}
+
 </style>';
+
 
 echo '<div class="gd-wrap">';
 echo '<h1>⚙️ goDesk — Editor de Config</h1>';
