@@ -6,7 +6,7 @@
 function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 
 $def = $data['default'] ?? [];
-$def_tags = $def['tags'] ?? [];
+$def_td = $def['topdesk'] ?? [];
 $clients = $data['clients'] ?? [];
 
 echo '<div class="godesk-module">';
@@ -51,16 +51,27 @@ echo '<div class="gd-field gd-field-tight">
 echo '</div>';
 
 echo '<div class="gd-divider"></div>';
-echo '<div class="gd-small-title">🏷️ Tags</div>';
+echo '<div class="gd-small-title">🎫 TopDesk</div>';
 
 echo '<div class="gd-row">';
-echo '<div class="gd-field"><label>contract</label><input type="text" name="default[tags][contract]" value="'.h($def_tags['contract'] ?? '').'"></div>';
-echo '<div class="gd-field"><label>oper_group</label><input type="text" name="default[tags][oper_group]" value="'.h($def_tags['oper_group'] ?? '').'"></div>';
-echo '<div class="gd-field"><label>main_caller</label><input type="text" name="default[tags][main_caller]" value="'.h($def_tags['main_caller'] ?? '').'"></div>';
-echo '<div class="gd-field"><label>secundary_caller</label><input type="text" name="default[tags][secundary_caller]" value="'.h($def_tags['secundary_caller'] ?? '').'"></div>';
+echo '<div class="gd-field"><label>contract</label><input type="text" name="default[topdesk][contract]" value="'.h($def_td['contract'] ?? '').'"></div>';
+echo '<div class="gd-field"><label>operator</label><input type="text" name="default[topdesk][operator]" value="'.h($def_td['operator'] ?? '').'"></div>';
+echo '<div class="gd-field"><label>oper_group</label><input type="text" name="default[topdesk][oper_group]" value="'.h($def_td['oper_group'] ?? '').'"></div>';
 echo '</div>';
 
+echo '<div class="gd-row">';
+echo '<div class="gd-field"><label>main_caller</label><input type="text" name="default[topdesk][main_caller]" value="'.h($def_td['main_caller'] ?? '').'"></div>';
+echo '<div class="gd-field"><label>secundary_caller</label><input type="text" name="default[topdesk][secundary_caller]" value="'.h($def_td['secundary_caller'] ?? '').'"></div>';
+echo '<div class="gd-field"><label>sla</label><input type="text" name="default[topdesk][sla]" value="'.h($def_td['sla'] ?? '').'"></div>';
 echo '</div>';
+
+echo '<div class="gd-row">';
+echo '<div class="gd-field"><label>category</label><input type="text" name="default[topdesk][category]" value="'.h($def_td['category'] ?? '').'"></div>';
+echo '<div class="gd-field"><label>sub_category</label><input type="text" name="default[topdesk][sub_category]" value="'.h($def_td['sub_category'] ?? '').'"></div>';
+echo '<div class="gd-field"><label>call_type</label><input type="text" name="default[topdesk][call_type]" value="'.h($def_td['call_type'] ?? '').'"></div>';
+echo '</div>';
+
+echo '</div>'; // default card
 
 //
 // CLIENTS
@@ -76,7 +87,7 @@ echo '<div id="gd-clients">';
 $idx = 0;
 foreach ($clients as $c) {
 	$name = $c['name'] ?? '';
-	$tags = $c['tags'] ?? [];
+	$td = $c['topdesk'] ?? [];
 	$autoclose = !empty($c['autoclose']) ? 'checked' : '';
 
 	echo '<div class="gd-client-card gd-client" data-idx="'.$idx.'">';
@@ -97,16 +108,27 @@ foreach ($clients as $c) {
 	echo '</div>';
 
 	echo '<div class="gd-divider"></div>';
-	echo '<div class="gd-small-title">🏷️ Tags</div>';
+	echo '<div class="gd-small-title">🎫 TopDesk</div>';
 
 	echo '<div class="gd-row">';
-	echo '<div class="gd-field"><label>contract</label><input type="text" name="clients['.$idx.'][tags][contract]" value="'.h($tags['contract'] ?? '').'"></div>';
-	echo '<div class="gd-field"><label>oper_group</label><input type="text" name="clients['.$idx.'][tags][oper_group]" value="'.h($tags['oper_group'] ?? '').'"></div>';
-	echo '<div class="gd-field"><label>main_caller</label><input type="text" name="clients['.$idx.'][tags][main_caller]" value="'.h($tags['main_caller'] ?? '').'"></div>';
-	echo '<div class="gd-field"><label>secundary_caller</label><input type="text" name="clients['.$idx.'][tags][secundary_caller]" value="'.h($tags['secundary_caller'] ?? '').'"></div>';
+	echo '<div class="gd-field"><label>contract</label><input type="text" name="clients['.$idx.'][topdesk][contract]" value="'.h($td['contract'] ?? '').'"></div>';
+	echo '<div class="gd-field"><label>operator</label><input type="text" name="clients['.$idx.'][topdesk][operator]" value="'.h($td['operator'] ?? '').'"></div>';
+	echo '<div class="gd-field"><label>oper_group</label><input type="text" name="clients['.$idx.'][topdesk][oper_group]" value="'.h($td['oper_group'] ?? '').'"></div>';
 	echo '</div>';
 
+	echo '<div class="gd-row">';
+	echo '<div class="gd-field"><label>main_caller</label><input type="text" name="clients['.$idx.'][topdesk][main_caller]" value="'.h($td['main_caller'] ?? '').'"></div>';
+	echo '<div class="gd-field"><label>secundary_caller</label><input type="text" name="clients['.$idx.'][topdesk][secundary_caller]" value="'.h($td['secundary_caller'] ?? '').'"></div>';
+	echo '<div class="gd-field"><label>sla</label><input type="text" name="clients['.$idx.'][topdesk][sla]" value="'.h($td['sla'] ?? '').'"></div>';
 	echo '</div>';
+
+	echo '<div class="gd-row">';
+	echo '<div class="gd-field"><label>category</label><input type="text" name="clients['.$idx.'][topdesk][category]" value="'.h($td['category'] ?? '').'"></div>';
+	echo '<div class="gd-field"><label>sub_category</label><input type="text" name="clients['.$idx.'][topdesk][sub_category]" value="'.h($td['sub_category'] ?? '').'"></div>';
+	echo '<div class="gd-field"><label>call_type</label><input type="text" name="clients['.$idx.'][topdesk][call_type]" value="'.h($td['call_type'] ?? '').'"></div>';
+	echo '</div>';
+
+	echo '</div>'; // client card
 
 	$idx++;
 }
@@ -123,8 +145,7 @@ echo '</div>'; // card clients
 
 echo '</form>';
 
-echo '</div>'; // wrap
-echo '</div>'; // module
+echo '</div></div>'; // wrap + module
 
 echo '<script>
 let gdClientIdx = '.(int)$idx.';
@@ -156,13 +177,24 @@ function gdAddClient(){
 		</div>
 
 		<div class="gd-divider"></div>
-		<div class="gd-small-title">🏷️ Tags</div>
+		<div class="gd-small-title">🎫 TopDesk</div>
 
 		<div class="gd-row">
-			<div class="gd-field"><label>contract</label><input type="text" name="clients[${i}][tags][contract]" value=""></div>
-			<div class="gd-field"><label>oper_group</label><input type="text" name="clients[${i}][tags][oper_group]" value=""></div>
-			<div class="gd-field"><label>main_caller</label><input type="text" name="clients[${i}][tags][main_caller]" value=""></div>
-			<div class="gd-field"><label>secundary_caller</label><input type="text" name="clients[${i}][tags][secundary_caller]" value=""></div>
+			<div class="gd-field"><label>contract</label><input type="text" name="clients[${i}][topdesk][contract]" value=""></div>
+			<div class="gd-field"><label>operator</label><input type="text" name="clients[${i}][topdesk][operator]" value=""></div>
+			<div class="gd-field"><label>oper_group</label><input type="text" name="clients[${i}][topdesk][oper_group]" value=""></div>
+		</div>
+
+		<div class="gd-row">
+			<div class="gd-field"><label>main_caller</label><input type="text" name="clients[${i}][topdesk][main_caller]" value=""></div>
+			<div class="gd-field"><label>secundary_caller</label><input type="text" name="clients[${i}][topdesk][secundary_caller]" value=""></div>
+			<div class="gd-field"><label>sla</label><input type="text" name="clients[${i}][topdesk][sla]" value=""></div>
+		</div>
+
+		<div class="gd-row">
+			<div class="gd-field"><label>category</label><input type="text" name="clients[${i}][topdesk][category]" value=""></div>
+			<div class="gd-field"><label>sub_category</label><input type="text" name="clients[${i}][topdesk][sub_category]" value=""></div>
+			<div class="gd-field"><label>call_type</label><input type="text" name="clients[${i}][topdesk][call_type]" value=""></div>
 		</div>
 	</div>`;
 	host.insertAdjacentHTML("beforeend", html);

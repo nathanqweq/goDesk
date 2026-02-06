@@ -59,6 +59,15 @@ class ConfigEdit extends CController {
 		$parsed['default'] ??= [];
 		$parsed['clients'] ??= [];
 
+		// Garantir estrutura nova (topdesk)
+		$parsed['default']['topdesk'] ??= [];
+		foreach ($parsed['clients'] as $k => $v) {
+			if (!is_array($v)) {
+				$parsed['clients'][$k] = [];
+			}
+			$parsed['clients'][$k]['topdesk'] ??= [];
+		}
+
 		return $parsed;
 	}
 
@@ -67,40 +76,54 @@ class ConfigEdit extends CController {
 	}
 
 	/**
-	 * Constrói a config final a partir do POST do form.
+	 * Normaliza o payload do formulário para o schema final do YAML.
 	 */
 	private function normalizeConfigFromPost(array $post_default, array $post_clients): array {
+		$def_td = (array)($post_default['topdesk'] ?? []);
+
 		$config = [
 			'default' => [
 				'urgency' => (string)($post_default['urgency'] ?? ''),
 				'impact' => (string)($post_default['impact'] ?? ''),
 				'autoclose' => $this->toBool($post_default['autoclose'] ?? false),
-				'tags' => [
-					'contract' => (string)($post_default['tags']['contract'] ?? ''),
-					'oper_group' => (string)($post_default['tags']['oper_group'] ?? ''),
-					'main_caller' => (string)($post_default['tags']['main_caller'] ?? ''),
-					'secundary_caller' => (string)($post_default['tags']['secundary_caller'] ?? '')
+				'topdesk' => [
+					'contract' => (string)($def_td['contract'] ?? ''),
+					'operator' => (string)($def_td['operator'] ?? ''),
+					'oper_group' => (string)($def_td['oper_group'] ?? ''),
+					'main_caller' => (string)($def_td['main_caller'] ?? ''),
+					'secundary_caller' => (string)($def_td['secundary_caller'] ?? ''),
+					'sla' => (string)($def_td['sla'] ?? ''),
+					'category' => (string)($def_td['category'] ?? ''),
+					'sub_category' => (string)($def_td['sub_category'] ?? ''),
+					'call_type' => (string)($def_td['call_type'] ?? '')
 				]
 			],
 			'clients' => []
 		];
 
-		// clients é uma lista: clients[0][name], clients[0][tags]...
+		// clients é uma lista: clients[0][name], clients[0][topdesk][...]
 		foreach ($post_clients as $row) {
 			$name = trim((string)($row['name'] ?? ''));
 			if ($name === '') {
 				continue;
 			}
 
+			$td = (array)($row['topdesk'] ?? []);
+
 			$config['clients'][$name] = [
 				'autoclose' => $this->toBool($row['autoclose'] ?? false),
 				'urgency' => (string)($row['urgency'] ?? ''),
 				'impact' => (string)($row['impact'] ?? ''),
-				'tags' => [
-					'contract' => (string)($row['tags']['contract'] ?? ''),
-					'oper_group' => (string)($row['tags']['oper_group'] ?? ''),
-					'main_caller' => (string)($row['tags']['main_caller'] ?? ''),
-					'secundary_caller' => (string)($row['tags']['secundary_caller'] ?? '')
+				'topdesk' => [
+					'contract' => (string)($td['contract'] ?? ''),
+					'operator' => (string)($td['operator'] ?? ''),
+					'oper_group' => (string)($td['oper_group'] ?? ''),
+					'main_caller' => (string)($td['main_caller'] ?? ''),
+					'secundary_caller' => (string)($td['secundary_caller'] ?? ''),
+					'sla' => (string)($td['sla'] ?? ''),
+					'category' => (string)($td['category'] ?? ''),
+					'sub_category' => (string)($td['sub_category'] ?? ''),
+					'call_type' => (string)($td['call_type'] ?? '')
 				]
 			];
 		}
@@ -112,20 +135,27 @@ class ConfigEdit extends CController {
 		if (!isset($cfg['default']) || !isset($cfg['clients'])) {
 			return ['ok' => false, 'error' => 'Config inválida: faltam as chaves default/clients.'];
 		}
-		if (!isset($cfg['default']['tags']) || !is_array($cfg['default']['tags'])) {
-			return ['ok' => false, 'error' => 'Config inválida: default.tags ausente.'];
+
+		if (!isset($cfg['default']['topdesk']) || !is_array($cfg['default']['topdesk'])) {
+			return ['ok' => false, 'error' => 'Config inválida: default.topdesk ausente.'];
 		}
+
+		// Checagem leve (deixa campos opcionais, mas garante chaves esperadas)
+		foreach (['contract','operator','oper_group','main_caller','secundary_caller','sla','category','sub_category','call_type'] as $k) {
+			if (!array_key_exists($k, $cfg['default']['topdesk'])) {
+				return ['ok' => false, 'error' => 'Config inválida: default.topdesk.'.$k.' ausente.'];
+			}
+		}
+
 		return ['ok' => true, 'error' => null];
 	}
 
 	/**
 	 * Salva o YAML com backup + escrita atômica no mesmo diretório do arquivo.
-	 * (No teu caso já está funcionando porque /etc/zabbix/godesk é gravável pelo pool nginx.)
 	 */
 	private function saveYamlAtomic(string $yaml_text): array {
 		$dir = dirname($this->config_path);
 
-		// Se arquivo existe, precisa ser gravável; se não existe, diretório precisa ser gravável.
 		if (file_exists($this->config_path)) {
 			if (!is_writable($this->config_path)) {
 				return ['ok' => false, 'error' => 'Sem permissão de escrita: '.$this->config_path];
@@ -140,12 +170,10 @@ class ConfigEdit extends CController {
 		$tmp = $dir.'/'.basename($this->config_path).'.tmp';
 		$bak = $dir.'/'.basename($this->config_path).'.bak.'.date('Ymd-His');
 
-		// Backup antes de sobrescrever
 		if (file_exists($this->config_path) && !@copy($this->config_path, $bak)) {
 			return ['ok' => false, 'error' => 'Falha ao criar backup em: '.$bak];
 		}
 
-		// Escrita segura
 		$bytes = @file_put_contents($tmp, $yaml_text, LOCK_EX);
 		if ($bytes === false) {
 			return ['ok' => false, 'error' => 'Falha ao escrever tmp: '.$tmp];
@@ -153,7 +181,6 @@ class ConfigEdit extends CController {
 
 		@chmod($tmp, 0640);
 
-		// Troca atômica
 		if (!@rename($tmp, $this->config_path)) {
 			@unlink($tmp);
 			return ['ok' => false, 'error' => 'Falha ao aplicar arquivo (rename).'];
@@ -205,7 +232,7 @@ class ConfigEdit extends CController {
 			}
 		}
 
-		// Converte clients dict -> lista para renderizar no form
+		// clients dict -> lista pro form
 		$clients_list = [];
 		if (isset($cfg['clients']) && is_array($cfg['clients'])) {
 			foreach ($cfg['clients'] as $name => $c) {
@@ -214,7 +241,7 @@ class ConfigEdit extends CController {
 					'autoclose' => (bool)($c['autoclose'] ?? false),
 					'urgency' => (string)($c['urgency'] ?? ''),
 					'impact' => (string)($c['impact'] ?? ''),
-					'tags' => (array)($c['tags'] ?? [])
+					'topdesk' => (array)($c['topdesk'] ?? [])
 				];
 			}
 		}

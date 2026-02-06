@@ -7,20 +7,24 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type TagsDefaults struct {
+type TopDeskDefaults struct {
 	Contract        string `yaml:"contract"`
 	Operator        string `yaml:"operator"`
 	OperGroup       string `yaml:"oper_group"`
 	MainCaller      string `yaml:"main_caller"`
 	SecundaryCaller string `yaml:"secundary_caller"`
+	Sla             string `yaml:"sla"`
+	Category        string `yaml:"category"`
+	SubCategory     string `yaml:"sub_category"`
+	CallType        string `yaml:"call_type"`
 	// Cc string `yaml:"cc"` // se quiser usar depois
 }
 
 type Policy struct {
-	Urgency   string       `yaml:"urgency"`
-	Impact    string       `yaml:"impact"`
-	AutoClose bool         `yaml:"autoclose"`
-	Tags      TagsDefaults `yaml:"tags"`
+	Urgency   string          `yaml:"urgency"`
+	Impact    string          `yaml:"impact"`
+	AutoClose bool            `yaml:"autoclose"`
+	TopDesk   TopDeskDefaults `yaml:"topdesk"`
 }
 
 type PoliciesFile struct {
@@ -82,24 +86,37 @@ func mergePolicy(def Policy, over Policy) Policy {
 	if strings.TrimSpace(over.Impact) != "" {
 		def.Impact = over.Impact
 	}
+
 	// autoclose do cliente manda (se existir bloco do cliente)
 	def.AutoClose = over.AutoClose
 
-	// tags: só sobrescreve se cliente tiver valor
-	if strings.TrimSpace(over.Tags.Contract) != "" {
-		def.Tags.Contract = over.Tags.Contract
+	// topdesk: só sobrescreve se cliente tiver valor
+	if strings.TrimSpace(over.TopDesk.Contract) != "" {
+		def.TopDesk.Contract = over.TopDesk.Contract
 	}
-	if strings.TrimSpace(over.Tags.Operator) != "" {
-		def.Tags.Operator = over.Tags.Operator
+	if strings.TrimSpace(over.TopDesk.Operator) != "" {
+		def.TopDesk.Operator = over.TopDesk.Operator
 	}
-	if strings.TrimSpace(over.Tags.OperGroup) != "" {
-		def.Tags.OperGroup = over.Tags.OperGroup
+	if strings.TrimSpace(over.TopDesk.OperGroup) != "" {
+		def.TopDesk.OperGroup = over.TopDesk.OperGroup
 	}
-	if strings.TrimSpace(over.Tags.MainCaller) != "" {
-		def.Tags.MainCaller = over.Tags.MainCaller
+	if strings.TrimSpace(over.TopDesk.MainCaller) != "" {
+		def.TopDesk.MainCaller = over.TopDesk.MainCaller
 	}
-	if strings.TrimSpace(over.Tags.SecundaryCaller) != "" {
-		def.Tags.SecundaryCaller = over.Tags.SecundaryCaller
+	if strings.TrimSpace(over.TopDesk.SecundaryCaller) != "" {
+		def.TopDesk.SecundaryCaller = over.TopDesk.SecundaryCaller
+	}
+	if strings.TrimSpace(over.TopDesk.Sla) != "" {
+		def.TopDesk.Sla = over.TopDesk.Sla
+	}
+	if strings.TrimSpace(over.TopDesk.Category) != "" {
+		def.TopDesk.Category = over.TopDesk.Category
+	}
+	if strings.TrimSpace(over.TopDesk.SubCategory) != "" {
+		def.TopDesk.SubCategory = over.TopDesk.SubCategory
+	}
+	if strings.TrimSpace(over.TopDesk.CallType) != "" {
+		def.TopDesk.CallType = over.TopDesk.CallType
 	}
 
 	return def

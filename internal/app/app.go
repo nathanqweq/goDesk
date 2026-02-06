@@ -26,14 +26,19 @@ func Run(cfg config.RuntimeConfig) error {
 	// Policy final (default + override do cliente)
 	pol := config.ResolvePolicy(pf, p.Cliente)
 
-	// Resolve TAGs (Zabbix > Cliente(YAML) > Default(YAML))
-	contract := pickTag(p.Contract, pol.Tags.Contract, pf.Default.Tags.Contract)
-	operator := pickTag(p.Operator, pol.Tags.Operator, pf.Default.Tags.Operator)
-	operGrp := pickTag(p.OperGroup, pol.Tags.OperGroup, pf.Default.Tags.OperGroup)
+	// Resolve campos TopDesk (Zabbix > Cliente(YAML) > Default(YAML))
+	contract := pickTag(p.Contract, pol.TopDesk.Contract, pf.Default.TopDesk.Contract)
 
-	mainCaller := pickTag(p.MainCaller, pol.Tags.MainCaller, pf.Default.Tags.MainCaller)
+	operator := pickTag(p.Operator, pol.TopDesk.Operator, pf.Default.TopDesk.Operator)
+	operGrp := pickTag(p.OperGroup, pol.TopDesk.OperGroup, pf.Default.TopDesk.OperGroup)
 
-	secCaller := pickTag(p.SecundaryCaller, pol.Tags.SecundaryCaller, pf.Default.Tags.SecundaryCaller)
+	mainCaller := pickTag(p.MainCaller, pol.TopDesk.MainCaller, pf.Default.TopDesk.MainCaller)
+	secCaller := pickTag(p.SecundaryCaller, pol.TopDesk.SecundaryCaller, pf.Default.TopDesk.SecundaryCaller)
+
+	slaID := pickTag(p.Sla, pol.TopDesk.Sla, pf.Default.TopDesk.Sla)
+	category := pickTag(p.Category, pol.TopDesk.Category, pf.Default.TopDesk.Category)
+	subCategory := pickTag(p.SubCategory, pol.TopDesk.SubCategory, pf.Default.TopDesk.SubCategory)
+	callType := pickTag(p.CallType, pol.TopDesk.CallType, pf.Default.TopDesk.CallType)
 
 	// sanity checks (pra não criar ticket quebrado)
 	if strings.TrimSpace(mainCaller) == "" {
@@ -43,7 +48,7 @@ func Run(cfg config.RuntimeConfig) error {
 		log.Printf("[app] WARN: oper_group ficou vazio após resolução (cliente=%q)\n", p.Cliente)
 	}
 	if strings.TrimSpace(operator) == "" {
-		log.Printf("[app] WARN: oper_group ficou vazio após resolução (cliente=%q)\n", p.Cliente)
+		log.Printf("[app] WARN: operator ficou vazio após resolução (cliente=%q)\n", p.Cliente)
 	}
 	if strings.TrimSpace(contract) == "" {
 		log.Printf("[app] WARN: contract ficou vazio após resolução (cliente=%q)\n", p.Cliente)
@@ -78,7 +83,22 @@ func Run(cfg config.RuntimeConfig) error {
 	switch {
 	case !exists && eventKind == "ProblemStart":
 		msgHTML := topdesk.CreateHTML(p, contract)
-		payload := buildCreatePayload(cfg.TicketName, msgHTML, p, pol, contract, operator, operGrp, mainCaller, secCaller)
+
+		payload := buildCreatePayload(
+			cfg.TicketName,
+			msgHTML,
+			p,
+			pol,
+			contract,
+			operator,
+			operGrp,
+			mainCaller,
+			secCaller,
+			slaID,
+			category,
+			subCategory,
+			callType,
+		)
 
 		created, err := td.CreateTicket(payload)
 		if err != nil {
@@ -116,29 +136,58 @@ func Run(cfg config.RuntimeConfig) error {
 	return nil
 }
 
-func buildCreatePayload(ticketName, msgHTML string, p rawdata.Payload, pol config.Policy,
+func buildCreatePayload(
+	ticketName, msgHTML string,
+	p rawdata.Payload,
+	pol config.Policy,
 	contract, operator, operGrp, mainCaller, secCaller string,
+	slaID, category, subCategory, callType string,
 ) map[string]any {
 	brief := ticketName
 	if len(brief) > 79 {
 		brief = brief[:79]
 	}
 
-	return map[string]any{
+	// defaults (mantém seu padrão atual)
+	entryTypeName := "Web"
+	callTypeName := "Resolução de incidente"
+	categoryName := "7 - Monitoramento"
+	subCategoryName := "Monitoramento " + contract
+	processingStatusName := "Registrado"
+
+	// overrides via YAML/Zabbix (se vierem)
+	if strings.TrimSpace(callType) != "" {
+		callTypeName = callType
+	}
+	if strings.TrimSpace(category) != "" {
+		categoryName = category
+	}
+	if strings.TrimSpace(subCategory) != "" {
+		subCategoryName = subCategory
+	}
+
+	payload := map[string]any{
 		"callerLookup":     map[string]any{"email": mainCaller},
 		"briefDescription": brief,
 		"request":          msgHTML,
-		"entryType":        map[string]any{"name": "Web"},
-		"callType":         map[string]any{"name": "Resolução de incidente"},
-		"category":         map[string]any{"name": "7 - Monitoramento"},
-		"subcategory":      map[string]any{"name": "Monitoramento " + contract},
+		"entryType":        map[string]any{"name": entryTypeName},
+		"callType":         map[string]any{"name": callTypeName},
+		"category":         map[string]any{"name": categoryName},
+		"subcategory":      map[string]any{"name": subCategoryName},
 		"impact":           map[string]any{"name": pol.Impact},
 		"urgency":          map[string]any{"name": pol.Urgency},
 		"operatorGroup":    map[string]any{"id": operGrp},
 		"operator":         map[string]any{"id": operator},
-		"processingStatus": map[string]any{"name": "Registrado"},
+		"processingStatus": map[string]any{"name": processingStatusName},
 		"optionalFields2":  map[string]any{"memo2": secCaller},
 	}
+
+	// SLA é objeto por ID (somente se tiver valor)
+	if strings.TrimSpace(slaID) != "" {
+		payload["sla"] = map[string]any{"id": slaID}
+	}
+
+	return payload
 }
 
 func buildUpdatePayload(action, currentStatus string) map[string]any {

@@ -1,0 +1,22 @@
+{
+ "status":"{TRIGGER.STATUS}",
+ "host":"{HOST.NAME}",
+ "trigger":"{EVENT.NAME}",
+ "value_item":"{ITEM.VALUE1}",
+ "severity":"{TRIGGER.SEVERITY}",
+ "date":"{EVENT.DATE}",
+ "hour":"{EVENT.TIME}",
+ "trigger_id":"{TRIGGER.ID}",
+ "event_id":"{EVENT.ID}",
+ "cliente":"{EVENT.TAGS.Cliente}",
+ "contract":"{EVENT.TAGS.Contrato}",
+ "oper_group":"{EVENT.TAGS.OperGrp}",
+ "operator":"{EVENT.TAGS.Operator}",
+ "main_caller":"{EVENT.TAGS.MainCaller}",
+ "secundary_caller":"{EVENT.TAGS.SecCaller}",
+ "sla":"{EVENT.TAGS.SLA}",
+ "category":"{EVENT.TAGS.Category}",
+ "sub_category":"{EVENT.TAGS.SubCategory}",
+ "call_type":"{EVENT.TAGS.CallType}",
+ "event_value":"{EVENT.VALUE}"
+}

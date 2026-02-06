@@ -1,0 +1,33 @@
+default:
+  urgency: "Baixa"
+  impact: "Sem impacto"
+  autoclose: false
+
+  topdesk:
+    contract: "aas"
+    operator: "CODIGO_OPERADOR"
+    oper_group: "OperGroup"
+    main_caller: "main caller"
+    secundary_caller: "secundary caller"
+    sla: "slaID"
+    category: ""
+    sub_category: ""
+    call_type: ""
+
+clients:
+
+  CRESOL:
+    urgency: "Baixa"
+    impact: "Sem impacto"
+    autoclose: false
+
+    topdesk:
+      contract: "aas"
+      operator: "CODIGO_OPERADOR"
+      oper_group: "OperGroup"
+      main_caller: "main caller"
+      secundary_caller: "secundary caller"
+      sla: "slaID"
+      category: ""
+      sub_category: ""
+      call_type: ""

@@ -7,7 +7,7 @@ function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 
 $config = $data['config'] ?? [];
 $def = $config['default'] ?? [];
-$def_tags = $def['tags'] ?? [];
+$def_td = $def['topdesk'] ?? [];
 $clients = $config['clients'] ?? [];
 
 echo '<div class="godesk-module">';
@@ -24,9 +24,6 @@ if (isset($config['_error'])) {
 	return;
 }
 
-//
-// DEFAULT CARD
-//
 echo '<div class="gd-card">';
 echo '<h2>📦 Default</h2>';
 
@@ -39,18 +36,17 @@ echo '<div class="gd-kv"><span class="gd-k">Autoclose</span><span class="gd-v">'
 echo '</div>';
 
 echo '<div class="gd-divider"></div>';
-echo '<div class="gd-small-title">🏷️ Tags</div>';
+echo '<div class="gd-small-title">🎫 TopDesk</div>';
+
 echo '<div class="gd-tags">';
-foreach (['contract','oper_group','main_caller','secundary_caller'] as $k) {
-	$v = $def_tags[$k] ?? '';
+foreach (['contract','operator','oper_group','main_caller','secundary_caller','sla','category','sub_category','call_type'] as $k) {
+	$v = $def_td[$k] ?? '';
 	echo '<span class="gd-tag">'.h($k).': '.h($v).'</span>';
 }
 echo '</div>';
-echo '</div>';
 
-//
-// CLIENTS
-//
+echo '</div>'; // default
+
 echo '<div class="gd-card">';
 echo '<h2>👥 Clients</h2>';
 
@@ -59,7 +55,7 @@ if (!is_array($clients) || count($clients) === 0) {
 }
 else {
 	foreach ($clients as $client_name => $c) {
-		$tags = $c['tags'] ?? [];
+		$td = $c['topdesk'] ?? [];
 
 		echo '<div class="gd-client-card">';
 		echo '<div class="gd-client-head">';
@@ -74,10 +70,10 @@ else {
 		echo '<div class="gd-kv"><span class="gd-k">Impact</span><span class="gd-v">'.h($c['impact'] ?? '').'</span></div>';
 		echo '</div>';
 
-		echo '<div class="gd-small-title" style="margin-top:10px;">🏷️ Tags</div>';
+		echo '<div class="gd-small-title" style="margin-top:10px;">🎫 TopDesk</div>';
 		echo '<div class="gd-tags">';
-		foreach (['contract','oper_group','main_caller','secundary_caller'] as $k) {
-			$v = $tags[$k] ?? '';
+		foreach (['contract','operator','oper_group','main_caller','secundary_caller','sla','category','sub_category','call_type'] as $k) {
+			$v = $td[$k] ?? '';
 			echo '<span class="gd-tag">'.h($k).': '.h($v).'</span>';
 		}
 		echo '</div>';
@@ -86,7 +82,6 @@ else {
 	}
 }
 
-echo '</div>'; // card clients
+echo '</div>'; // clients card
 
-echo '</div>'; // wrap
-echo '</div>'; // module
+echo '</div></div>'; // wrap + module
