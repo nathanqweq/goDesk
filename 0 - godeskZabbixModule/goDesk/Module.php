@@ -20,9 +20,9 @@ class Module extends CModule {
 	 */
 	public function init(): void {
 		APP::Component()->get('menu.main')
-			->findOrAdd(_('Monitoring'))
+			->findOrAdd(_('Alerts'))
 			->getSubmenu()
-			->insertAfter(_('Alerts'),
+			->insertAfter(_('Scripts'),
 				(new CMenuItem(_('goDesk')))->setSubMenu(
 					new CMenu([
 						(new CMenuItem(_('Config (visualizar)')))->setAction('godesk.config.view'),
