@@ -12,7 +12,7 @@
     },
     "godesk.config.edit": {
       "class": "ConfigEdit",
-      "view": "godesk.config_edit"
+      "view": "godesk.configedit"
     }
   }
 }
