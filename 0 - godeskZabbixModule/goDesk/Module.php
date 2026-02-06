@@ -10,7 +10,7 @@ use CMenuItem;
 class Module extends CModule {
 	public function init(): void {
 		APP::Component()->get('menu.main')
-			->findOrAdd(_('Monitoring'))
+			->findOrAdd(_('Administration'))
 			->getSubmenu()
 			->insertAfter(_('Discovery'),
 				(new CMenuItem(_('goDesk')))->setSubMenu(
