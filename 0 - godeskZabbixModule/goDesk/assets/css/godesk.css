@@ -1,0 +1,118 @@
+/* ===============================
+   goDesk module global styles
+================================ */
+
+.gd-wrap {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* Cards */
+.gd-card {
+    border-radius: 10px;
+    padding: 18px;
+    margin: 18px 0;
+    border: 1px solid #dcdcdc;
+    background: #ffffff;
+    box-shadow: 0 2px 6px rgba(0,0,0,.06);
+}
+
+.gd-card h2 {
+    margin-bottom: 15px;
+}
+
+/* Layout */
+.gd-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.gd-field {
+    display: flex;
+    flex-direction: column;
+    min-width: 220px;
+    flex: 1;
+    gap: 6px;
+}
+
+.gd-field label {
+    font-size: 12px;
+    color: #666;
+}
+
+.gd-field input[type=text] {
+    padding: 9px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    background: #fff;
+    color: #000;
+}
+
+/* Buttons */
+.gd-btn {
+    background: #f0f3f7;
+    border: 1px solid #c2c8d0;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    color: #222;
+    transition: 0.15s;
+}
+
+.gd-btn:hover {
+    background: #e4e9f0;
+}
+
+/* banners */
+.gd-banner {
+    padding: 12px;
+    border-radius: 8px;
+    margin: 15px 0;
+    font-weight: 600;
+}
+
+.gd-ok {
+    background: #e9f7ef;
+    border: 1px solid #b7e2c7;
+    color: #1e7e34;
+}
+
+.gd-err {
+    background: #fdecea;
+    border: 1px solid #f5c2c7;
+    color: #a30000;
+}
+
+/* client block */
+.gd-client {
+    border: 1px dashed #c9c9c9;
+    background: #fafafa;
+}
+
+/* ===============================
+   DARK THEME SUPPORT
+================================ */
+
+[theme='dark-theme'] .gd-card {
+    background: #1f1f23;
+    border: 1px solid #333;
+    color: #e6e6e6;
+}
+
+[theme='dark-theme'] .gd-field input[type=text] {
+    background: #2b2b30;
+    border: 1px solid #444;
+    color: #eee;
+}
+
+[theme='dark-theme'] .gd-btn {
+    background: #2b2f36;
+    border: 1px solid #444;
+    color: #eee;
+}
+
+[theme='dark-theme'] .gd-btn:hover {
+    background: #383e47;
+}

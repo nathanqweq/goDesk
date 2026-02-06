@@ -1,51 +1,13 @@
 <?php
-
 (new CHtmlPage())
 	->setTitle($data['title'])
 	->show();
 
+// $data['config'] vem da action
+// $data['path'] é o caminho do arquivo
+
+
 $config = $data['config'];
-
-echo '<style>
-.godesk-card {
-	background: #fff;
-	border: 1px solid #dcdcdc;
-	border-radius: 6px;
-	padding: 15px;
-	margin-bottom: 15px;
-	box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-}
-
-.godesk-title {
-	font-size: 18px;
-	font-weight: bold;
-	margin-bottom: 10px;
-}
-
-.godesk-tag {
-	display: inline-block;
-	background: #eef3ff;
-	border: 1px solid #ccd7ff;
-	padding: 4px 8px;
-	margin: 3px;
-	border-radius: 4px;
-	font-size: 12px;
-}
-
-.godesk-section {
-	margin-top: 30px;
-}
-
-.godesk-bool-true {
-	color: green;
-	font-weight: bold;
-}
-
-.godesk-bool-false {
-	color: red;
-	font-weight: bold;
-}
-</style>';
 
 echo '<h1>⚙️ goDesk Config Viewer</h1>';
 

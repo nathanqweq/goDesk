@@ -1,4 +1,12 @@
 <?php
+/**
+ * Action: godesk.config.edit
+ *
+ * Form de edição da configuração do goDesk.
+ * - Lê YAML do disco
+ * - Renderiza campos (default + clients)
+ * - No POST: normaliza + valida + gera YAML + salva (backup + escrita atômica)
+ */
 
 namespace Modules\GoDesk\Actions;
 
@@ -7,7 +15,7 @@ use CControllerResponseData;
 
 class ConfigEdit extends CController {
 
-	private string $config_path = '/etc/zabbix/godesk-config.yaml';
+	private string $config_path = '/etc/zabbix/godesk/godesk-config.yaml';
 
 	public function init(): void {
 		// depois a gente reforça CSRF; por enquanto mantém simples:

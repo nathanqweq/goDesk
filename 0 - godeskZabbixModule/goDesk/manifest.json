@@ -2,13 +2,15 @@
   "manifest_version": 2.0,
   "id": "godesk",
   "name": "goDesk",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "namespace": "GoDesk",
-  "description": "goDesk module.",
+  "assets": {
+    "css": ["godesk.css"]
+  },
   "actions": {
-    "godesk.hello": {
-      "class": "Hello",
-      "view": "godesk.hello"
+    "godesk.config.view": {
+      "class": "ConfigView",
+      "view": "godesk.configview"
     },
     "godesk.config.edit": {
       "class": "ConfigEdit",
