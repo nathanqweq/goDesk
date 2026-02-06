@@ -16,7 +16,8 @@ default:
 
 clients:
 
-  CRESOL:
+  CRESOL-AP-SW:
+    client: "Cresol"
     urgency: "Baixa"
     impact: "Sem impacto"
     autoclose: false

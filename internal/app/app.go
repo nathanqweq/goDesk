@@ -23,10 +23,15 @@ func Run(cfg config.RuntimeConfig) error {
 		return err
 	}
 
-	// Policy final (default + override do cliente)
-	pol := config.ResolvePolicy(pf, p.Cliente)
+	// Policy final (default + override da RULE)
+	pol := config.ResolvePolicy(pf, p.RuleName)
 
-	// Resolve campos TopDesk (Zabbix > Cliente(YAML) > Default(YAML))
+	// Nome bonito de cliente (display): Zabbix > YAML rule > YAML default
+	displayClient := pickTag(p.Cliente, pol.Client, pf.Default.Client)
+	// mantém compatibilidade com seu HTML atual (se ele usa p.Cliente)
+	p.Cliente = displayClient
+
+	// Resolve campos TopDesk (Zabbix > Rule(YAML) > Default(YAML))
 	contract := pickTag(p.Contract, pol.TopDesk.Contract, pf.Default.TopDesk.Contract)
 
 	operator := pickTag(p.Operator, pol.TopDesk.Operator, pf.Default.TopDesk.Operator)
@@ -42,16 +47,16 @@ func Run(cfg config.RuntimeConfig) error {
 
 	// sanity checks (pra não criar ticket quebrado)
 	if strings.TrimSpace(mainCaller) == "" {
-		log.Printf("[app] WARN: mainCaller ficou vazio após resolução (cliente=%q)\n", p.Cliente)
+		log.Printf("[app] WARN: mainCaller ficou vazio após resolução (rule=%q cliente=%q)\n", p.RuleName, p.Cliente)
 	}
 	if strings.TrimSpace(operGrp) == "" {
-		log.Printf("[app] WARN: oper_group ficou vazio após resolução (cliente=%q)\n", p.Cliente)
+		log.Printf("[app] WARN: oper_group ficou vazio após resolução (rule=%q cliente=%q)\n", p.RuleName, p.Cliente)
 	}
 	if strings.TrimSpace(operator) == "" {
-		log.Printf("[app] WARN: operator ficou vazio após resolução (cliente=%q)\n", p.Cliente)
+		log.Printf("[app] WARN: operator ficou vazio após resolução (rule=%q cliente=%q)\n", p.RuleName, p.Cliente)
 	}
 	if strings.TrimSpace(contract) == "" {
-		log.Printf("[app] WARN: contract ficou vazio após resolução (cliente=%q)\n", p.Cliente)
+		log.Printf("[app] WARN: contract ficou vazio após resolução (rule=%q cliente=%q)\n", p.RuleName, p.Cliente)
 	}
 
 	timeout := time.Duration(cfg.TimeoutSec) * time.Second
@@ -72,8 +77,8 @@ func Run(cfg config.RuntimeConfig) error {
 	}
 
 	eventKind := rawdata.EventKind(p)
-	log.Printf("[app] kind=%s cliente=%q autoclose=%v urgency=%q impact=%q ticket=%q\n",
-		eventKind, p.Cliente, pol.AutoClose, pol.Urgency, pol.Impact, cfg.TicketName)
+	log.Printf("[app] kind=%s rule=%q cliente=%q autoclose=%v urgency=%q impact=%q ticket=%q\n",
+		eventKind, p.RuleName, p.Cliente, pol.AutoClose, pol.Urgency, pol.Impact, cfg.TicketName)
 
 	exists, ticketID, status, err := td.TicketExists(cfg.TicketName)
 	if err != nil {
@@ -155,7 +160,7 @@ func buildCreatePayload(
 	subCategoryName := "Monitoramento " + contract
 	processingStatusName := "Registrado"
 
-	// overrides via YAML/Zabbix (se vierem)
+	// overrides via Zabbix/YAML
 	if strings.TrimSpace(callType) != "" {
 		callTypeName = callType
 	}
@@ -182,7 +187,7 @@ func buildCreatePayload(
 		"optionalFields2":  map[string]any{"memo2": secCaller},
 	}
 
-	// SLA é objeto por ID (somente se tiver valor)
+	// SLA é por ID
 	if strings.TrimSpace(slaID) != "" {
 		payload["sla"] = map[string]any{"id": slaID}
 	}

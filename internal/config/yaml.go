@@ -21,10 +21,14 @@ type TopDeskDefaults struct {
 }
 
 type Policy struct {
-	Urgency   string          `yaml:"urgency"`
-	Impact    string          `yaml:"impact"`
-	AutoClose bool            `yaml:"autoclose"`
-	TopDesk   TopDeskDefaults `yaml:"topdesk"`
+	// nome bonito / display do cliente (não é a key do map)
+	Client string `yaml:"client"`
+
+	Urgency   string `yaml:"urgency"`
+	Impact    string `yaml:"impact"`
+	AutoClose bool   `yaml:"autoclose"`
+
+	TopDesk TopDeskDefaults `yaml:"topdesk"`
 }
 
 type PoliciesFile struct {
@@ -57,21 +61,22 @@ func LoadPolicies(path string) (PoliciesFile, error) {
 	return pf, nil
 }
 
-func ResolvePolicy(pf PoliciesFile, cliente string) Policy {
-	cliente = strings.TrimSpace(cliente)
+// ResolvePolicy agora recebe RULE NAME (key em clients:)
+func ResolvePolicy(pf PoliciesFile, ruleName string) Policy {
+	ruleName = strings.TrimSpace(ruleName)
 	p := pf.Default
-	if cliente == "" {
+	if ruleName == "" {
 		return p
 	}
 
 	// match exato
-	if cpol, ok := pf.Clients[cliente]; ok {
+	if cpol, ok := pf.Clients[ruleName]; ok {
 		return mergePolicy(p, cpol)
 	}
 
 	// match case-insensitive
 	for k, v := range pf.Clients {
-		if strings.EqualFold(strings.TrimSpace(k), cliente) {
+		if strings.EqualFold(strings.TrimSpace(k), ruleName) {
 			return mergePolicy(p, v)
 		}
 	}
@@ -80,6 +85,9 @@ func ResolvePolicy(pf PoliciesFile, cliente string) Policy {
 }
 
 func mergePolicy(def Policy, over Policy) Policy {
+	if strings.TrimSpace(over.Client) != "" {
+		def.Client = over.Client
+	}
 	if strings.TrimSpace(over.Urgency) != "" {
 		def.Urgency = over.Urgency
 	}

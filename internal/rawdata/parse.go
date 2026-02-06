@@ -21,7 +21,7 @@ func Parse(raw string) (Payload, error) {
 
 	Normalize(&p)
 
-	// --- normaliza event_value para "0"/"1" (aceita " 1 ", "0", etc.)
+	// normaliza event_value para "0"/"1"
 	p.EventValue = strings.TrimSpace(p.EventValue)
 	p.EventValue = strings.Trim(p.EventValue, `"'`)
 
@@ -32,21 +32,21 @@ func Parse(raw string) (Payload, error) {
 	if strings.TrimSpace(p.Trigger) == "" {
 		return Payload{}, errors.New("RAWDATA inválido: trigger vazio")
 	}
+	if strings.TrimSpace(p.RuleName) == "" {
+		return Payload{}, errors.New("RAWDATA inválido: rule_name vazio (EVENT.TAGS.RuleName)")
+	}
 
-	// Cliente NÃO obrigatório: se não vier, cai no default do YAML
-	p.Cliente = strings.TrimSpace(p.Cliente)
-
-	// valida event_value:
-	// - aceita "0"/"1"
-	// - se vier como "0.0" ou "1.0" ou "0 " etc, tenta converter
+	// aceita "0"/"1" (ou string numérica)
 	if p.EventValue != "0" && p.EventValue != "1" {
-		// tenta converter string numérica → int
 		if n, err := strconv.Atoi(p.EventValue); err == nil && (n == 0 || n == 1) {
 			p.EventValue = strconv.Itoa(n)
 		} else {
 			return Payload{}, fmt.Errorf("RAWDATA inválido: event_value deve ser '0' ou '1' (veio %q)", p.EventValue)
 		}
 	}
+
+	// cliente agora é display (não obrigatório)
+	p.Cliente = strings.TrimSpace(p.Cliente)
 
 	return p, nil
 }

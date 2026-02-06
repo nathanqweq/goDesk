@@ -78,28 +78,33 @@ echo '</div>'; // default card
 //
 echo '<div class="gd-card">';
 echo '<div class="gd-client-head">';
-echo '<h2 style="margin:0">👥 Clients</h2>';
-echo '<button class="gd-btn" type="button" onclick="gdAddClient()">＋ Adicionar cliente</button>';
+echo '<h2 style="margin:0">👥 Rules</h2>';
+echo '<button class="gd-btn" type="button" onclick="gdAddClient()">＋ Adicionar rule</button>';
 echo '</div>';
 
 echo '<div id="gd-clients">';
 
 $idx = 0;
 foreach ($clients as $c) {
-	$name = $c['name'] ?? '';
+	$rule_name = $c['rule_name'] ?? '';
+	$client_name = $c['client'] ?? '';
 	$td = $c['topdesk'] ?? [];
 	$autoclose = !empty($c['autoclose']) ? 'checked' : '';
 
 	echo '<div class="gd-client-card gd-client" data-idx="'.$idx.'">';
 
 	echo '<div class="gd-client-head">';
-	echo '<div class="gd-client-name">🏢 Cliente</div>';
+	echo '<div class="gd-client-name">🧩 Rule</div>';
 	echo '<button class="gd-btn gd-btn-danger" type="button" onclick="gdRemoveClient(this)">Remover</button>';
 	echo '</div>';
 
 	echo '<div class="gd-row">';
-	echo '<div class="gd-field"><label>Nome</label><input type="text" name="clients['.$idx.'][name]" value="'.h($name).'"></div>';
+	echo '<div class="gd-field"><label>Rule name (chave do YAML)</label><input type="text" name="clients['.$idx.'][rule_name]" value="'.h($rule_name).'"></div>';
+	echo '<div class="gd-field"><label>Client (nome do cliente)</label><input type="text" name="clients['.$idx.'][client]" value="'.h($client_name).'"></div>';
 	echo '<div class="gd-field"><label>Urgency</label><input type="text" name="clients['.$idx.'][urgency]" value="'.h($c['urgency'] ?? '').'"></div>';
+	echo '</div>';
+
+	echo '<div class="gd-row">';
 	echo '<div class="gd-field"><label>Impact</label><input type="text" name="clients['.$idx.'][impact]" value="'.h($c['impact'] ?? '').'"></div>';
 	echo '<div class="gd-field gd-field-tight">
 		<label>Autoclose</label>
@@ -128,7 +133,7 @@ foreach ($clients as $c) {
 	echo '<div class="gd-field"><label>call_type</label><input type="text" name="clients['.$idx.'][topdesk][call_type]" value="'.h($td['call_type'] ?? '').'"></div>';
 	echo '</div>';
 
-	echo '</div>'; // client card
+	echo '</div>';
 
 	$idx++;
 }
@@ -145,7 +150,7 @@ echo '</div>'; // card clients
 
 echo '</form>';
 
-echo '</div></div>'; // wrap + module
+echo '</div></div>';
 
 echo '<script>
 let gdClientIdx = '.(int)$idx.';
@@ -162,13 +167,17 @@ function gdAddClient(){
 	const html = `
 	<div class="gd-client-card gd-client" data-idx="${i}">
 		<div class="gd-client-head">
-			<div class="gd-client-name">🏢 Cliente</div>
+			<div class="gd-client-name">🧩 Rule</div>
 			<button class="gd-btn gd-btn-danger" type="button" onclick="gdRemoveClient(this)">Remover</button>
 		</div>
 
 		<div class="gd-row">
-			<div class="gd-field"><label>Nome</label><input type="text" name="clients[${i}][name]" value=""></div>
+			<div class="gd-field"><label>Rule name (chave do YAML)</label><input type="text" name="clients[${i}][rule_name]" value=""></div>
+			<div class="gd-field"><label>Client (nome do cliente)</label><input type="text" name="clients[${i}][client]" value=""></div>
 			<div class="gd-field"><label>Urgency</label><input type="text" name="clients[${i}][urgency]" value=""></div>
+		</div>
+
+		<div class="gd-row">
 			<div class="gd-field"><label>Impact</label><input type="text" name="clients[${i}][impact]" value=""></div>
 			<div class="gd-field gd-field-tight">
 				<label>Autoclose</label>

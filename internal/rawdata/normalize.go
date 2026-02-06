@@ -3,7 +3,7 @@ package rawdata
 import "strings"
 
 func Normalize(p *Payload) {
-	// ===== EVENTO =====
+	// evento
 	p.Status = clean(p.Status)
 	p.Host = clean(p.Host)
 	p.Trigger = clean(p.Trigger)
@@ -14,22 +14,25 @@ func Normalize(p *Payload) {
 	p.TriggerID = clean(p.TriggerID)
 	p.EventID = clean(p.EventID)
 	p.EventValue = clean(p.EventValue)
+
+	// novo
+	p.RuleName = clean(p.RuleName)
 	p.Cliente = clean(p.Cliente)
 
-	// ===== TAGS / TOPDESK =====
+	// topdesk
 	p.Contract = clean(p.Contract)
 	p.OperGroup = clean(p.OperGroup)
 	p.Operator = clean(p.Operator)
 	p.MainCaller = clean(p.MainCaller)
 	p.SecundaryCaller = clean(p.SecundaryCaller)
 
-	// ===== NOVOS CAMPOS DINÂMICOS =====
+	// dinâmicos
 	p.Sla = clean(p.Sla)
 	p.Category = clean(p.Category)
 	p.SubCategory = clean(p.SubCategory)
 	p.CallType = clean(p.CallType)
 
-	// futuro (se você ativar no payload)
+	// futuro
 	p.EntryType = clean(p.EntryType)
 	p.ProcessingStatus = clean(p.ProcessingStatus)
 

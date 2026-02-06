@@ -6,6 +6,15 @@
  * - Lê YAML do disco
  * - Renderiza campos (default + clients)
  * - No POST: normaliza + valida + gera YAML + salva (backup + escrita atômica)
+ *
+ * Schema atualizado:
+ * clients:
+ *   <RULE_NAME>:
+ *     client: "Nome do cliente"
+ *     autoclose: true/false
+ *     urgency: "..."
+ *     impact: "..."
+ *     topdesk: { ... }
  */
 
 namespace Modules\GoDesk\Actions;
@@ -18,7 +27,6 @@ class ConfigEdit extends CController {
 	private string $config_path = '/etc/zabbix/godesk/godesk-config.yaml';
 
 	public function init(): void {
-		// Simplificado por enquanto (sem CSRF). Podemos reforçar depois.
 		$this->disableCsrfValidation();
 	}
 
@@ -33,7 +41,6 @@ class ConfigEdit extends CController {
 	}
 
 	protected function checkPermissions(): bool {
-		// Edição: recomendável restringir a Super Admin.
 		return (isset(\CWebUser::$data['type']) && \CWebUser::$data['type'] == USER_TYPE_SUPER_ADMIN);
 	}
 
@@ -59,13 +66,14 @@ class ConfigEdit extends CController {
 		$parsed['default'] ??= [];
 		$parsed['clients'] ??= [];
 
-		// Garantir estrutura nova (topdesk)
 		$parsed['default']['topdesk'] ??= [];
-		foreach ($parsed['clients'] as $k => $v) {
+
+		foreach ($parsed['clients'] as $rule => $v) {
 			if (!is_array($v)) {
-				$parsed['clients'][$k] = [];
+				$parsed['clients'][$rule] = [];
 			}
-			$parsed['clients'][$k]['topdesk'] ??= [];
+			$parsed['clients'][$rule]['client'] ??= '';
+			$parsed['clients'][$rule]['topdesk'] ??= [];
 		}
 
 		return $parsed;
@@ -75,8 +83,17 @@ class ConfigEdit extends CController {
 		return ($v === 1 || $v === '1' || $v === true || $v === 'true' || $v === 'on');
 	}
 
+	private function normalizeNullString($v): string {
+		// Se o usuário digitar "null" (string), mantém string mesmo.
+		// Se quiser converter pra vazio automaticamente, troca aqui.
+		return (string)$v;
+	}
+
 	/**
-	 * Normaliza o payload do formulário para o schema final do YAML.
+	 * Constrói o YAML final a partir do POST.
+	 * clients[] agora tem:
+	 * - rule_name (chave)
+	 * - client (nome do cliente)
 	 */
 	private function normalizeConfigFromPost(array $post_default, array $post_clients): array {
 		$def_td = (array)($post_default['topdesk'] ?? []);
@@ -91,7 +108,7 @@ class ConfigEdit extends CController {
 					'operator' => (string)($def_td['operator'] ?? ''),
 					'oper_group' => (string)($def_td['oper_group'] ?? ''),
 					'main_caller' => (string)($def_td['main_caller'] ?? ''),
-					'secundary_caller' => (string)($def_td['secundary_caller'] ?? ''),
+					'secundary_caller' => $this->normalizeNullString($def_td['secundary_caller'] ?? ''),
 					'sla' => (string)($def_td['sla'] ?? ''),
 					'category' => (string)($def_td['category'] ?? ''),
 					'sub_category' => (string)($def_td['sub_category'] ?? ''),
@@ -101,16 +118,16 @@ class ConfigEdit extends CController {
 			'clients' => []
 		];
 
-		// clients é uma lista: clients[0][name], clients[0][topdesk][...]
 		foreach ($post_clients as $row) {
-			$name = trim((string)($row['name'] ?? ''));
-			if ($name === '') {
+			$rule_name = trim((string)($row['rule_name'] ?? ''));
+			if ($rule_name === '') {
 				continue;
 			}
 
 			$td = (array)($row['topdesk'] ?? []);
 
-			$config['clients'][$name] = [
+			$config['clients'][$rule_name] = [
+				'client' => (string)($row['client'] ?? ''),
 				'autoclose' => $this->toBool($row['autoclose'] ?? false),
 				'urgency' => (string)($row['urgency'] ?? ''),
 				'impact' => (string)($row['impact'] ?? ''),
@@ -119,7 +136,7 @@ class ConfigEdit extends CController {
 					'operator' => (string)($td['operator'] ?? ''),
 					'oper_group' => (string)($td['oper_group'] ?? ''),
 					'main_caller' => (string)($td['main_caller'] ?? ''),
-					'secundary_caller' => (string)($td['secundary_caller'] ?? ''),
+					'secundary_caller' => $this->normalizeNullString($td['secundary_caller'] ?? ''),
 					'sla' => (string)($td['sla'] ?? ''),
 					'category' => (string)($td['category'] ?? ''),
 					'sub_category' => (string)($td['sub_category'] ?? ''),
@@ -140,19 +157,25 @@ class ConfigEdit extends CController {
 			return ['ok' => false, 'error' => 'Config inválida: default.topdesk ausente.'];
 		}
 
-		// Checagem leve (deixa campos opcionais, mas garante chaves esperadas)
 		foreach (['contract','operator','oper_group','main_caller','secundary_caller','sla','category','sub_category','call_type'] as $k) {
 			if (!array_key_exists($k, $cfg['default']['topdesk'])) {
 				return ['ok' => false, 'error' => 'Config inválida: default.topdesk.'.$k.' ausente.'];
 			}
 		}
 
+		// Garante que cada client tem campo "client" e topdesk
+		foreach ($cfg['clients'] as $rule => $c) {
+			if (!isset($c['client'])) {
+				return ['ok' => false, 'error' => 'Config inválida: clients.'.$rule.'.client ausente.'];
+			}
+			if (!isset($c['topdesk']) || !is_array($c['topdesk'])) {
+				return ['ok' => false, 'error' => 'Config inválida: clients.'.$rule.'.topdesk ausente.'];
+			}
+		}
+
 		return ['ok' => true, 'error' => null];
 	}
 
-	/**
-	 * Salva o YAML com backup + escrita atômica no mesmo diretório do arquivo.
-	 */
 	private function saveYamlAtomic(string $yaml_text): array {
 		$dir = dirname($this->config_path);
 
@@ -232,12 +255,13 @@ class ConfigEdit extends CController {
 			}
 		}
 
-		// clients dict -> lista pro form
+		// Converte clients dict -> lista para renderizar no form
 		$clients_list = [];
 		if (isset($cfg['clients']) && is_array($cfg['clients'])) {
-			foreach ($cfg['clients'] as $name => $c) {
+			foreach ($cfg['clients'] as $rule_name => $c) {
 				$clients_list[] = [
-					'name' => $name,
+					'rule_name' => $rule_name,
+					'client' => (string)($c['client'] ?? ''),
 					'autoclose' => (bool)($c['autoclose'] ?? false),
 					'urgency' => (string)($c['urgency'] ?? ''),
 					'impact' => (string)($c['impact'] ?? ''),

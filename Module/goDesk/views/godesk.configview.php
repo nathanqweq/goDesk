@@ -48,24 +48,29 @@ echo '</div>';
 echo '</div>'; // default
 
 echo '<div class="gd-card">';
-echo '<h2>👥 Clients</h2>';
+echo '<h2>👥 Rules</h2>';
 
 if (!is_array($clients) || count($clients) === 0) {
-	echo '<div class="gd-muted">Nenhum cliente cadastrado.</div>';
+	echo '<div class="gd-muted">Nenhuma rule cadastrada.</div>';
 }
 else {
-	foreach ($clients as $client_name => $c) {
+	foreach ($clients as $rule_name => $c) {
 		$td = $c['topdesk'] ?? [];
 
 		echo '<div class="gd-client-card">';
 		echo '<div class="gd-client-head">';
-		echo '<div class="gd-client-name">🏢 '.h($client_name).'</div>';
+		echo '<div class="gd-client-name">🧩 Rule: '.h($rule_name).'</div>';
 
 		$c_auto = !empty($c['autoclose']) ? '<span class="gd-pill gd-true">autoclose</span>' : '<span class="gd-pill gd-false">manual</span>';
 		echo '<div>'.$c_auto.'</div>';
 		echo '</div>';
 
-		echo '<div class="gd-row">';
+		$client_name = (string)($c['client'] ?? '');
+		if ($client_name !== '') {
+			echo '<div class="gd-muted"><b>Client:</b> '.h($client_name).'</div>';
+		}
+
+		echo '<div class="gd-row" style="margin-top:10px;">';
 		echo '<div class="gd-kv"><span class="gd-k">Urgency</span><span class="gd-v">'.h($c['urgency'] ?? '').'</span></div>';
 		echo '<div class="gd-kv"><span class="gd-k">Impact</span><span class="gd-v">'.h($c['impact'] ?? '').'</span></div>';
 		echo '</div>';
