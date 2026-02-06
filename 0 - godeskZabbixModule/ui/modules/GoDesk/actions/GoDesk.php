@@ -19,9 +19,8 @@ class GoDesk extends CController {
 		return $this->validateInput($fields);
 	}
 
-	protected function checkPermissions(): bool {
-		$permit_user_types = [USER_TYPE_ZABBIX_ADMIN, USER_TYPE_SUPER_ADMIN];
-		return in_array($this->getUserType(), $permit_user_types);
+	protected function checkPermissions() {
+		return $this->getUserType() >= USER_TYPE_ZABBIX_ADMIN;
 	}
 
 	protected function doAction(): void {
