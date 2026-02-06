@@ -4,11 +4,15 @@
   "name": "goDesk",
   "version": "0.1.0",
   "namespace": "GoDesk",
-  "description": "goDesk module (Hello World).",
+  "description": "goDesk module.",
   "actions": {
     "godesk.hello": {
       "class": "Hello",
       "view": "godesk.hello"
+    },
+    "godesk.config.edit": {
+      "class": "ConfigEdit",
+      "view": "godesk.config_edit"
     }
   }
 }

@@ -10,12 +10,13 @@ use CMenuItem;
 class Module extends CModule {
 	public function init(): void {
 		APP::Component()->get('menu.main')
-			->findOrAdd(_('Administration'))
+			->findOrAdd(_('Monitoring'))
 			->getSubmenu()
 			->insertAfter(_('Discovery'),
 				(new CMenuItem(_('goDesk')))->setSubMenu(
 					new CMenu([
-						(new CMenuItem(_('Hello World')))->setAction('godesk.hello')
+						(new CMenuItem(_('Hello World')))->setAction('godesk.hello'),
+						(new CMenuItem(_('Editar config')))->setAction('godesk.config.edit')
 					])
 				)
 			);
