@@ -18,7 +18,7 @@ class ConfigEdit extends CController {
 	private string $config_path = '/etc/zabbix/godesk/godesk-config.yaml';
 
 	public function init(): void {
-		// depois a gente reforça CSRF; por enquanto mantém simples:
+		// Simplificado por enquanto (sem CSRF). Podemos reforçar depois.
 		$this->disableCsrfValidation();
 	}
 
@@ -33,7 +33,7 @@ class ConfigEdit extends CController {
 	}
 
 	protected function checkPermissions(): bool {
-		// recomendado: só Super Admin
+		// Edição: recomendável restringir a Super Admin.
 		return (isset(\CWebUser::$data['type']) && \CWebUser::$data['type'] == USER_TYPE_SUPER_ADMIN);
 	}
 
@@ -41,14 +41,17 @@ class ConfigEdit extends CController {
 		if (!file_exists($this->config_path)) {
 			return ['default' => [], 'clients' => []];
 		}
+
 		if (!is_readable($this->config_path)) {
 			return ['default' => [], 'clients' => [], '_error' => 'Sem permissão de leitura: '.$this->config_path];
 		}
+
 		if (!function_exists('yaml_parse_file')) {
 			return ['default' => [], 'clients' => [], '_error' => 'Extensão PHP yaml não instalada (yaml_parse_file).'];
 		}
 
 		$parsed = @yaml_parse_file($this->config_path);
+
 		if ($parsed === false || !is_array($parsed)) {
 			return ['default' => [], 'clients' => [], '_error' => 'YAML inválido ou vazio.'];
 		}
@@ -60,10 +63,12 @@ class ConfigEdit extends CController {
 	}
 
 	private function toBool($v): bool {
-		// checkbox pode vir como "1" ou true
 		return ($v === 1 || $v === '1' || $v === true || $v === 'true' || $v === 'on');
 	}
 
+	/**
+	 * Constrói a config final a partir do POST do form.
+	 */
 	private function normalizeConfigFromPost(array $post_default, array $post_clients): array {
 		$config = [
 			'default' => [
@@ -80,7 +85,7 @@ class ConfigEdit extends CController {
 			'clients' => []
 		];
 
-		// clients vem como lista: clients[0][name], clients[0][urgency], etc.
+		// clients é uma lista: clients[0][name], clients[0][tags]...
 		foreach ($post_clients as $row) {
 			$name = trim((string)($row['name'] ?? ''));
 			if ($name === '') {
@@ -107,33 +112,40 @@ class ConfigEdit extends CController {
 		if (!isset($cfg['default']) || !isset($cfg['clients'])) {
 			return ['ok' => false, 'error' => 'Config inválida: faltam as chaves default/clients.'];
 		}
-		// checks mínimos
 		if (!isset($cfg['default']['tags']) || !is_array($cfg['default']['tags'])) {
 			return ['ok' => false, 'error' => 'Config inválida: default.tags ausente.'];
 		}
 		return ['ok' => true, 'error' => null];
 	}
 
+	/**
+	 * Salva o YAML com backup + escrita atômica no mesmo diretório do arquivo.
+	 * (No teu caso já está funcionando porque /etc/zabbix/godesk é gravável pelo pool nginx.)
+	 */
 	private function saveYamlAtomic(string $yaml_text): array {
-		if (!file_exists($this->config_path)) {
-			// se não existe, precisa permissão de escrita no diretório
-			$dir = dirname($this->config_path);
+		$dir = dirname($this->config_path);
+
+		// Se arquivo existe, precisa ser gravável; se não existe, diretório precisa ser gravável.
+		if (file_exists($this->config_path)) {
+			if (!is_writable($this->config_path)) {
+				return ['ok' => false, 'error' => 'Sem permissão de escrita: '.$this->config_path];
+			}
+		}
+		else {
 			if (!is_writable($dir)) {
 				return ['ok' => false, 'error' => 'Sem permissão para criar arquivo em: '.$dir];
 			}
 		}
-		else if (!is_writable($this->config_path)) {
-			return ['ok' => false, 'error' => 'Sem permissão de escrita: '.$this->config_path];
-		}
 
-		$dir = dirname($this->config_path);
 		$tmp = $dir.'/'.basename($this->config_path).'.tmp';
 		$bak = $dir.'/'.basename($this->config_path).'.bak.'.date('Ymd-His');
 
+		// Backup antes de sobrescrever
 		if (file_exists($this->config_path) && !@copy($this->config_path, $bak)) {
 			return ['ok' => false, 'error' => 'Falha ao criar backup em: '.$bak];
 		}
 
+		// Escrita segura
 		$bytes = @file_put_contents($tmp, $yaml_text, LOCK_EX);
 		if ($bytes === false) {
 			return ['ok' => false, 'error' => 'Falha ao escrever tmp: '.$tmp];
@@ -141,6 +153,7 @@ class ConfigEdit extends CController {
 
 		@chmod($tmp, 0640);
 
+		// Troca atômica
 		if (!@rename($tmp, $this->config_path)) {
 			@unlink($tmp);
 			return ['ok' => false, 'error' => 'Falha ao aplicar arquivo (rename).'];
@@ -192,7 +205,7 @@ class ConfigEdit extends CController {
 			}
 		}
 
-		// transforma clients dict em lista pro form ficar fácil
+		// Converte clients dict -> lista para renderizar no form
 		$clients_list = [];
 		if (isset($cfg['clients']) && is_array($cfg['clients'])) {
 			foreach ($cfg['clients'] as $name => $c) {
@@ -207,7 +220,7 @@ class ConfigEdit extends CController {
 		}
 
 		$this->setResponse(new CControllerResponseData([
-			'title' => _('goDesk - Editar config'),
+			'title' => _('goDesk - Editar configuração'),
 			'path' => $this->config_path,
 			'status' => $status,
 			'error' => $error,

@@ -4,6 +4,7 @@
   "name": "goDesk",
   "version": "1.0.0",
   "namespace": "GoDesk",
+  "description": "goDesk module (config viewer/editor).",
   "assets": {
     "css": ["godesk.css"]
   },

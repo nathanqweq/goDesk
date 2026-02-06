@@ -13,28 +13,28 @@ use CControllerResponseData;
 
 class ConfigView extends CController {
 
-	/** Caminho do arquivo de configuração (ajuste aqui se mudar) */
+	/**
+	 * Caminho do arquivo de config.
+	 * (No teu caso já está funcionando em /etc/zabbix/godesk/godesk-config.yaml)
+	 */
 	private string $config_path = '/etc/zabbix/godesk/godesk-config.yaml';
 
 	public function init(): void {
-		// Tela somente leitura (GET), então mantemos simples.
+		// Tela de leitura (GET).
 		$this->disableCsrfValidation();
 	}
 
 	protected function checkInput(): bool {
-		// Sem parâmetros esperados no GET por enquanto.
 		return true;
 	}
 
 	protected function checkPermissions(): bool {
-		// Pode abrir para todos, ou restringir; por enquanto liberado.
-		// Se quiser travar: USER_TYPE_ZABBIX_ADMIN / SUPER_ADMIN etc.
+		// Visualização pode ser liberada.
 		return true;
 	}
 
 	/**
-	 * Carrega e faz parse do YAML para array PHP.
-	 * Retorna um array com dados e/ou mensagem de erro.
+	 * Carrega o YAML e retorna array com dados ou _error.
 	 */
 	private function loadConfig(): array {
 		if (!file_exists($this->config_path)) {

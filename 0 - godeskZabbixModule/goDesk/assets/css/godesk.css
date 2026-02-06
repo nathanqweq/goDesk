@@ -1,118 +1,307 @@
-/* ===============================
-   goDesk module global styles
-================================ */
+/* =========================================================
+   goDesk module styles
+   Escopado em .godesk-module para não brigar com o tema Zabbix
+========================================================= */
 
-.gd-wrap {
-    max-width: 1200px;
-    margin: 0 auto;
+.godesk-module .gd-wrap {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.godesk-module .gd-header {
+  margin: 12px 0 18px 0;
+}
+
+.godesk-module .gd-title {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.godesk-module .gd-subtitle {
+  margin-top: 6px;
+  color: #666;
+  font-size: 12px;
 }
 
 /* Cards */
-.gd-card {
-    border-radius: 10px;
-    padding: 18px;
-    margin: 18px 0;
-    border: 1px solid #dcdcdc;
-    background: #ffffff;
-    box-shadow: 0 2px 6px rgba(0,0,0,.06);
+.godesk-module .gd-card {
+  border-radius: 10px;
+  padding: 18px;
+  margin: 18px 0;
+  border: 1px solid #dcdcdc;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(0,0,0,.06);
 }
 
-.gd-card h2 {
-    margin-bottom: 15px;
+.godesk-module .gd-divider {
+  height: 1px;
+  background: rgba(0,0,0,.08);
+  margin: 14px 0;
 }
 
-/* Layout */
-.gd-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
+.godesk-module .gd-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
 }
 
-.gd-field {
-    display: flex;
-    flex-direction: column;
-    min-width: 220px;
-    flex: 1;
-    gap: 6px;
+/* Inputs */
+.godesk-module .gd-field {
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  flex: 1;
+  gap: 6px;
 }
 
-.gd-field label {
-    font-size: 12px;
-    color: #666;
+.godesk-module .gd-field-tight {
+  min-width: 180px;
+  flex: 0 0 auto;
 }
 
-.gd-field input[type=text] {
-    padding: 9px;
-    border-radius: 6px;
-    border: 1px solid #ccc;
-    background: #fff;
-    color: #000;
+.godesk-module .gd-field label {
+  font-size: 12px;
+  color: #666;
+}
+
+.godesk-module .gd-field input[type="text"] {
+  padding: 9px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  background: #fff;
+  color: #000;
+}
+
+/* checkbox area */
+.godesk-module .gd-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 6px;
 }
 
 /* Buttons */
-.gd-btn {
-    background: #f0f3f7;
-    border: 1px solid #c2c8d0;
-    padding: 10px 16px;
-    border-radius: 8px;
-    font-weight: 600;
-    cursor: pointer;
-    color: #222;
-    transition: 0.15s;
+.godesk-module .gd-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 16px;
+  flex-wrap: wrap;
 }
 
-.gd-btn:hover {
-    background: #e4e9f0;
+.godesk-module .gd-btn {
+  background: #f0f3f7;
+  border: 1px solid #c2c8d0;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  color: #222;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 140px;
+  transition: 0.15s;
+  text-decoration: none;
 }
 
-/* banners */
-.gd-banner {
-    padding: 12px;
-    border-radius: 8px;
-    margin: 15px 0;
-    font-weight: 600;
+.godesk-module .gd-btn:hover {
+  background: #e4e9f0;
 }
 
-.gd-ok {
-    background: #e9f7ef;
-    border: 1px solid #b7e2c7;
-    color: #1e7e34;
+.godesk-module .gd-btn-primary {
+  background: #dceeff;
+  border-color: #b9d9ff;
 }
 
-.gd-err {
-    background: #fdecea;
-    border: 1px solid #f5c2c7;
-    color: #a30000;
+.godesk-module .gd-btn-primary:hover {
+  background: #cfe6ff;
 }
 
-/* client block */
-.gd-client {
-    border: 1px dashed #c9c9c9;
-    background: #fafafa;
+.godesk-module .gd-btn-danger {
+  background: #ffe6e6;
+  border-color: #ffc6c6;
 }
 
-/* ===============================
-   DARK THEME SUPPORT
-================================ */
-
-[theme='dark-theme'] .gd-card {
-    background: #1f1f23;
-    border: 1px solid #333;
-    color: #e6e6e6;
+.godesk-module .gd-btn-danger:hover {
+  background: #ffd8d8;
 }
 
-[theme='dark-theme'] .gd-field input[type=text] {
-    background: #2b2b30;
-    border: 1px solid #444;
-    color: #eee;
+/* Banners */
+.godesk-module .gd-banner {
+  padding: 12px;
+  border-radius: 8px;
+  margin: 15px 0;
+  font-weight: 700;
 }
 
-[theme='dark-theme'] .gd-btn {
-    background: #2b2f36;
-    border: 1px solid #444;
-    color: #eee;
+.godesk-module .gd-ok {
+  background: #e9f7ef;
+  border: 1px solid #b7e2c7;
+  color: #1e7e34;
 }
 
-[theme='dark-theme'] .gd-btn:hover {
-    background: #383e47;
+.godesk-module .gd-err {
+  background: #fdecea;
+  border: 1px solid #f5c2c7;
+  color: #a30000;
+}
+
+.godesk-module .gd-muted {
+  color: #666;
+  font-size: 13px;
+}
+
+/* View helpers */
+.godesk-module .gd-kv {
+  min-width: 220px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.godesk-module .gd-k {
+  font-size: 12px;
+  color: #666;
+}
+
+.godesk-module .gd-v {
+  font-size: 14px;
+  font-weight: 700;
+  color: #111;
+}
+
+.godesk-module .gd-small-title {
+  font-weight: 800;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.godesk-module .gd-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.godesk-module .gd-tag {
+  background: #eef3ff;
+  border: 1px solid #ccd7ff;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.godesk-module .gd-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  border: 1px solid rgba(0,0,0,.12);
+}
+
+.godesk-module .gd-true {
+  background: #e9f7ef;
+  color: #1e7e34;
+}
+
+.godesk-module .gd-false {
+  background: #fdecea;
+  color: #a30000;
+}
+
+/* Client cards */
+.godesk-module .gd-client-card {
+  border-radius: 10px;
+  padding: 14px;
+  margin-top: 12px;
+  border: 1px solid rgba(0,0,0,.10);
+  background: #fafafa;
+}
+
+.godesk-module .gd-client-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.godesk-module .gd-client-name {
+  font-weight: 900;
+}
+
+/* =========================================================
+   Dark theme (Zabbix)
+========================================================= */
+
+[theme='dark-theme'] .godesk-module .gd-subtitle,
+[theme='dark-theme'] .godesk-module .gd-k,
+[theme='dark-theme'] .godesk-module .gd-muted,
+[theme='dark-theme'] .godesk-module .gd-field label {
+  color: #b6b6b6;
+}
+
+[theme='dark-theme'] .godesk-module .gd-card {
+  background: #1f1f23;
+  border: 1px solid #333;
+  box-shadow: 0 2px 8px rgba(0,0,0,.30);
+}
+
+[theme='dark-theme'] .godesk-module .gd-divider {
+  background: rgba(255,255,255,.10);
+}
+
+[theme='dark-theme'] .godesk-module .gd-field input[type="text"] {
+  background: #2b2b30;
+  border: 1px solid #444;
+  color: #eee;
+}
+
+[theme='dark-theme'] .godesk-module .gd-v {
+  color: #eee;
+}
+
+[theme='dark-theme'] .godesk-module .gd-tag {
+  background: #2b2f36;
+  border: 1px solid #444;
+  color: #eee;
+}
+
+[theme='dark-theme'] .godesk-module .gd-btn {
+  background: #2b2f36;
+  border: 1px solid #444;
+  color: #eee;
+}
+
+[theme='dark-theme'] .godesk-module .gd-btn:hover {
+  background: #383e47;
+}
+
+[theme='dark-theme'] .godesk-module .gd-btn-primary {
+  background: #243447;
+  border-color: #35506f;
+}
+
+[theme='dark-theme'] .godesk-module .gd-btn-primary:hover {
+  background: #2a3e55;
+}
+
+[theme='dark-theme'] .godesk-module .gd-btn-danger {
+  background: #3a2626;
+  border-color: #5a2f2f;
+}
+
+[theme='dark-theme'] .godesk-module .gd-btn-danger:hover {
+  background: #452c2c;
+}
+
+[theme='dark-theme'] .godesk-module .gd-client-card {
+  background: #17171a;
+  border: 1px solid #333;
 }

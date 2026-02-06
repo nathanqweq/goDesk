@@ -3,71 +3,90 @@
 	->setTitle($data['title'])
 	->show();
 
-// $data['config'] vem da action
-// $data['path'] é o caminho do arquivo
+function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 
+$config = $data['config'] ?? [];
+$def = $config['default'] ?? [];
+$def_tags = $def['tags'] ?? [];
+$clients = $config['clients'] ?? [];
 
-$config = $data['config'];
+echo '<div class="godesk-module">';
+echo '<div class="gd-wrap">';
 
-echo '<h1>⚙️ goDesk Config Viewer</h1>';
+echo '<div class="gd-header">';
+echo '<div class="gd-title">'.h($data['title']).'</div>';
+echo '<div class="gd-subtitle"><b>Arquivo:</b> '.h($data['path'] ?? '').'</div>';
+echo '</div>';
 
-//
-// DEFAULT
-//
-if (isset($config['default'])) {
-	$d = $config['default'];
-
-	echo '<div class="godesk-section">';
-	echo '<div class="godesk-title">📦 Default Config</div>';
-	echo '<div class="godesk-card">';
-
-	echo '<b>Urgency:</b> '.$d['urgency'].'<br>';
-	echo '<b>Impact:</b> '.$d['impact'].'<br>';
-
-	$auto = $d['autoclose'] ? '<span class="godesk-bool-true">true</span>' : '<span class="godesk-bool-false">false</span>';
-	echo '<b>Autoclose:</b> '.$auto.'<br><br>';
-
-	echo '<b>Tags:</b><br>';
-	foreach ($d['tags'] as $k => $v) {
-		echo '<span class="godesk-tag">'.$k.': '.$v.'</span>';
-	}
-
-	echo '</div>';
-	echo '</div>';
+if (isset($config['_error'])) {
+	echo '<div class="gd-banner gd-err"><b>Erro:</b> '.h($config['_error']).'</div>';
+	echo '</div></div>';
+	return;
 }
 
 //
-// CLIENTES
+// DEFAULT CARD
 //
-if (isset($config['clients'])) {
-	echo '<div class="godesk-section">';
-	echo '<div class="godesk-title">👥 Clients</div>';
+echo '<div class="gd-card">';
+echo '<h2>📦 Default</h2>';
 
-	foreach ($config['clients'] as $client => $c) {
+echo '<div class="gd-row">';
+echo '<div class="gd-kv"><span class="gd-k">Urgency</span><span class="gd-v">'.h($def['urgency'] ?? '').'</span></div>';
+echo '<div class="gd-kv"><span class="gd-k">Impact</span><span class="gd-v">'.h($def['impact'] ?? '').'</span></div>';
 
-		echo '<div class="godesk-card">';
-		echo '<div class="godesk-title">🏢 '.$client.'</div>';
+$auto = !empty($def['autoclose']) ? '<span class="gd-pill gd-true">true</span>' : '<span class="gd-pill gd-false">false</span>';
+echo '<div class="gd-kv"><span class="gd-k">Autoclose</span><span class="gd-v">'.$auto.'</span></div>';
+echo '</div>';
 
-		if (isset($c['urgency']))
-			echo '<b>Urgency:</b> '.$c['urgency'].'<br>';
+echo '<div class="gd-divider"></div>';
+echo '<div class="gd-small-title">🏷️ Tags</div>';
+echo '<div class="gd-tags">';
+foreach (['contract','oper_group','main_caller','secundary_caller'] as $k) {
+	$v = $def_tags[$k] ?? '';
+	echo '<span class="gd-tag">'.h($k).': '.h($v).'</span>';
+}
+echo '</div>';
+echo '</div>';
 
-		if (isset($c['impact']))
-			echo '<b>Impact:</b> '.$c['impact'].'<br>';
+//
+// CLIENTS
+//
+echo '<div class="gd-card">';
+echo '<h2>👥 Clients</h2>';
 
-		if (isset($c['autoclose'])) {
-			$auto = $c['autoclose'] ? '<span class="godesk-bool-true">true</span>' : '<span class="godesk-bool-false">false</span>';
-			echo '<b>Autoclose:</b> '.$auto.'<br>';
+if (!is_array($clients) || count($clients) === 0) {
+	echo '<div class="gd-muted">Nenhum cliente cadastrado.</div>';
+}
+else {
+	foreach ($clients as $client_name => $c) {
+		$tags = $c['tags'] ?? [];
+
+		echo '<div class="gd-client-card">';
+		echo '<div class="gd-client-head">';
+		echo '<div class="gd-client-name">🏢 '.h($client_name).'</div>';
+
+		$c_auto = !empty($c['autoclose']) ? '<span class="gd-pill gd-true">autoclose</span>' : '<span class="gd-pill gd-false">manual</span>';
+		echo '<div>'.$c_auto.'</div>';
+		echo '</div>';
+
+		echo '<div class="gd-row">';
+		echo '<div class="gd-kv"><span class="gd-k">Urgency</span><span class="gd-v">'.h($c['urgency'] ?? '').'</span></div>';
+		echo '<div class="gd-kv"><span class="gd-k">Impact</span><span class="gd-v">'.h($c['impact'] ?? '').'</span></div>';
+		echo '</div>';
+
+		echo '<div class="gd-small-title" style="margin-top:10px;">🏷️ Tags</div>';
+		echo '<div class="gd-tags">';
+		foreach (['contract','oper_group','main_caller','secundary_caller'] as $k) {
+			$v = $tags[$k] ?? '';
+			echo '<span class="gd-tag">'.h($k).': '.h($v).'</span>';
 		}
-
-		if (isset($c['tags'])) {
-			echo '<br><b>Tags:</b><br>';
-			foreach ($c['tags'] as $k => $v) {
-				echo '<span class="godesk-tag">'.$k.': '.$v.'</span>';
-			}
-		}
+		echo '</div>';
 
 		echo '</div>';
 	}
-
-	echo '</div>';
 }
+
+echo '</div>'; // card clients
+
+echo '</div>'; // wrap
+echo '</div>'; // module
