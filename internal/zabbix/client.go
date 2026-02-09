@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -23,10 +24,10 @@ type Client struct {
 }
 
 type rpcResp struct {
-	JSONRPC string   `json:"jsonrpc"`
-	Result  any      `json:"result"`
-	Error   *rpcErr  `json:"error"`
-	ID      any      `json:"id"`
+	JSONRPC string          `json:"jsonrpc"`
+	Result  json.RawMessage `json:"result"`
+	Error   *rpcErr         `json:"error"`
+	ID      any             `json:"id"`
 }
 
 type rpcErr struct {
@@ -41,6 +42,8 @@ func (c Client) Acknowledge(eventID string, message string) error {
 	eventID = strings.TrimSpace(eventID)
 
 	if base == "" || token == "" || eventID == "" {
+		log.Printf("[zabbix] ACK SKIP base_set=%v token_set=%v eventid=%q\n",
+			base != "", token != "", eventID)
 		return nil
 	}
 
@@ -49,15 +52,13 @@ func (c Client) Acknowledge(eventID string, message string) error {
 		to = 10 * time.Second
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), to)
-	defer cancel()
+	url := strings.TrimRight(base, "/") + "/api_jsonrpc.php"
 
-	// ✅ Bearer via header (sem "auth" no payload)
+	// payload JSON-RPC (Bearer no header)
 	payload := map[string]any{
 		"jsonrpc": "2.0",
 		"method":  "event.acknowledge",
 		"params": map[string]any{
-			// pode ser string ou array; mantive array que é mais compatível
 			"eventids": []string{eventID},
 			"action":   6,
 			"message":  message,
@@ -67,18 +68,22 @@ func (c Client) Acknowledge(eventID string, message string) error {
 
 	b, err := json.Marshal(payload)
 	if err != nil {
+		log.Printf("[zabbix] ACK ERROR marshal eventid=%q err=%v\n", eventID, err)
 		return err
 	}
 
-	url := strings.TrimRight(base, "/") + "/api_jsonrpc.php"
+	ctx, cancel := context.WithTimeout(context.Background(), to)
+	defer cancel()
+
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(b))
 	if err != nil {
+		log.Printf("[zabbix] ACK ERROR build_request eventid=%q err=%v\n", eventID, err)
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
 
-	// ✅ client só pro Zabbix
+	// client só pro Zabbix (não afeta TopDesk)
 	baseClient := c.HTTP
 	if baseClient == nil {
 		baseClient = &http.Client{}
@@ -91,25 +96,42 @@ func (c Client) Acknowledge(eventID string, message string) error {
 		},
 	}
 
+	log.Printf("[zabbix] ACK SEND url=%q insecureTLS=%v eventid=%q msg_len=%d timeout=%s\n",
+		url, c.InsecureTLS, eventID, len(message), to)
+
 	resp, err := zclient.Do(req)
 	if err != nil {
+		log.Printf("[zabbix] ACK ERROR http_do url=%q eventid=%q err=%v\n", url, eventID, err)
 		return err
 	}
 	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
+	bodyBytes, _ := io.ReadAll(resp.Body)
+	body := string(bodyBytes)
 
-	// HTTP error
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("Zabbix ack HTTP %d: %s", resp.StatusCode, string(body))
+	// limita body no log pra não explodir
+	bodyLog := body
+	if len(bodyLog) > 800 {
+		bodyLog = bodyLog[:800] + "...(truncated)"
 	}
 
-	// ✅ se vier erro JSON-RPC com HTTP 200, pega também
+	log.Printf("[zabbix] ACK HTTP status=%d eventid=%q resp=%s\n", resp.StatusCode, eventID, bodyLog)
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("Zabbix ack HTTP %d: %s", resp.StatusCode, body)
+	}
+
+	// valida erro JSON-RPC mesmo com HTTP 200
 	var rr rpcResp
-	if err := json.Unmarshal(body, &rr); err == nil && rr.Error != nil {
+	if err := json.Unmarshal(bodyBytes, &rr); err != nil {
+		// não dá pra garantir que aplicou
+		return fmt.Errorf("Zabbix ack: resposta não é JSON-RPC válida: %v (body=%s)", err, bodyLog)
+	}
+	if rr.Error != nil {
 		return fmt.Errorf("Zabbix ack RPC error code=%d message=%q data=%q",
 			rr.Error.Code, rr.Error.Message, rr.Error.Data)
 	}
 
+	log.Printf("[zabbix] ACK OK eventid=%q\n", eventID)
 	return nil
 }
