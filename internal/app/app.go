@@ -119,7 +119,9 @@ func Run(cfg config.RuntimeConfig) error {
 		if err != nil {
 			return err
 		}
-		_ = zx.Acknowledge(p.EventID, "Chamado criado: "+created)
+		if err := zx.Acknowledge(p.EventID, "Chamado criado: "+created); err != nil {
+			log.Printf("[zabbix] ACK ERROR: %v\n", err)
+		}
 
 	case exists && eventKind == "ProblemStart":
 		action := "Recebemos novamente o alerta " + p.Trigger + " em nosso Zabbix."
