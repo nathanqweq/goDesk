@@ -84,6 +84,7 @@ func Run(cfg config.RuntimeConfig) error {
 		Token:   cfg.ZabbixKey,
 		HTTP:    httpClient,
 		Timeout: timeout,
+		InsecureTLS:  true,
 	}
 
 	eventKind := rawdata.EventKind(p)

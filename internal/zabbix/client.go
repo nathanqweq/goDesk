@@ -3,6 +3,7 @@ package zabbix
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -16,6 +17,9 @@ type Client struct {
 	Token   string
 	HTTP    *http.Client
 	Timeout time.Duration
+
+	// Se true, ignora validação TLS APENAS para chamadas do Zabbix
+	InsecureTLS bool
 }
 
 func (c Client) Acknowledge(eventID string, message string) error {
@@ -23,26 +27,57 @@ func (c Client) Acknowledge(eventID string, message string) error {
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout)
+	// timeout defensivo
+	to := c.Timeout
+	if to <= 0 {
+		to = 10 * time.Second
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), to)
 	defer cancel()
 
+	// ✅ eventids como array + auth no payload (compatível)
 	payload := map[string]any{
 		"jsonrpc": "2.0",
 		"method":  "event.acknowledge",
 		"params": map[string]any{
-			"eventids": eventID,
+			"eventids": []string{strings.TrimSpace(eventID)},
 			"action":   6,
 			"message":  message,
 		},
-		"id": 1,
+		"auth": strings.TrimSpace(c.Token),
+		"id":   1,
 	}
 
-	b, _ := json.Marshal(payload)
-	req, _ := http.NewRequestWithContext(ctx, "POST", strings.TrimRight(c.BaseURL, "/")+"/api_jsonrpc.php", bytes.NewReader(b))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.Token)
+	b, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
 
-	resp, err := c.HTTP.Do(req)
+	url := strings.TrimRight(strings.TrimSpace(c.BaseURL), "/") + "/api_jsonrpc.php"
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(b))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(c.Token))
+
+	// ✅ cria um client só pro Zabbix (não afeta o resto do sistema)
+	baseClient := c.HTTP
+	if baseClient == nil {
+		baseClient = &http.Client{}
+	}
+
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: c.InsecureTLS},
+	}
+
+	zclient := &http.Client{
+		Timeout:   baseClient.Timeout,
+		Transport: transport,
+	}
+
+	resp, err := zclient.Do(req)
 	if err != nil {
 		return err
 	}
