@@ -197,7 +197,7 @@ func buildCreatePayload(
 		"optionalFields2":  map[string]any{"memo2": secCaller},
 	}
 
-	// SLA é por ID
+	// SLA só é enviado quando autoclose=true
 	if pol.AutoClose && strings.TrimSpace(slaID) != "" {
 		payload["sla"] = map[string]any{"id": slaID}
 	}
