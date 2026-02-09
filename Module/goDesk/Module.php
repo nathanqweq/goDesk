@@ -2,7 +2,7 @@
 /**
  * goDesk - Zabbix Frontend Module
  *
- * Responsável por inicializar o módulo no frontend e registrar itens de menu.
+ * Registra itens de menu e inicializa o módulo.
  */
 
 namespace Modules\GoDesk;
@@ -13,11 +13,6 @@ use CMenu;
 use CMenuItem;
 
 class Module extends CModule {
-
-	/**
-	 * Executado quando o módulo é carregado pelo frontend.
-	 * Adiciona o submenu "goDesk" em Monitoring.
-	 */
 	public function init(): void {
 		APP::Component()->get('menu.main')
 			->findOrAdd(_('Alerts'))

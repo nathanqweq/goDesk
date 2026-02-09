@@ -2,11 +2,12 @@
   "manifest_version": 2.0,
   "id": "godesk",
   "name": "goDesk",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "namespace": "GoDesk",
   "description": "goDesk module (config viewer/editor).",
   "assets": {
-    "css": ["godesk.css"]
+    "css": ["css/godesk.css"],
+    "js": ["js/godesk.js"]
   },
   "actions": {
     "godesk.config.view": {

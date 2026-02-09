@@ -2,18 +2,17 @@
 /**
  * Action: godesk.config.edit
  *
- * Form de edição da configuração do goDesk.
- * - Lê YAML do disco
- * - Renderiza campos (default + clients)
- * - No POST: normaliza + valida + gera YAML + salva (backup + escrita atômica)
+ * Editor de configuração do goDesk.
  *
- * Schema atualizado:
+ * Schema:
+ * default:
+ *   urgency, impact, autoclose
+ *   topdesk: { contract, operator, oper_group, main_caller, secundary_caller, sla, category, sub_category, call_type }
+ *
  * clients:
  *   <RULE_NAME>:
  *     client: "Nome do cliente"
- *     autoclose: true/false
- *     urgency: "..."
- *     impact: "..."
+ *     urgency, impact, autoclose
  *     topdesk: { ... }
  */
 
@@ -84,17 +83,9 @@ class ConfigEdit extends CController {
 	}
 
 	private function normalizeNullString($v): string {
-		// Se o usuário digitar "null" (string), mantém string mesmo.
-		// Se quiser converter pra vazio automaticamente, troca aqui.
 		return (string)$v;
 	}
 
-	/**
-	 * Constrói o YAML final a partir do POST.
-	 * clients[] agora tem:
-	 * - rule_name (chave)
-	 * - client (nome do cliente)
-	 */
 	private function normalizeConfigFromPost(array $post_default, array $post_clients): array {
 		$def_td = (array)($post_default['topdesk'] ?? []);
 
@@ -163,7 +154,6 @@ class ConfigEdit extends CController {
 			}
 		}
 
-		// Garante que cada client tem campo "client" e topdesk
 		foreach ($cfg['clients'] as $rule => $c) {
 			if (!isset($c['client'])) {
 				return ['ok' => false, 'error' => 'Config inválida: clients.'.$rule.'.client ausente.'];
@@ -255,7 +245,6 @@ class ConfigEdit extends CController {
 			}
 		}
 
-		// Converte clients dict -> lista para renderizar no form
 		$clients_list = [];
 		if (isset($cfg['clients']) && is_array($cfg['clients'])) {
 			foreach ($cfg['clients'] as $rule_name => $c) {

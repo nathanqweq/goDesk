@@ -1,73 +1,90 @@
 <?php
-/**
- * Action: godesk.config.view
- *
- * Lê o arquivo YAML de configuração do goDesk e envia os dados para a view
- * que exibe a configuração de forma amigável.
- */
+(new CHtmlPage())
+	->setTitle($data['title'])
+	->show();
 
-namespace Modules\GoDesk\Actions;
+function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 
-use CController;
-use CControllerResponseData;
+$config = $data['config'] ?? [];
+$def = $config['default'] ?? [];
+$def_td = $def['topdesk'] ?? [];
+$clients = $config['clients'] ?? [];
 
-class ConfigView extends CController {
+echo '<div class="godesk-module">';
+echo '<div class="gd-wrap">';
 
-	/**
-	 * Caminho do arquivo de config.
-	 * (No teu caso já está funcionando em /etc/zabbix/godesk/godesk-config.yaml)
-	 */
-	private string $config_path = '/etc/zabbix/godesk/godesk-config.yaml';
+echo '<div class="gd-header">';
+echo '<div class="gd-title">'.h($data['title']).'</div>';
+echo '<div class="gd-subtitle"><b>Arquivo:</b> '.h($data['path'] ?? '').'</div>';
+echo '</div>';
 
-	public function init(): void {
-		// Tela de leitura (GET).
-		$this->disableCsrfValidation();
-	}
+if (isset($config['_error'])) {
+	echo '<div class="gd-banner gd-err"><b>Erro:</b> '.h($config['_error']).'</div>';
+	echo '</div></div>';
+	return;
+}
 
-	protected function checkInput(): bool {
-		return true;
-	}
+echo '<div class="gd-card">';
+echo '<h2>📦 Default</h2>';
 
-	protected function checkPermissions(): bool {
-		// Visualização pode ser liberada.
-		return true;
-	}
+echo '<div class="gd-row">';
+echo '<div class="gd-kv"><span class="gd-k">Urgency</span><span class="gd-v">'.h($def['urgency'] ?? '').'</span></div>';
+echo '<div class="gd-kv"><span class="gd-k">Impact</span><span class="gd-v">'.h($def['impact'] ?? '').'</span></div>';
 
-	/**
-	 * Carrega o YAML e retorna array com dados ou _error.
-	 */
-	private function loadConfig(): array {
-		if (!file_exists($this->config_path)) {
-			return ['_error' => 'Arquivo não encontrado: '.$this->config_path];
+$auto = !empty($def['autoclose']) ? '<span class="gd-pill gd-true">true</span>' : '<span class="gd-pill gd-false">false</span>';
+echo '<div class="gd-kv"><span class="gd-k">Autoclose</span><span class="gd-v">'.$auto.'</span></div>';
+echo '</div>';
+
+echo '<div class="gd-divider"></div>';
+echo '<div class="gd-small-title">🎫 TopDesk</div>';
+echo '<div class="gd-tags">';
+foreach (['contract','operator','oper_group','main_caller','secundary_caller','sla','category','sub_category','call_type'] as $k) {
+	$v = $def_td[$k] ?? '';
+	echo '<span class="gd-tag">'.h($k).': '.h($v).'</span>';
+}
+echo '</div>';
+echo '</div>';
+
+echo '<div class="gd-card">';
+echo '<h2>👥 Rules</h2>';
+
+if (!is_array($clients) || count($clients) === 0) {
+	echo '<div class="gd-muted">Nenhuma rule cadastrada.</div>';
+}
+else {
+	foreach ($clients as $rule_name => $c) {
+		$td = $c['topdesk'] ?? [];
+
+		echo '<div class="gd-client-card">';
+		echo '<div class="gd-client-head">';
+		echo '<div class="gd-client-name">🧩 Rule: '.h($rule_name).'</div>';
+
+		$c_auto = !empty($c['autoclose']) ? '<span class="gd-pill gd-true">autoclose</span>' : '<span class="gd-pill gd-false">manual</span>';
+		echo '<div>'.$c_auto.'</div>';
+		echo '</div>';
+
+		$client_name = (string)($c['client'] ?? '');
+		if ($client_name !== '') {
+			echo '<div class="gd-muted"><b>Client:</b> '.h($client_name).'</div>';
 		}
 
-		if (!is_readable($this->config_path)) {
-			return ['_error' => 'Sem permissão de leitura: '.$this->config_path];
+		echo '<div class="gd-row" style="margin-top:10px;">';
+		echo '<div class="gd-kv"><span class="gd-k">Urgency</span><span class="gd-v">'.h($c['urgency'] ?? '').'</span></div>';
+		echo '<div class="gd-kv"><span class="gd-k">Impact</span><span class="gd-v">'.h($c['impact'] ?? '').'</span></div>';
+		echo '</div>';
+
+		echo '<div class="gd-small-title" style="margin-top:10px;">🎫 TopDesk</div>';
+		echo '<div class="gd-tags">';
+		foreach (['contract','operator','oper_group','main_caller','secundary_caller','sla','category','sub_category','call_type'] as $k) {
+			$v = $td[$k] ?? '';
+			echo '<span class="gd-tag">'.h($k).': '.h($v).'</span>';
 		}
+		echo '</div>';
 
-		if (!function_exists('yaml_parse_file')) {
-			return ['_error' => 'Extensão PHP yaml não instalada (yaml_parse_file).'];
-		}
-
-		$parsed = @yaml_parse_file($this->config_path);
-
-		if ($parsed === false || !is_array($parsed)) {
-			return ['_error' => 'YAML inválido ou vazio.'];
-		}
-
-		$parsed['default'] ??= [];
-		$parsed['clients'] ??= [];
-
-		return $parsed;
-	}
-
-	protected function doAction(): void {
-		$config = $this->loadConfig();
-
-		$this->setResponse(new CControllerResponseData([
-			'title' => _('goDesk - Configuração'),
-			'path' => $this->config_path,
-			'config' => $config
-		]));
+		echo '</div>';
 	}
 }
+
+echo '</div>';
+
+echo '</div></div>';

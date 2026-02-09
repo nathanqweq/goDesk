@@ -30,9 +30,6 @@ if (!empty($data['error'])) {
 echo '<form method="post" action="zabbix.php?action=godesk.config.edit">';
 echo '<input type="hidden" name="save" value="1">';
 
-//
-// DEFAULT
-//
 echo '<div class="gd-card">';
 echo '<h2>📦 Default</h2>';
 
@@ -44,7 +41,7 @@ $checked = !empty($def['autoclose']) ? 'checked' : '';
 echo '<div class="gd-field gd-field-tight">
 	<label>Autoclose</label>
 	<div class="gd-check">
-		<input type="checkbox" name="default[autoclose]" value="1" '.$checked.'>
+		<input type="checkbox" class="gd-autoclose" name="default[autoclose]" value="1" '.$checked.'>
 		<span class="gd-muted">fechar automaticamente</span>
 	</div>
 </div>';
@@ -62,7 +59,7 @@ echo '</div>';
 echo '<div class="gd-row">';
 echo '<div class="gd-field"><label>main_caller</label><input type="text" name="default[topdesk][main_caller]" value="'.h($def_td['main_caller'] ?? '').'"></div>';
 echo '<div class="gd-field"><label>secundary_caller</label><input type="text" name="default[topdesk][secundary_caller]" value="'.h($def_td['secundary_caller'] ?? '').'"></div>';
-echo '<div class="gd-field"><label>sla</label><input type="text" name="default[topdesk][sla]" value="'.h($def_td['sla'] ?? '').'"></div>';
+echo '<div class="gd-field"><label>sla</label><input type="text" class="gd-sla" name="default[topdesk][sla]" value="'.h($def_td['sla'] ?? '').'"></div>';
 echo '</div>';
 
 echo '<div class="gd-row">';
@@ -71,15 +68,12 @@ echo '<div class="gd-field"><label>sub_category</label><input type="text" name="
 echo '<div class="gd-field"><label>call_type</label><input type="text" name="default[topdesk][call_type]" value="'.h($def_td['call_type'] ?? '').'"></div>';
 echo '</div>';
 
-echo '</div>'; // default card
+echo '</div>';
 
-//
-// CLIENTS
-//
 echo '<div class="gd-card">';
 echo '<div class="gd-client-head">';
 echo '<h2 style="margin:0">👥 Rules</h2>';
-echo '<button class="gd-btn" type="button" onclick="gdAddClient()">＋ Adicionar rule</button>';
+echo '<button class="gd-btn" type="button" data-gd-add>＋ Adicionar rule</button>';
 echo '</div>';
 
 echo '<div id="gd-clients">';
@@ -95,7 +89,7 @@ foreach ($clients as $c) {
 
 	echo '<div class="gd-client-head">';
 	echo '<div class="gd-client-name">🧩 Rule</div>';
-	echo '<button class="gd-btn gd-btn-danger" type="button" onclick="gdRemoveClient(this)">Remover</button>';
+	echo '<button class="gd-btn gd-btn-danger" type="button" data-gd-remove>Remover</button>';
 	echo '</div>';
 
 	echo '<div class="gd-row">';
@@ -108,7 +102,9 @@ foreach ($clients as $c) {
 	echo '<div class="gd-field"><label>Impact</label><input type="text" name="clients['.$idx.'][impact]" value="'.h($c['impact'] ?? '').'"></div>';
 	echo '<div class="gd-field gd-field-tight">
 		<label>Autoclose</label>
-		<div class="gd-check"><input type="checkbox" name="clients['.$idx.'][autoclose]" value="1" '.$autoclose.'></div>
+		<div class="gd-check">
+			<input type="checkbox" class="gd-autoclose" name="clients['.$idx.'][autoclose]" value="1" '.$autoclose.'>
+		</div>
 	</div>';
 	echo '</div>';
 
@@ -124,7 +120,7 @@ foreach ($clients as $c) {
 	echo '<div class="gd-row">';
 	echo '<div class="gd-field"><label>main_caller</label><input type="text" name="clients['.$idx.'][topdesk][main_caller]" value="'.h($td['main_caller'] ?? '').'"></div>';
 	echo '<div class="gd-field"><label>secundary_caller</label><input type="text" name="clients['.$idx.'][topdesk][secundary_caller]" value="'.h($td['secundary_caller'] ?? '').'"></div>';
-	echo '<div class="gd-field"><label>sla</label><input type="text" name="clients['.$idx.'][topdesk][sla]" value="'.h($td['sla'] ?? '').'"></div>';
+	echo '<div class="gd-field"><label>sla</label><input type="text" class="gd-sla" name="clients['.$idx.'][topdesk][sla]" value="'.h($td['sla'] ?? '').'"></div>';
 	echo '</div>';
 
 	echo '<div class="gd-row">';
@@ -138,74 +134,16 @@ foreach ($clients as $c) {
 	$idx++;
 }
 
-echo '</div>'; // gd-clients
+echo '</div>';
 
 echo '<div class="gd-actions">';
 echo '<button class="gd-btn gd-btn-primary" type="submit">💾 Salvar</button>';
-echo '<a class="gd-btn" href="zabbix.php?action=godesk.config.edit" style="text-decoration:none;">↩ Recarregar</a>';
-echo '<a class="gd-btn" href="zabbix.php?action=godesk.config.view" style="text-decoration:none;">👁️ Visualizar</a>';
+echo '<a class="gd-btn" href="zabbix.php?action=godesk.config.edit">↩ Recarregar</a>';
+echo '<a class="gd-btn" href="zabbix.php?action=godesk.config.view">👁️ Visualizar</a>';
 echo '</div>';
 
-echo '</div>'; // card clients
+echo '</div>';
 
 echo '</form>';
 
 echo '</div></div>';
-
-echo '<script>
-let gdClientIdx = '.(int)$idx.';
-
-function gdRemoveClient(btn){
-	const card = btn.closest(".gd-client");
-	if(card){ card.remove(); }
-}
-
-function gdAddClient(){
-	const host = document.getElementById("gd-clients");
-	const i = gdClientIdx++;
-
-	const html = `
-	<div class="gd-client-card gd-client" data-idx="${i}">
-		<div class="gd-client-head">
-			<div class="gd-client-name">🧩 Rule</div>
-			<button class="gd-btn gd-btn-danger" type="button" onclick="gdRemoveClient(this)">Remover</button>
-		</div>
-
-		<div class="gd-row">
-			<div class="gd-field"><label>Rule name (chave do YAML)</label><input type="text" name="clients[${i}][rule_name]" value=""></div>
-			<div class="gd-field"><label>Client (nome do cliente)</label><input type="text" name="clients[${i}][client]" value=""></div>
-			<div class="gd-field"><label>Urgency</label><input type="text" name="clients[${i}][urgency]" value=""></div>
-		</div>
-
-		<div class="gd-row">
-			<div class="gd-field"><label>Impact</label><input type="text" name="clients[${i}][impact]" value=""></div>
-			<div class="gd-field gd-field-tight">
-				<label>Autoclose</label>
-				<div class="gd-check"><input type="checkbox" name="clients[${i}][autoclose]" value="1"></div>
-			</div>
-		</div>
-
-		<div class="gd-divider"></div>
-		<div class="gd-small-title">🎫 TopDesk</div>
-
-		<div class="gd-row">
-			<div class="gd-field"><label>contract</label><input type="text" name="clients[${i}][topdesk][contract]" value=""></div>
-			<div class="gd-field"><label>operator</label><input type="text" name="clients[${i}][topdesk][operator]" value=""></div>
-			<div class="gd-field"><label>oper_group</label><input type="text" name="clients[${i}][topdesk][oper_group]" value=""></div>
-		</div>
-
-		<div class="gd-row">
-			<div class="gd-field"><label>main_caller</label><input type="text" name="clients[${i}][topdesk][main_caller]" value=""></div>
-			<div class="gd-field"><label>secundary_caller</label><input type="text" name="clients[${i}][topdesk][secundary_caller]" value=""></div>
-			<div class="gd-field"><label>sla</label><input type="text" name="clients[${i}][topdesk][sla]" value=""></div>
-		</div>
-
-		<div class="gd-row">
-			<div class="gd-field"><label>category</label><input type="text" name="clients[${i}][topdesk][category]" value=""></div>
-			<div class="gd-field"><label>sub_category</label><input type="text" name="clients[${i}][topdesk][sub_category]" value=""></div>
-			<div class="gd-field"><label>call_type</label><input type="text" name="clients[${i}][topdesk][call_type]" value=""></div>
-		</div>
-	</div>`;
-	host.insertAdjacentHTML("beforeend", html);
-}
-</script>';
