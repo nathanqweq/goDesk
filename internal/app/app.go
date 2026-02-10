@@ -127,13 +127,13 @@ func Run(cfg config.RuntimeConfig) error {
 	case exists && eventKind == "ProblemStart":
 		action := "Recebemos novamente o alerta " + p.Trigger + " em nosso Zabbix."
 		_ = td.PatchTicket(ticketID, buildUpdatePayload(action, status))
-		if err := zx.Acknowledge(p.EventID, "Chamado criado: "+ticketID); err != nil {
+		if err := zx.Acknowledge(p.EventID, "Chamado já existe: "+ticketID); err != nil {
 			log.Printf("[zabbix] ACK ERROR: %v\n", err)
 		}
 
 	case exists && eventKind == "ProblemRecovery":
 		if strings.EqualFold(status, "Fechado") {
-			if err := zx.Acknowledge(p.EventID, "Chamado criado: "+ticketID); err != nil {
+			if err := zx.Acknowledge(p.EventID, "Chamado já estava fechado: "+ticketID); err != nil {
 				log.Printf("[zabbix] ACK ERROR: %v\n", err)
 			}
 			return nil
@@ -147,13 +147,13 @@ func Run(cfg config.RuntimeConfig) error {
 					"name": "Fechado",
 				},
 			})
-			if err := zx.Acknowledge(p.EventID, "Chamado criado: "+ticketID); err != nil {
+			if err := zx.Acknowledge(p.EventID, "Chamado encerrado: "+ticketID); err != nil {
 				log.Printf("[zabbix] ACK ERROR: %v\n", err)
 			}
 		} else {
 			action := "Recebemos a normalização do alerta " + p.Trigger + " em nosso Zabbix."
 			_ = td.PatchTicket(ticketID, buildUpdatePayload(action, status))
-			if err := zx.Acknowledge(p.EventID, "Chamado criado: "+ticketID); err != nil {
+			if err := zx.Acknowledge(p.EventID, "Normalização recebida (sem autoclose): "+ticketID); err != nil {
 				log.Printf("[zabbix] ACK ERROR: %v\n", err)
 			}
 		}
