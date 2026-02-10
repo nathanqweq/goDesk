@@ -1,7 +1,6 @@
 package app
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -45,15 +44,6 @@ func Run(cfg config.RuntimeConfig) error {
 	category := pickTag(p.Category, pol.TopDesk.Category, pf.Default.TopDesk.Category)
 	subCategory := pickTag(p.SubCategory, pol.TopDesk.SubCategory, pf.Default.TopDesk.SubCategory)
 	callType := pickTag(p.CallType, pol.TopDesk.CallType, pf.Default.TopDesk.CallType)
-
-	// SLA obrigatório quando AutoClose=true
-	if pol.AutoClose && strings.TrimSpace(slaID) == "" {
-		log.Printf("[app] ERROR: SLA obrigatório para autoclose (rule=%q cliente=%q). "+
-			"Defina via tag do Zabbix (sla) ou no YAML (clients.%s.topdesk.sla / default.topdesk.sla).\n",
-			p.RuleName, p.Cliente, p.RuleName,
-		)
-		return fmt.Errorf("SLA obrigatório para autoclose (rule=%s)", p.RuleName)
-	}
 
 	// sanity checks (pra não criar ticket quebrado)
 	if strings.TrimSpace(mainCaller) == "" {
@@ -208,9 +198,9 @@ func buildCreatePayload(
 		"optionalFields2":  map[string]any{"memo2": secCaller},
 	}
 
-	// SLA só é enviado quando autoclose=true
-	if pol.AutoClose && strings.TrimSpace(slaID) != "" {
-		payload["sla"] = map[string]any{"id": slaID}
+	// SLA é enviado sempre que existir (independente de autoclose)
+	if v := strings.TrimSpace(slaID); v != "" && !strings.EqualFold(v, "null") {
+		payload["sla"] = map[string]any{"id": v}
 	}
 
 	return payload
