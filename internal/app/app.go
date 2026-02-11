@@ -44,6 +44,8 @@ func Run(cfg config.RuntimeConfig) error {
 	category := pickTag(p.Category, pol.TopDesk.Category, pf.Default.TopDesk.Category)
 	subCategory := pickTag(p.SubCategory, pol.TopDesk.SubCategory, pf.Default.TopDesk.SubCategory)
 	callType := pickTag(p.CallType, pol.TopDesk.CallType, pf.Default.TopDesk.CallType)
+
+	// Urgency/Impact/Priority seguem hierarquia: Zabbix > rule > default
 	pol.Urgency = pickTag(p.Urgency, pol.Urgency, pf.Default.Urgency)
 	pol.Impact = pickTag(p.Impact, pol.Impact, pf.Default.Impact)
 	priority := pickTag(p.Priority, pol.Priority, pf.Default.Priority)
@@ -60,12 +62,6 @@ func Run(cfg config.RuntimeConfig) error {
 	}
 	if strings.TrimSpace(contract) == "" {
 		log.Printf("[app] WARN: contract ficou vazio após resolução (rule=%q cliente=%q)\n", p.RuleName, p.Cliente)
-	}
-	if strings.TrimSpace(p.Urgency) != "" {
-		pol.Urgency = p.Urgency
-	}
-	if strings.TrimSpace(p.Impact) != "" {
-		pol.Impact = p.Impact
 	}
 
 	timeout := time.Duration(cfg.TimeoutSec) * time.Second
@@ -87,8 +83,8 @@ func Run(cfg config.RuntimeConfig) error {
 	}
 
 	eventKind := rawdata.EventKind(p)
-	log.Printf("[app] kind=%s rule=%q cliente=%q autoclose=%v urgency=%q impact=%q ticket=%q\n",
-		eventKind, p.RuleName, p.Cliente, pol.AutoClose, pol.Urgency, pol.Impact, cfg.TicketName)
+	log.Printf("[app] kind=%s rule=%q cliente=%q autoclose=%v urgency=%q impact=%q priority=%q ticket=%q\n",
+		eventKind, p.RuleName, p.Cliente, pol.AutoClose, pol.Urgency, pol.Impact, priority, cfg.TicketName)
 
 	exists, ticketID, status, err := td.TicketExists(cfg.TicketName)
 	if err != nil {
@@ -102,7 +98,6 @@ func Run(cfg config.RuntimeConfig) error {
 		payload := buildCreatePayload(
 			cfg.TicketName,
 			msgHTML,
-			p,
 			pol,
 			contract,
 			operator,
@@ -164,7 +159,6 @@ func Run(cfg config.RuntimeConfig) error {
 
 func buildCreatePayload(
 	ticketName, msgHTML string,
-	p rawdata.Payload,
 	pol config.Policy,
 	contract, operator, operGrp, mainCaller, secCaller string,
 	slaID, category, subCategory, callType, priority string,
@@ -181,15 +175,15 @@ func buildCreatePayload(
 	subCategoryName := "Monitoramento " + contract
 	processingStatusName := "Registrado"
 
-	// overrides via Zabbix/YAML
-	if strings.TrimSpace(callType) != "" {
-		callTypeName = callType
+	// overrides via Zabbix/YAML (se vier vazio, mantém defaults)
+	if strings.TrimSpace(callType) != "" && !strings.EqualFold(strings.TrimSpace(callType), "null") {
+		callTypeName = strings.TrimSpace(callType)
 	}
-	if strings.TrimSpace(category) != "" {
-		categoryName = category
+	if strings.TrimSpace(category) != "" && !strings.EqualFold(strings.TrimSpace(category), "null") {
+		categoryName = strings.TrimSpace(category)
 	}
-	if strings.TrimSpace(subCategory) != "" {
-		subCategoryName = subCategory
+	if strings.TrimSpace(subCategory) != "" && !strings.EqualFold(strings.TrimSpace(subCategory), "null") {
+		subCategoryName = strings.TrimSpace(subCategory)
 	}
 
 	payload := map[string]any{
@@ -200,12 +194,20 @@ func buildCreatePayload(
 		"callType":         map[string]any{"name": callTypeName},
 		"category":         map[string]any{"name": categoryName},
 		"subcategory":      map[string]any{"name": subCategoryName},
-		"impact":           map[string]any{"name": pol.Impact},
-		"urgency":          map[string]any{"name": pol.Urgency},
 		"operatorGroup":    map[string]any{"id": operGrp},
 		"operator":         map[string]any{"id": operator},
 		"processingStatus": map[string]any{"name": processingStatusName},
 		"optionalFields2":  map[string]any{"memo2": secCaller},
+	}
+
+	// ✅ Impact só vai se existir (evita 400 por name inexistente/vazio)
+	if v := strings.TrimSpace(pol.Impact); v != "" && !strings.EqualFold(v, "null") {
+		payload["impact"] = map[string]any{"name": v}
+	}
+
+	// ✅ Urgency só vai se existir (evita 400 por name inexistente/vazio)
+	if v := strings.TrimSpace(pol.Urgency); v != "" && !strings.EqualFold(v, "null") {
+		payload["urgency"] = map[string]any{"name": v}
 	}
 
 	// SLA é enviado sempre que existir (independente de autoclose)
@@ -213,8 +215,9 @@ func buildCreatePayload(
 		payload["sla"] = map[string]any{"id": v}
 	}
 
-	if strings.TrimSpace(priority) != "" {
-		payload["priority"] = map[string]any{"name": priority}
+	// Priority opcional
+	if v := strings.TrimSpace(priority); v != "" && !strings.EqualFold(v, "null") {
+		payload["priority"] = map[string]any{"name": v}
 	}
 
 	return payload

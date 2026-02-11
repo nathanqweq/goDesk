@@ -10,7 +10,6 @@
  "hour":"{EVENT.TIME}",
  "trigger_id":"{TRIGGER.ID}",
  "event_id":"{EVENT.ID}",
- "cliente":"{EVENT.TAGS.Cliente}",
  "contract":"{EVENT.TAGS.Contrato}",
  "oper_group":"{EVENT.TAGS.OperGrp}",
  "operator":"{EVENT.TAGS.Operator}",
