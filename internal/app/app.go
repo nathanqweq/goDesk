@@ -46,6 +46,7 @@ func Run(cfg config.RuntimeConfig) error {
 	callType := pickTag(p.CallType, pol.TopDesk.CallType, pf.Default.TopDesk.CallType)
 	pol.Urgency = pickTag(p.Urgency, pol.Urgency, pf.Default.Urgency)
 	pol.Impact = pickTag(p.Impact, pol.Impact, pf.Default.Impact)
+	priority := pickTag(p.Priority, pol.Priority, pf.Default.Priority)
 
 	// sanity checks (pra não criar ticket quebrado)
 	if strings.TrimSpace(mainCaller) == "" {
@@ -112,6 +113,7 @@ func Run(cfg config.RuntimeConfig) error {
 			category,
 			subCategory,
 			callType,
+			priority,
 		)
 
 		created, err := td.CreateTicket(payload)
@@ -165,7 +167,7 @@ func buildCreatePayload(
 	p rawdata.Payload,
 	pol config.Policy,
 	contract, operator, operGrp, mainCaller, secCaller string,
-	slaID, category, subCategory, callType string,
+	slaID, category, subCategory, callType, priority string,
 ) map[string]any {
 	brief := ticketName
 	if len(brief) > 79 {
@@ -209,6 +211,10 @@ func buildCreatePayload(
 	// SLA é enviado sempre que existir (independente de autoclose)
 	if v := strings.TrimSpace(slaID); v != "" && !strings.EqualFold(v, "null") {
 		payload["sla"] = map[string]any{"id": v}
+	}
+
+	if strings.TrimSpace(priority) != "" {
+		payload["priority"] = map[string]any{"name": priority}
 	}
 
 	return payload

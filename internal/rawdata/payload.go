@@ -36,6 +36,7 @@ type Payload struct {
 	CallType    string `json:"call_type"`
 	Urgency     string `json:"urgency"`
 	Impact      string `json:"impact"`
+	Priority    string `json:"priority"`
 
 	// ===== FUTURO (se quiser ativar depois) =====
 	EntryType        string `json:"entry_type"`

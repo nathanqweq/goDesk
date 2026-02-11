@@ -24,6 +24,7 @@ type Policy struct {
 	// nome bonito / display do cliente (não é a key do map)
 	Client string `yaml:"client"`
 
+	Priority  string `yaml:"priority"`
 	Urgency   string `yaml:"urgency"`
 	Impact    string `yaml:"impact"`
 	AutoClose bool   `yaml:"autoclose"`
@@ -93,6 +94,9 @@ func mergePolicy(def Policy, over Policy) Policy {
 	}
 	if strings.TrimSpace(over.Impact) != "" {
 		def.Impact = over.Impact
+	}
+	if strings.TrimSpace(over.Priority) != "" {
+		def.Priority = over.Priority
 	}
 
 	// autoclose do cliente manda (se existir bloco do cliente)

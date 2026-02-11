@@ -20,5 +20,8 @@
  "category":"{EVENT.TAGS.Category}",
  "sub_category":"{EVENT.TAGS.SubCategory}",
  "call_type":"{EVENT.TAGS.CallType}",
- "event_value":"{EVENT.VALUE}"
+ "event_value":"{EVENT.VALUE}",
+ "urgency":"{EVENT.TAGS.Urgency}",
+ "impact":"{EVENT.TAGS.Impact}",
+ "priority": "{EVENT.TAGS.Priority}"
 }
