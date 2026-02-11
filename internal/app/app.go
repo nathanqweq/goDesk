@@ -58,6 +58,12 @@ func Run(cfg config.RuntimeConfig) error {
 	if strings.TrimSpace(contract) == "" {
 		log.Printf("[app] WARN: contract ficou vazio após resolução (rule=%q cliente=%q)\n", p.RuleName, p.Cliente)
 	}
+	if strings.TrimSpace(p.Urgency) != "" {
+		pol.Urgency = p.Urgency
+	}
+	if strings.TrimSpace(p.Impact) != "" {
+		pol.Impact = p.Impact
+	}
 
 	timeout := time.Duration(cfg.TimeoutSec) * time.Second
 	httpClient := &http.Client{Timeout: timeout}
