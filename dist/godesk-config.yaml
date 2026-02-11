@@ -1,34 +1,36 @@
 default:
+  client: "Cliente padrão" # opcional no Go (não é editado pelo módulo PHP)
   urgency: "Baixa"
   impact: "Sem impacto"
+  priority: "" # opcional
   autoclose: false
 
   topdesk:
-    contract: "aas"
-    operator: "CODIGO_OPERADOR"
-    oper_group: "OperGroup"
-    main_caller: "main caller"
-    secundary_caller: "secundary caller"
-    sla: "slaID"
-    category: ""
-    sub_category: ""
-    call_type: ""
+    contract: "CONTRATO_PADRAO"
+    operator: "ID_OPERADOR_PADRAO"
+    oper_group: "ID_GRUPO_PADRAO"
+    main_caller: "monitoramento@empresa.com"
+    secundary_caller: ""
+    sla: "ID_SLA_PADRAO"
+    category: "7 - Monitoramento"
+    sub_category: "Monitoramento CONTRATO_PADRAO"
+    call_type: "Resolução de incidente"
 
 clients:
-
-  CRESOL-AP-SW:
+  CRESOL-AP-SW: # precisa bater com RAWDATA.rule_name
     client: "Cresol"
     urgency: "Baixa"
     impact: "Sem impacto"
+    priority: "" # opcional
     autoclose: false
 
     topdesk:
-      contract: "aas"
-      operator: "CODIGO_OPERADOR"
-      oper_group: "OperGroup"
-      main_caller: "main caller"
-      secundary_caller: "secundary caller"
-      sla: "slaID"
-      category: ""
-      sub_category: ""
-      call_type: ""
+      contract: "CONTRATO_CRESOL"
+      operator: "ID_OPERADOR_CRESOL"
+      oper_group: "ID_GRUPO_CRESOL"
+      main_caller: "noc@empresa.com"
+      secundary_caller: ""
+      sla: "ID_SLA_CRESOL"
+      category: "7 - Monitoramento"
+      sub_category: "Monitoramento CRESOL"
+      call_type: "Resolução de incidente"

@@ -73,6 +73,10 @@
             <label>Impact</label>
             <input type="text" name="clients[${i}][impact]" value="">
           </div>
+          <div class="gd-field">
+            <label>Priority</label>
+            <input type="text" name="clients[${i}][priority]" value="">
+          </div>
           <div class="gd-field gd-field-tight">
             <label>Autoclose</label>
             <div class="gd-check">

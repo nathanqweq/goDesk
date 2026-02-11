@@ -28,8 +28,10 @@ echo '<div class="gd-card">';
 echo '<h2>📦 Default</h2>';
 
 echo '<div class="gd-row">';
+echo '<div class="gd-kv"><span class="gd-k">Client (fallback)</span><span class="gd-v">'.h($def['client'] ?? '').'</span></div>';
 echo '<div class="gd-kv"><span class="gd-k">Urgency</span><span class="gd-v">'.h($def['urgency'] ?? '').'</span></div>';
 echo '<div class="gd-kv"><span class="gd-k">Impact</span><span class="gd-v">'.h($def['impact'] ?? '').'</span></div>';
+echo '<div class="gd-kv"><span class="gd-k">Priority</span><span class="gd-v">'.h($def['priority'] ?? '').'</span></div>';
 
 $auto = !empty($def['autoclose']) ? '<span class="gd-pill gd-true">true</span>' : '<span class="gd-pill gd-false">false</span>';
 echo '<div class="gd-kv"><span class="gd-k">Autoclose</span><span class="gd-v">'.$auto.'</span></div>';
@@ -71,6 +73,7 @@ else {
 		echo '<div class="gd-row" style="margin-top:10px;">';
 		echo '<div class="gd-kv"><span class="gd-k">Urgency</span><span class="gd-v">'.h($c['urgency'] ?? '').'</span></div>';
 		echo '<div class="gd-kv"><span class="gd-k">Impact</span><span class="gd-v">'.h($c['impact'] ?? '').'</span></div>';
+		echo '<div class="gd-kv"><span class="gd-k">Priority</span><span class="gd-v">'.h($c['priority'] ?? '').'</span></div>';
 		echo '</div>';
 
 		echo '<div class="gd-small-title" style="margin-top:10px;">🎫 TopDesk</div>';

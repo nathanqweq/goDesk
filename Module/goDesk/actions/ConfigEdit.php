@@ -6,13 +6,13 @@
  *
  * Schema:
  * default:
- *   urgency, impact, autoclose
+ *   client, urgency, impact, priority, autoclose
  *   topdesk: { contract, operator, oper_group, main_caller, secundary_caller, sla, category, sub_category, call_type }
  *
  * clients:
  *   <RULE_NAME>:
  *     client: "Nome do cliente"
- *     urgency, impact, autoclose
+ *     urgency, impact, priority, autoclose
  *     topdesk: { ... }
  */
 
@@ -65,6 +65,8 @@ class ConfigEdit extends CController {
 		$parsed['default'] ??= [];
 		$parsed['clients'] ??= [];
 
+		$parsed['default']['client'] ??= '';
+		$parsed['default']['priority'] ??= '';
 		$parsed['default']['topdesk'] ??= [];
 
 		foreach ($parsed['clients'] as $rule => $v) {
@@ -72,6 +74,7 @@ class ConfigEdit extends CController {
 				$parsed['clients'][$rule] = [];
 			}
 			$parsed['clients'][$rule]['client'] ??= '';
+			$parsed['clients'][$rule]['priority'] ??= '';
 			$parsed['clients'][$rule]['topdesk'] ??= [];
 		}
 
@@ -91,8 +94,10 @@ class ConfigEdit extends CController {
 
 		$config = [
 			'default' => [
+				'client' => (string)($post_default['client'] ?? ''),
 				'urgency' => (string)($post_default['urgency'] ?? ''),
 				'impact' => (string)($post_default['impact'] ?? ''),
+				'priority' => (string)($post_default['priority'] ?? ''),
 				'autoclose' => $this->toBool($post_default['autoclose'] ?? false),
 				'topdesk' => [
 					'contract' => (string)($def_td['contract'] ?? ''),
@@ -122,6 +127,7 @@ class ConfigEdit extends CController {
 				'autoclose' => $this->toBool($row['autoclose'] ?? false),
 				'urgency' => (string)($row['urgency'] ?? ''),
 				'impact' => (string)($row['impact'] ?? ''),
+				'priority' => (string)($row['priority'] ?? ''),
 				'topdesk' => [
 					'contract' => (string)($td['contract'] ?? ''),
 					'operator' => (string)($td['operator'] ?? ''),
@@ -254,6 +260,7 @@ class ConfigEdit extends CController {
 					'autoclose' => (bool)($c['autoclose'] ?? false),
 					'urgency' => (string)($c['urgency'] ?? ''),
 					'impact' => (string)($c['impact'] ?? ''),
+					'priority' => (string)($c['priority'] ?? ''),
 					'topdesk' => (array)($c['topdesk'] ?? [])
 				];
 			}

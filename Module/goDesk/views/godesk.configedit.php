@@ -34,8 +34,13 @@ echo '<div class="gd-card">';
 echo '<h2>📦 Default</h2>';
 
 echo '<div class="gd-row">';
+echo '<div class="gd-field"><label>Client (fallback display)</label><input type="text" name="default[client]" value="'.h($def['client'] ?? '').'"></div>';
 echo '<div class="gd-field"><label>Urgency</label><input type="text" name="default[urgency]" value="'.h($def['urgency'] ?? '').'"></div>';
 echo '<div class="gd-field"><label>Impact</label><input type="text" name="default[impact]" value="'.h($def['impact'] ?? '').'"></div>';
+echo '</div>';
+
+echo '<div class="gd-row">';
+echo '<div class="gd-field"><label>Priority</label><input type="text" name="default[priority]" value="'.h($def['priority'] ?? '').'"></div>';
 
 $checked = !empty($def['autoclose']) ? 'checked' : '';
 echo '<div class="gd-field gd-field-tight">
@@ -100,6 +105,7 @@ foreach ($clients as $c) {
 
 	echo '<div class="gd-row">';
 	echo '<div class="gd-field"><label>Impact</label><input type="text" name="clients['.$idx.'][impact]" value="'.h($c['impact'] ?? '').'"></div>';
+	echo '<div class="gd-field"><label>Priority</label><input type="text" name="clients['.$idx.'][priority]" value="'.h($c['priority'] ?? '').'"></div>';
 	echo '<div class="gd-field gd-field-tight">
 		<label>Autoclose</label>
 		<div class="gd-check">

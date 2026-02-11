@@ -48,6 +48,8 @@ class ConfigView extends CController {
 		$parsed['default'] ??= [];
 		$parsed['clients'] ??= [];
 
+		$parsed['default']['client'] ??= '';
+		$parsed['default']['priority'] ??= '';
 		$parsed['default']['topdesk'] ??= [];
 
 		foreach ($parsed['clients'] as $rule => $c) {
@@ -55,6 +57,7 @@ class ConfigView extends CController {
 				$parsed['clients'][$rule] = [];
 			}
 			$parsed['clients'][$rule]['client'] ??= '';
+			$parsed['clients'][$rule]['priority'] ??= '';
 			$parsed['clients'][$rule]['topdesk'] ??= [];
 		}
 
