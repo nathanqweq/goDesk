@@ -31,6 +31,8 @@ func Normalize(p *Payload) {
 	p.Category = clean(p.Category)
 	p.SubCategory = clean(p.SubCategory)
 	p.CallType = clean(p.CallType)
+	p.Urgency = clean(p.Urgency)
+	p.Impact = clean(p.Impact)
 
 	// futuro
 	p.EntryType = clean(p.EntryType)
@@ -42,6 +44,12 @@ func Normalize(p *Payload) {
 	}
 	if strings.EqualFold(p.MainCaller, "null") {
 		p.MainCaller = ""
+	}
+	if strings.EqualFold(p.Urgency, "null") {
+		p.Urgency = ""
+	}
+	if strings.EqualFold(p.Impact, "null") {
+		p.Impact = ""
 	}
 }
 

@@ -44,6 +44,8 @@ func Run(cfg config.RuntimeConfig) error {
 	category := pickTag(p.Category, pol.TopDesk.Category, pf.Default.TopDesk.Category)
 	subCategory := pickTag(p.SubCategory, pol.TopDesk.SubCategory, pf.Default.TopDesk.SubCategory)
 	callType := pickTag(p.CallType, pol.TopDesk.CallType, pf.Default.TopDesk.CallType)
+	pol.Urgency = pickTag(p.Urgency, pol.Urgency, pf.Default.Urgency)
+	pol.Impact = pickTag(p.Impact, pol.Impact, pf.Default.Impact)
 
 	// sanity checks (pra não criar ticket quebrado)
 	if strings.TrimSpace(mainCaller) == "" {
