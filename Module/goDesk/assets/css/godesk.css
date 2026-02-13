@@ -73,6 +73,16 @@
   color: #000;
 }
 
+.godesk-module .gd-field textarea {
+  padding: 9px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  background: #fff;
+  color: #000;
+  min-height: 92px;
+  resize: vertical;
+}
+
 /* checkbox area */
 .godesk-module .gd-check {
   display: inline-flex;
@@ -258,6 +268,12 @@
 }
 
 [theme='dark-theme'] .godesk-module .gd-field input[type="text"] {
+  background: #2b2b30;
+  border: 1px solid #444;
+  color: #eee;
+}
+
+[theme='dark-theme'] .godesk-module .gd-field textarea {
   background: #2b2b30;
   border: 1px solid #444;
   color: #eee;

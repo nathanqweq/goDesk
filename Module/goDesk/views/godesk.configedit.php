@@ -73,6 +73,21 @@ echo '<div class="gd-field"><label>sub_category</label><input type="text" name="
 echo '<div class="gd-field"><label>call_type</label><input type="text" name="default[topdesk][call_type]" value="'.h($def_td['call_type'] ?? '').'"></div>';
 echo '</div>';
 
+$def_send_more = !empty($def_td['send_more_info']) ? 'checked' : '';
+$def_send_more_hidden = !empty($def_td['send_more_info']) ? '' : ' style="display:none"';
+echo '<div class="gd-row">';
+echo '<div class="gd-field gd-field-tight">
+	<label>Sendmore info</label>
+	<div class="gd-check">
+		<input type="checkbox" class="gd-sendmore-toggle" name="default[topdesk][send_more_info]" value="1" '.$def_send_more.'>
+		<span class="gd-muted">comentar após criar o chamado</span>
+	</div>
+</div>';
+echo '</div>';
+echo '<div class="gd-row gd-sendmore-box"'.$def_send_more_hidden.'>';
+echo '<div class="gd-field"><label>Texto sendmore (puro)</label><textarea class="gd-sendmore-text" name="default[topdesk][more_info_text]" rows="4">'.h($def_td['more_info_text'] ?? '').'</textarea></div>';
+echo '</div>';
+
 echo '</div>';
 
 echo '<div class="gd-card">';
@@ -133,6 +148,21 @@ foreach ($clients as $c) {
 	echo '<div class="gd-field"><label>category</label><input type="text" name="clients['.$idx.'][topdesk][category]" value="'.h($td['category'] ?? '').'"></div>';
 	echo '<div class="gd-field"><label>sub_category</label><input type="text" name="clients['.$idx.'][topdesk][sub_category]" value="'.h($td['sub_category'] ?? '').'"></div>';
 	echo '<div class="gd-field"><label>call_type</label><input type="text" name="clients['.$idx.'][topdesk][call_type]" value="'.h($td['call_type'] ?? '').'"></div>';
+	echo '</div>';
+
+	$send_more = !empty($td['send_more_info']) ? 'checked' : '';
+	$send_more_hidden = !empty($td['send_more_info']) ? '' : ' style="display:none"';
+	echo '<div class="gd-row">';
+	echo '<div class="gd-field gd-field-tight">
+		<label>Sendmore info</label>
+		<div class="gd-check">
+			<input type="checkbox" class="gd-sendmore-toggle" name="clients['.$idx.'][topdesk][send_more_info]" value="1" '.$send_more.'>
+			<span class="gd-muted">comentar após criar o chamado</span>
+		</div>
+	</div>';
+	echo '</div>';
+	echo '<div class="gd-row gd-sendmore-box"'.$send_more_hidden.'>';
+	echo '<div class="gd-field"><label>Texto sendmore (puro)</label><textarea class="gd-sendmore-text" name="clients['.$idx.'][topdesk][more_info_text]" rows="4">'.h($td['more_info_text'] ?? '').'</textarea></div>';
 	echo '</div>';
 
 	echo '</div>';

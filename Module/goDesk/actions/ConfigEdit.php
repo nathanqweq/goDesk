@@ -7,7 +7,7 @@
  * Schema:
  * default:
  *   client, urgency, impact, priority, autoclose
- *   topdesk: { contract, operator, oper_group, main_caller, secundary_caller, sla, category, sub_category, call_type }
+ *   topdesk: { contract, operator, oper_group, main_caller, secundary_caller, sla, category, sub_category, call_type, send_more_info, more_info_text }
  *
  * clients:
  *   <RULE_NAME>:
@@ -68,6 +68,8 @@ class ConfigEdit extends CController {
 		$parsed['default']['client'] ??= '';
 		$parsed['default']['priority'] ??= '';
 		$parsed['default']['topdesk'] ??= [];
+		$parsed['default']['topdesk']['send_more_info'] ??= false;
+		$parsed['default']['topdesk']['more_info_text'] ??= '';
 
 		foreach ($parsed['clients'] as $rule => $v) {
 			if (!is_array($v)) {
@@ -76,6 +78,8 @@ class ConfigEdit extends CController {
 			$parsed['clients'][$rule]['client'] ??= '';
 			$parsed['clients'][$rule]['priority'] ??= '';
 			$parsed['clients'][$rule]['topdesk'] ??= [];
+			$parsed['clients'][$rule]['topdesk']['send_more_info'] ??= false;
+			$parsed['clients'][$rule]['topdesk']['more_info_text'] ??= '';
 		}
 
 		return $parsed;
@@ -108,7 +112,9 @@ class ConfigEdit extends CController {
 					'sla' => (string)($def_td['sla'] ?? ''),
 					'category' => (string)($def_td['category'] ?? ''),
 					'sub_category' => (string)($def_td['sub_category'] ?? ''),
-					'call_type' => (string)($def_td['call_type'] ?? '')
+					'call_type' => (string)($def_td['call_type'] ?? ''),
+					'send_more_info' => $this->toBool($def_td['send_more_info'] ?? false),
+					'more_info_text' => (string)($def_td['more_info_text'] ?? '')
 				]
 			],
 			'clients' => []
@@ -137,7 +143,9 @@ class ConfigEdit extends CController {
 					'sla' => (string)($td['sla'] ?? ''),
 					'category' => (string)($td['category'] ?? ''),
 					'sub_category' => (string)($td['sub_category'] ?? ''),
-					'call_type' => (string)($td['call_type'] ?? '')
+					'call_type' => (string)($td['call_type'] ?? ''),
+					'send_more_info' => $this->toBool($td['send_more_info'] ?? false),
+					'more_info_text' => (string)($td['more_info_text'] ?? '')
 				]
 			];
 		}
@@ -154,7 +162,7 @@ class ConfigEdit extends CController {
 			return ['ok' => false, 'error' => 'Config inválida: default.topdesk ausente.'];
 		}
 
-		foreach (['contract','operator','oper_group','main_caller','secundary_caller','sla','category','sub_category','call_type'] as $k) {
+		foreach (['contract','operator','oper_group','main_caller','secundary_caller','sla','category','sub_category','call_type','send_more_info','more_info_text'] as $k) {
 			if (!array_key_exists($k, $cfg['default']['topdesk'])) {
 				return ['ok' => false, 'error' => 'Config inválida: default.topdesk.'.$k.' ausente.'];
 			}

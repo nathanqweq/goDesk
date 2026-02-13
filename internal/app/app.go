@@ -115,6 +115,19 @@ func Run(cfg config.RuntimeConfig) error {
 		if err != nil {
 			return err
 		}
+		if pol.TopDesk.SendMoreInfo {
+			infoMsg := strings.TrimSpace(pol.TopDesk.MoreInfoText)
+			if infoMsg != "" && !strings.EqualFold(infoMsg, "null") {
+				if err := td.PatchTicket(created, map[string]any{
+					"action":                   infoMsg,
+					"actionInvisibleForCaller": true,
+				}); err != nil {
+					log.Printf("[topdesk] WARN: falha ao enviar send_more_info ticket=%s: %v\n", created, err)
+				}
+			} else {
+				log.Printf("[topdesk] WARN: send_more_info ativo sem texto configurado (rule=%q)\n", p.RuleName)
+			}
+		}
 		if err := zx.Acknowledge(p.EventID, "Chamado criado: "+created); err != nil {
 			log.Printf("[zabbix] ACK ERROR: %v\n", err)
 		}

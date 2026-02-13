@@ -17,6 +17,8 @@ type TopDeskDefaults struct {
 	Category        string `yaml:"category"`
 	SubCategory     string `yaml:"sub_category"`
 	CallType        string `yaml:"call_type"`
+	SendMoreInfo    bool   `yaml:"send_more_info"`
+	MoreInfoText    string `yaml:"more_info_text"`
 	// Cc string `yaml:"cc"` // se quiser usar depois
 }
 
@@ -129,6 +131,10 @@ func mergePolicy(def Policy, over Policy) Policy {
 	}
 	if strings.TrimSpace(over.TopDesk.CallType) != "" {
 		def.TopDesk.CallType = over.TopDesk.CallType
+	}
+	def.TopDesk.SendMoreInfo = over.TopDesk.SendMoreInfo
+	if over.TopDesk.MoreInfoText != "" {
+		def.TopDesk.MoreInfoText = over.TopDesk.MoreInfoText
 	}
 
 	return def

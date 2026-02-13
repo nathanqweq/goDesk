@@ -44,7 +44,13 @@ foreach (['contract','operator','oper_group','main_caller','secundary_caller','s
 	$v = $def_td[$k] ?? '';
 	echo '<span class="gd-tag">'.h($k).': '.h($v).'</span>';
 }
+echo '<span class="gd-tag">send_more_info: '.(!empty($def_td['send_more_info']) ? 'true' : 'false').'</span>';
 echo '</div>';
+if (!empty($def_td['more_info_text'])) {
+	echo '<div class="gd-row" style="margin-top:10px;">';
+	echo '<div class="gd-kv"><span class="gd-k">more_info_text</span><span class="gd-v">'.nl2br(h($def_td['more_info_text'])).'</span></div>';
+	echo '</div>';
+}
 echo '</div>';
 
 echo '<div class="gd-card">';
@@ -82,7 +88,13 @@ else {
 			$v = $td[$k] ?? '';
 			echo '<span class="gd-tag">'.h($k).': '.h($v).'</span>';
 		}
+		echo '<span class="gd-tag">send_more_info: '.(!empty($td['send_more_info']) ? 'true' : 'false').'</span>';
 		echo '</div>';
+		if (!empty($td['more_info_text'])) {
+			echo '<div class="gd-row" style="margin-top:10px;">';
+			echo '<div class="gd-kv"><span class="gd-k">more_info_text</span><span class="gd-v">'.nl2br(h($td['more_info_text'])).'</span></div>';
+			echo '</div>';
+		}
 
 		echo '</div>';
 	}

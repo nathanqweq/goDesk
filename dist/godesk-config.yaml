@@ -14,6 +14,8 @@ default:
     sla: "ID_SLA_PADRAO"
     category: "7 - Monitoramento"
     sub_category: "Monitoramento CONTRATO_PADRAO"
+    send_more_info: false
+    more_info_text: ""
     call_type: "Resolução de incidente"
 
 clients:
@@ -33,4 +35,6 @@ clients:
       sla: "ID_SLA_CRESOL"
       category: "7 - Monitoramento"
       sub_category: "Monitoramento CRESOL"
+      send_more_info: false
+      more_info_text: ""
       call_type: "Resolução de incidente"

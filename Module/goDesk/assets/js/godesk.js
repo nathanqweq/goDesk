@@ -25,6 +25,29 @@
     document.querySelectorAll(".gd-autoclose").forEach(toggleSlaFromCheckbox);
   }
 
+  function toggleSendMore(chk) {
+    const container = closestContainer(chk);
+    if (!container) return;
+
+    const box = container.querySelector(".gd-sendmore-box");
+    const txt = container.querySelector(".gd-sendmore-text");
+    if (!box || !txt) return;
+
+    if (chk.checked) {
+      box.style.display = "";
+      txt.disabled = false;
+      txt.style.opacity = "1";
+    } else {
+      box.style.display = "none";
+      txt.disabled = true;
+      txt.style.opacity = "0.55";
+    }
+  }
+
+  function initSendMoreToggles() {
+    document.querySelectorAll(".gd-sendmore-toggle").forEach(toggleSendMore);
+  }
+
   function removeClient(btn) {
     const card = btn.closest(".gd-client");
     if (card) card.remove();
@@ -105,6 +128,23 @@
           <div class="gd-field"><label>sub_category</label><input type="text" name="clients[${i}][topdesk][sub_category]" value=""></div>
           <div class="gd-field"><label>call_type</label><input type="text" name="clients[${i}][topdesk][call_type]" value=""></div>
         </div>
+
+        <div class="gd-row">
+          <div class="gd-field gd-field-tight">
+            <label>Sendmore info</label>
+            <div class="gd-check">
+              <input type="checkbox" class="gd-sendmore-toggle" name="clients[${i}][topdesk][send_more_info]" value="1">
+              <span class="gd-muted">comentar após criar o chamado</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="gd-row gd-sendmore-box" style="display:none">
+          <div class="gd-field">
+            <label>Texto sendmore (puro)</label>
+            <textarea class="gd-sendmore-text" name="clients[${i}][topdesk][more_info_text]" rows="4" disabled></textarea>
+          </div>
+        </div>
       </div>
     `;
 
@@ -112,6 +152,7 @@
 
     // como por padrão autoclose vem desligado, trava SLA
     initSlaLocks();
+    initSendMoreToggles();
   }
 
   // Event delegation (sem precisar onclick inline)
@@ -134,7 +175,13 @@
   document.addEventListener("change", (e) => {
     const chk = e.target.closest(".gd-autoclose");
     if (chk) toggleSlaFromCheckbox(chk);
+
+    const more = e.target.closest(".gd-sendmore-toggle");
+    if (more) toggleSendMore(more);
   });
 
-  document.addEventListener("DOMContentLoaded", initSlaLocks);
+  document.addEventListener("DOMContentLoaded", () => {
+    initSlaLocks();
+    initSendMoreToggles();
+  });
 })();
