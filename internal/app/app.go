@@ -210,7 +210,11 @@ func buildCreatePayload(
 		"operatorGroup":    map[string]any{"id": operGrp},
 		"operator":         map[string]any{"id": operator},
 		"processingStatus": map[string]any{"name": processingStatusName},
-		"optionalFields2":  map[string]any{"memo2": secCaller},
+	}
+
+	// Secondary caller só é enviado quando existir valor válido.
+	if v := strings.TrimSpace(secCaller); v != "" && !strings.EqualFold(v, "null") {
+		payload["optionalFields2"] = map[string]any{"memo2": v}
 	}
 
 	// ✅ Impact só vai se existir (evita 400 por name inexistente/vazio)
