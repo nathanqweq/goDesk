@@ -63,6 +63,17 @@ func CloseHTML(ticketID string, p rawdata.Payload) string {
 	)
 }
 
+func OpeningEmailHTML(ticketID string, p rawdata.Payload, contractResolved string) string {
+	intro := fmt.Sprintf(
+		"Ol\u00e1 prezados,<br><br>"+
+			"Informamos que estamos com o seguinte alerta em nosso monitoramento que gerou o chamado %s.<br>"+
+			"Estamos verificando e em breve retornaremos com mais atualiza\u00e7\u00f5es.<br><br>",
+		empty(ticketID, "-"),
+	)
+
+	return intro + CreateHTML(p, contractResolved) + "<br>Atenciosamente,<br>Equipe de Suporte e Monitoramento Teltec"
+}
+
 func empty(v, def string) string {
 	v = strings.TrimSpace(v)
 	if v == "" || strings.EqualFold(v, "null") || strings.EqualFold(v, "UNKNOWN") {

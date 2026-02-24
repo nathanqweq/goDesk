@@ -88,6 +88,22 @@ echo '<div class="gd-row gd-sendmore-box"'.$def_send_more_hidden.'>';
 echo '<div class="gd-field"><label>Texto sendmore (puro)</label><textarea class="gd-sendmore-text" name="default[topdesk][more_info_text]" rows="4">'.h($def_td['more_info_text'] ?? '').'</textarea></div>';
 echo '</div>';
 
+$def_send_email = !empty($def_td['send_email']) ? 'checked' : '';
+$def_send_email_hidden = !empty($def_td['send_email']) ? '' : ' style="display:none"';
+echo '<div class="gd-row">';
+echo '<div class="gd-field gd-field-tight">
+	<label>Enviar email</label>
+	<div class="gd-check">
+		<input type="checkbox" class="gd-sendemail-toggle" name="default[topdesk][send_email]" value="1" '.$def_send_email.'>
+		<span class="gd-muted">enviar email apos criar o chamado</span>
+	</div>
+</div>';
+echo '</div>';
+echo '<div class="gd-row gd-sendemail-box"'.$def_send_email_hidden.'>';
+echo '<div class="gd-field"><label>Email para</label><input type="text" class="gd-email-to" name="default[topdesk][email_to]" value="'.h($def_td['email_to'] ?? '').'"></div>';
+echo '<div class="gd-field"><label>Email copia</label><input type="text" class="gd-email-cc" name="default[topdesk][email_cc]" value="'.h($def_td['email_cc'] ?? '').'"></div>';
+echo '</div>';
+
 echo '</div>';
 
 echo '<div class="gd-card">';
@@ -163,6 +179,22 @@ foreach ($clients as $c) {
 	echo '</div>';
 	echo '<div class="gd-row gd-sendmore-box"'.$send_more_hidden.'>';
 	echo '<div class="gd-field"><label>Texto sendmore (puro)</label><textarea class="gd-sendmore-text" name="clients['.$idx.'][topdesk][more_info_text]" rows="4">'.h($td['more_info_text'] ?? '').'</textarea></div>';
+	echo '</div>';
+
+	$send_email = !empty($td['send_email']) ? 'checked' : '';
+	$send_email_hidden = !empty($td['send_email']) ? '' : ' style="display:none"';
+	echo '<div class="gd-row">';
+	echo '<div class="gd-field gd-field-tight">
+		<label>Enviar email</label>
+		<div class="gd-check">
+			<input type="checkbox" class="gd-sendemail-toggle" name="clients['.$idx.'][topdesk][send_email]" value="1" '.$send_email.'>
+			<span class="gd-muted">enviar email apos criar o chamado</span>
+		</div>
+	</div>';
+	echo '</div>';
+	echo '<div class="gd-row gd-sendemail-box"'.$send_email_hidden.'>';
+	echo '<div class="gd-field"><label>Email para</label><input type="text" class="gd-email-to" name="clients['.$idx.'][topdesk][email_to]" value="'.h($td['email_to'] ?? '').'"></div>';
+	echo '<div class="gd-field"><label>Email copia</label><input type="text" class="gd-email-cc" name="clients['.$idx.'][topdesk][email_cc]" value="'.h($td['email_cc'] ?? '').'"></div>';
 	echo '</div>';
 
 	echo '</div>';

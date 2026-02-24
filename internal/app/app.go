@@ -1,12 +1,14 @@
 package app
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
 	"time"
 
 	"godesk/internal/config"
+	"godesk/internal/mailer"
 	"godesk/internal/rawdata"
 	"godesk/internal/topdesk"
 	"godesk/internal/zabbix"
@@ -126,6 +128,33 @@ func Run(cfg config.RuntimeConfig) error {
 				}
 			} else {
 				log.Printf("[topdesk] WARN: send_more_info ativo sem texto configurado (rule=%q)\n", p.RuleName)
+			}
+		}
+		if pol.TopDesk.SendEmail {
+			to := mailer.ParseRecipients(pol.TopDesk.EmailTo)
+			cc := mailer.ParseRecipients(pol.TopDesk.EmailCc)
+
+			if len(to) == 0 {
+				log.Printf("[email] WARN: send_email ativo sem destinatario TO (rule=%q)\n", p.RuleName)
+			} else {
+				subject := fmt.Sprintf("%s - %s", cfg.TicketName, created)
+				body := topdesk.OpeningEmailHTML(created, p, contract)
+				err := mailer.SendHTML(
+					mailer.Config{
+						Host: cfg.SMTPHost,
+						Port: cfg.SMTPPort,
+						User: cfg.SMTPUser,
+						Pass: cfg.SMTPPass,
+						From: cfg.SMTPFrom,
+					},
+					to,
+					cc,
+					subject,
+					body,
+				)
+				if err != nil {
+					log.Printf("[email] WARN: falha ao enviar email ticket=%s: %v\n", created, err)
+				}
 			}
 		}
 		if err := zx.Acknowledge(p.EventID, "Chamado criado: "+created); err != nil {

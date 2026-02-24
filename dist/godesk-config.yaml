@@ -1,5 +1,5 @@
 default:
-  client: "Cliente padrão" # opcional no Go (não é editado pelo módulo PHP)
+  client: "Cliente padrao" # opcional no Go (nao e editado pelo modulo PHP)
   urgency: "Baixa"
   impact: "Sem impacto"
   priority: "" # opcional
@@ -16,7 +16,10 @@ default:
     sub_category: "Monitoramento CONTRATO_PADRAO"
     send_more_info: false
     more_info_text: ""
-    call_type: "Resolução de incidente"
+    send_email: false
+    email_to: ""
+    email_cc: ""
+    call_type: "Resolucao de incidente"
 
 clients:
   CRESOL-AP-SW: # precisa bater com RAWDATA.rule_name
@@ -37,4 +40,7 @@ clients:
       sub_category: "Monitoramento CRESOL"
       send_more_info: false
       more_info_text: ""
-      call_type: "Resolução de incidente"
+      send_email: false
+      email_to: ""
+      email_cc: ""
+      call_type: "Resolucao de incidente"

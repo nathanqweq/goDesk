@@ -53,6 +53,9 @@ class ConfigView extends CController {
 		$parsed['default']['topdesk'] ??= [];
 		$parsed['default']['topdesk']['send_more_info'] ??= false;
 		$parsed['default']['topdesk']['more_info_text'] ??= '';
+		$parsed['default']['topdesk']['send_email'] ??= false;
+		$parsed['default']['topdesk']['email_to'] ??= '';
+		$parsed['default']['topdesk']['email_cc'] ??= '';
 
 		foreach ($parsed['clients'] as $rule => $c) {
 			if (!is_array($c)) {
@@ -63,6 +66,9 @@ class ConfigView extends CController {
 			$parsed['clients'][$rule]['topdesk'] ??= [];
 			$parsed['clients'][$rule]['topdesk']['send_more_info'] ??= false;
 			$parsed['clients'][$rule]['topdesk']['more_info_text'] ??= '';
+			$parsed['clients'][$rule]['topdesk']['send_email'] ??= false;
+			$parsed['clients'][$rule]['topdesk']['email_to'] ??= '';
+			$parsed['clients'][$rule]['topdesk']['email_cc'] ??= '';
 		}
 
 		return $parsed;

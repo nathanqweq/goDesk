@@ -48,6 +48,34 @@
     document.querySelectorAll(".gd-sendmore-toggle").forEach(toggleSendMore);
   }
 
+  function toggleSendEmail(chk) {
+    const container = closestContainer(chk);
+    if (!container) return;
+
+    const box = container.querySelector(".gd-sendemail-box");
+    const to = container.querySelector(".gd-email-to");
+    const cc = container.querySelector(".gd-email-cc");
+    if (!box || !to || !cc) return;
+
+    if (chk.checked) {
+      box.style.display = "";
+      to.disabled = false;
+      cc.disabled = false;
+      to.style.opacity = "1";
+      cc.style.opacity = "1";
+    } else {
+      box.style.display = "none";
+      to.disabled = true;
+      cc.disabled = true;
+      to.style.opacity = "0.55";
+      cc.style.opacity = "0.55";
+    }
+  }
+
+  function initSendEmailToggles() {
+    document.querySelectorAll(".gd-sendemail-toggle").forEach(toggleSendEmail);
+  }
+
   function removeClient(btn) {
     const card = btn.closest(".gd-client");
     if (card) card.remove();
@@ -145,6 +173,27 @@
             <textarea class="gd-sendmore-text" name="clients[${i}][topdesk][more_info_text]" rows="4" disabled></textarea>
           </div>
         </div>
+
+        <div class="gd-row">
+          <div class="gd-field gd-field-tight">
+            <label>Enviar email</label>
+            <div class="gd-check">
+              <input type="checkbox" class="gd-sendemail-toggle" name="clients[${i}][topdesk][send_email]" value="1">
+              <span class="gd-muted">enviar email apos criar o chamado</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="gd-row gd-sendemail-box" style="display:none">
+          <div class="gd-field">
+            <label>Email para</label>
+            <input type="text" class="gd-email-to" name="clients[${i}][topdesk][email_to]" value="" disabled>
+          </div>
+          <div class="gd-field">
+            <label>Email copia</label>
+            <input type="text" class="gd-email-cc" name="clients[${i}][topdesk][email_cc]" value="" disabled>
+          </div>
+        </div>
       </div>
     `;
 
@@ -153,6 +202,7 @@
     // como por padrão autoclose vem desligado, trava SLA
     initSlaLocks();
     initSendMoreToggles();
+    initSendEmailToggles();
   }
 
   // Event delegation (sem precisar onclick inline)
@@ -178,10 +228,14 @@
 
     const more = e.target.closest(".gd-sendmore-toggle");
     if (more) toggleSendMore(more);
+
+    const sendEmail = e.target.closest(".gd-sendemail-toggle");
+    if (sendEmail) toggleSendEmail(sendEmail);
   });
 
   document.addEventListener("DOMContentLoaded", () => {
     initSlaLocks();
     initSendMoreToggles();
+    initSendEmailToggles();
   });
 })();

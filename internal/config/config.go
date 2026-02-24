@@ -18,6 +18,12 @@ type RuntimeConfig struct {
 	LogFile    string
 	ConfigFile string
 	TimeoutSec int
+
+	SMTPHost string
+	SMTPPort string
+	SMTPUser string
+	SMTPPass string
+	SMTPFrom string
 }
 
 func FromArgs(argv []string) (RuntimeConfig, error) {
@@ -38,6 +44,11 @@ func FromArgs(argv []string) (RuntimeConfig, error) {
 		LogFile:    getenv("TOPDESK_LOG_FILE", "/tmp/goDesk-integration.log"),
 		ConfigFile: getenv("TOPDESK_CONFIG", "/etc/zabbix/godesk/godesk-config.yaml"),
 		TimeoutSec: atoiDefault(getenv("TOPDESK_TIMEOUT_SEC", "15"), 15),
+		SMTPHost:   getenv("TOPDESK_SMTP_HOST", ""),
+		SMTPPort:   getenv("TOPDESK_SMTP_PORT", "25"),
+		SMTPUser:   getenv("TOPDESK_SMTP_USER", ""),
+		SMTPPass:   getenv("TOPDESK_SMTP_PASS", ""),
+		SMTPFrom:   getenv("TOPDESK_SMTP_FROM", ""),
 	}
 
 	// sane

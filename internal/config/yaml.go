@@ -19,7 +19,9 @@ type TopDeskDefaults struct {
 	CallType        string `yaml:"call_type"`
 	SendMoreInfo    bool   `yaml:"send_more_info"`
 	MoreInfoText    string `yaml:"more_info_text"`
-	// Cc string `yaml:"cc"` // se quiser usar depois
+	SendEmail       bool   `yaml:"send_email"`
+	EmailTo         string `yaml:"email_to"`
+	EmailCc         string `yaml:"email_cc"`
 }
 
 type Policy struct {
@@ -135,6 +137,13 @@ func mergePolicy(def Policy, over Policy) Policy {
 	def.TopDesk.SendMoreInfo = over.TopDesk.SendMoreInfo
 	if over.TopDesk.MoreInfoText != "" {
 		def.TopDesk.MoreInfoText = over.TopDesk.MoreInfoText
+	}
+	def.TopDesk.SendEmail = over.TopDesk.SendEmail
+	if over.TopDesk.EmailTo != "" {
+		def.TopDesk.EmailTo = over.TopDesk.EmailTo
+	}
+	if over.TopDesk.EmailCc != "" {
+		def.TopDesk.EmailCc = over.TopDesk.EmailCc
 	}
 
 	return def

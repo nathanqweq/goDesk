@@ -45,6 +45,9 @@ foreach (['contract','operator','oper_group','main_caller','secundary_caller','s
 	echo '<span class="gd-tag">'.h($k).': '.h($v).'</span>';
 }
 echo '<span class="gd-tag">send_more_info: '.(!empty($def_td['send_more_info']) ? 'true' : 'false').'</span>';
+echo '<span class="gd-tag">send_email: '.(!empty($def_td['send_email']) ? 'true' : 'false').'</span>';
+echo '<span class="gd-tag">email_to: '.h($def_td['email_to'] ?? '').'</span>';
+echo '<span class="gd-tag">email_cc: '.h($def_td['email_cc'] ?? '').'</span>';
 echo '</div>';
 if (!empty($def_td['more_info_text'])) {
 	echo '<div class="gd-row" style="margin-top:10px;">';
@@ -89,6 +92,9 @@ else {
 			echo '<span class="gd-tag">'.h($k).': '.h($v).'</span>';
 		}
 		echo '<span class="gd-tag">send_more_info: '.(!empty($td['send_more_info']) ? 'true' : 'false').'</span>';
+		echo '<span class="gd-tag">send_email: '.(!empty($td['send_email']) ? 'true' : 'false').'</span>';
+		echo '<span class="gd-tag">email_to: '.h($td['email_to'] ?? '').'</span>';
+		echo '<span class="gd-tag">email_cc: '.h($td['email_cc'] ?? '').'</span>';
 		echo '</div>';
 		if (!empty($td['more_info_text'])) {
 			echo '<div class="gd-row" style="margin-top:10px;">';
