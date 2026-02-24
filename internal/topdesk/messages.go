@@ -118,6 +118,13 @@ func OpeningEmailHTML(ticketID string, p rawdata.Payload, contractResolved strin
       </style>
    </head>
    <body lang=PT-BR link="#0563C1" vlink="#954F72">
+      <p class=MsoNormal>
+         Ola prezados,<br><br>
+         Informamos que estamos com o seguinte alerta em nosso monitoramento que gerou o chamado %s.<br>
+         Estamos verificando e em breve retornaremos com mais atualizacoes.
+         <o:p></o:p>
+      </p>
+      <p class=MsoNormal><o:p>&nbsp;</o:p></p>
       <table class=MsoNormalTable border=0 cellspacing=0 cellpadding=0 width="100%%" style='width:100.0%%'>
          <tr>
             <td style='padding:0cm 0cm 0cm 0cm'>
@@ -336,10 +343,15 @@ func OpeningEmailHTML(ticketID string, p rawdata.Payload, contractResolved strin
       <p class=MsoNormal>
          <o:p>&nbsp;</o:p>
       </p>
+      <p class=MsoNormal>
+         Atenciosamente, Equipe de Suporte e Monitoramento Teltec.
+         <o:p></o:p>
+      </p>
       </div>
    </body>
 </html>`,
 		htmlEscape(empty(p.Cliente, "-")),
+		htmlEscape(empty(ticketID, "-")),
 		htmlEscape(empty(contractResolved, "-")),
 		htmlEscape(empty(p.Status, "-")),
 		htmlEscape(empty(p.Host, "-")),
