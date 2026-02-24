@@ -64,56 +64,283 @@ func CloseHTML(ticketID string, p rawdata.Payload) string {
 }
 
 func OpeningEmailHTML(ticketID string, p rawdata.Payload, contractResolved string) string {
-	return fmt.Sprintf(`<!DOCTYPE html>
-<html>
-  <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Zabbix - Teltec Solutions</title>
-    <style>
-      body { margin: 0; padding: 16px; background: #f3f5f7; font-family: Calibri, Arial, sans-serif; color: #2b2b2b; }
-      .mail-wrap { max-width: 760px; margin: 0 auto; background: #ffffff; border: 1px solid #e1e4e8; }
-      .head { background: #3a6cbf; color: #fff; padding: 16px 20px; font-family: Verdana, Arial, sans-serif; }
-      .head .kicker { font-size: 12px; opacity: 0.9; }
-      .head .title { font-size: 22px; font-weight: 700; margin-top: 4px; }
-      .content { padding: 18px 20px; font-size: 14px; line-height: 1.45; }
-      .ticket { margin: 10px 0 18px 0; padding: 10px 12px; background: #f8fafc; border-left: 4px solid #3a6cbf; }
-      .grid { width: 100%%; border-collapse: collapse; margin-top: 10px; }
-      .grid td { border: 1px solid #e6e6e6; padding: 8px 10px; vertical-align: top; }
-      .grid td:first-child { width: 34%%; font-weight: 700; background: #fafafa; }
-      .foot { background: #646D7E; color: #fff; text-align: center; font-size: 12px; padding: 10px; font-family: Verdana, Arial, sans-serif; }
-    </style>
-  </head>
-  <body>
-    <div class="mail-wrap">
-      <div class="head">
-        <div class="kicker">Zabbix</div>
-        <div class="title">Teltec Solutions - %s</div>
+	return fmt.Sprintf(`<html>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=utf-8">
+   <head>
+      <title>Zabbix - %s</title>
+      <style>
+         <!--
+            /* Font Definitions */
+            @font-face
+            	{font-family:"Cambria Math";
+            	panose-1:2 4 5 3 5 4 6 3 2 4;}
+            @font-face
+            	{font-family:Calibri;
+            	panose-1:2 15 5 2 2 2 4 3 2 4;}
+            @font-face
+            	{font-family:Verdana;
+            	panose-1:2 11 6 4 3 5 4 4 2 4;}
+            /* Style Definitions */
+            p.MsoNormal, li.MsoNormal, div.MsoNormal
+            	{margin:0cm;
+            	margin-bottom:.0001pt;
+            	font-size:11.0pt;
+            	font-family:"Calibri",sans-serif;}
+            a:link, span.MsoHyperlink
+            	{mso-style-priority:99;
+            	color:#0563C1;
+            	text-decoration:underline;}
+            a:visited, span.MsoHyperlinkFollowed
+            	{mso-style-priority:99;
+            	color:#954F72;
+            	text-decoration:underline;}
+            p.msonormal0, li.msonormal0, div.msonormal0
+            	{mso-style-name:msonormal;
+            	mso-margin-top-alt:auto;
+            	margin-right:0cm;
+            	mso-margin-bottom-alt:auto;
+            	margin-left:0cm;
+            	font-size:11.0pt;
+            	font-family:"Calibri",sans-serif;}
+            span.EstiloDeEmail18
+            	{mso-style-type:personal-reply;
+            	font-family:"Calibri",sans-serif;
+            	color:#002060;}
+            .MsoChpDefault
+            	{mso-style-type:export-only;
+            	font-size:10.0pt;}
+            @page WordSection1
+            	{size:612.0pt 792.0pt;
+            	margin:70.85pt 3.0cm 70.85pt 3.0cm;}
+            div.WordSection1
+            	{page:WordSection1;}
+            -->
+      </style>
+   </head>
+   <body lang=PT-BR link="#0563C1" vlink="#954F72">
+      <table class=MsoNormalTable border=0 cellspacing=0 cellpadding=0 width="100%%" style='width:100.0%%'>
+         <tr>
+            <td style='padding:0cm 0cm 0cm 0cm'>
+               <div align=center>
+                  <table class=MsoNormalTable border=0 cellspacing=0 cellpadding=0 width=522 style='width:391.5pt;border-collapse:collapse'>
+                     <tr>
+                        <td style='padding:.75pt .75pt .75pt .75pt'>
+                           <div align=center>
+                              <table class=MsoNormalTable border=0 cellspacing=0 cellpadding=0 width=520 style='width:390.0pt;border-collapse:collapse'>
+                                 <tr>
+                                    <td style='background:#E1E4E8;padding:7.5pt 0cm 3.75pt 0cm'>
+                                       <div align=center>
+                                          <table class=MsoNormalTable border=0 cellpadding=0 width=490 style='width:367.5pt;background:#3a6cbf'>
+                                             <tr>
+                                                <td style='padding:2.25pt 2.25pt 2.25pt 93.75pt'>
+                                                   <table class=MsoNormalTable border=0 cellspacing=0 cellpadding=0 style='border-collapse:collapse'>
+                                                      <tr>
+                                                         <td style='background:#E12234;padding:0cm 9.75pt 0cm 9.75pt'>
+                                                            <p class=MsoNormal align=center style='text-align:center'>
+                                                               <span style='font-size:36.0pt;font-family:"Verdana",sans-serif;color:white'>Z</span>
+                                                               <o:p></o:p>
+                                                            </p>
+                                                         </td>
+                                                         <td style='background:#3a6cbf;padding:0cm 0cm 0cm 7.5pt'>
+                                                            <p class=MsoNormal>
+                                                               <span style='font-size:24.0pt;font-family:"Verdana",sans-serif;color:white'>Teltec Solutions<br></span>
+                                                               <span style='font-size:13.5pt;font-family:"Verdana",sans-serif;color:white'>Zabbix %s</span>
+                                                               <o:p></o:p>
+                                                            </p>
+                                                         </td>
+                                                      </tr>
+                                                   </table>
+                                                </td>
+                                             </tr>
+                                          </table>
+                                       </div>
+                                    </td>
+                                 </tr>
+                                 <tr>
+                                    <td style='background:#E1E4E8;padding:3.75pt 10.5pt 9.0pt 10.5pt'>
+                                       <table class=MsoNormalTable border=0 cellspacing=0 cellpadding=0 width="100%%" style='width:100.0%%'>
+                                          <tr>
+                                             <td style='padding:.75pt .75pt .75pt .75pt'>
+                                                <table class=MsoNormalTable border=0 cellspacing=0 cellpadding=0 width="100%%" style='width:100.0%%'>
+                                                   <tr>
+                                                      <td style='background:white;padding:3.75pt 3.75pt 3.75pt 11.25pt'>
+                                                         <table class=MsoNormalTable border=0 cellspacing=0 cellpadding=0 width="100%%" style='width:100.0%%'>
+                                                            <tr>
+                                                               <td style='padding:2.25pt 2.25pt 2.25pt 2.25pt'>
+                                                                  <p class=MsoNormal>
+                                                                     <b>
+                                                                        Status:
+                                                                        <o:p></o:p>
+                                                                     </b>
+                                                                  </p>
+                                                               </td>
+                                                               <td style='padding:2.25pt 2.25pt 2.25pt 2.25pt'>
+                                                                  <p class=MsoNormal>
+                                                                     %s
+                                                                     <o:p></o:p>
+                                                                  </p>
+                                                               </td>
+                                                            </tr>
+                                                            <tr>
+                                                               <td style='padding:2.25pt 2.25pt 2.25pt 2.25pt'>
+                                                                  <p class=MsoNormal>
+                                                                     <b>
+                                                                        Host:
+                                                                        <o:p></o:p>
+                                                                     </b>
+                                                                  </p>
+                                                               </td>
+                                                               <td width="65%%" style='width:65.0%%;padding:2.25pt 2.25pt 2.25pt 2.25pt'>
+                                                                  <p class=MsoNormal>
+                                                                     %s
+                                                                     <o:p></o:p>
+                                                                  </p>
+                                                               </td>
+                                                            </tr>
+                                                            <tr>
+                                                               <td style='padding:2.25pt 2.25pt 2.25pt 2.25pt'>
+                                                                  <p class=MsoNormal>
+                                                                     <b>
+                                                                        Trigger:
+                                                                        <o:p></o:p>
+                                                                     </b>
+                                                                  </p>
+                                                               </td>
+                                                               <td width="65%%" style='width:65.0%%;padding:2.25pt 2.25pt 2.25pt 2.25pt'>
+                                                                  <p class=MsoNormal>
+                                                                     %s
+                                                                     <o:p></o:p>
+                                                                  </p>
+                                                               </td>
+                                                            </tr>
+                                                            <tr>
+                                                               <td style='padding:2.25pt 2.25pt 2.25pt 2.25pt'>
+                                                                  <p class=MsoNormal>
+                                                                     <b>
+                                                                        Valor do Evento:
+                                                                        <o:p></o:p>
+                                                                     </b>
+                                                                  </p>
+                                                               </td>
+                                                               <td style='padding:2.25pt 2.25pt 2.25pt 2.25pt'>
+                                                                  <p class=MsoNormal>
+                                                                     %s
+                                                                     <o:p></o:p>
+                                                                  </p>
+                                                               </td>
+                                                            </tr>
+                                                            <tr>
+                                                               <td style='padding:2.25pt 2.25pt 2.25pt 2.25pt'>
+                                                                  <p class=MsoNormal>
+                                                                     <b>
+                                                                        Severidade:
+                                                                        <o:p></o:p>
+                                                                     </b>
+                                                                  </p>
+                                                               </td>
+                                                               <td style='padding:2.25pt 2.25pt 2.25pt 2.25pt'>
+                                                                  <p class=MsoNormal>
+                                                                     %s
+                                                                     <o:p></o:p>
+                                                                  </p>
+                                                               </td>
+                                                            </tr>
+                                                            <tr>
+                                                               <td style='padding:2.25pt 2.25pt 2.25pt 2.25pt'>
+                                                                  <p class=MsoNormal>
+                                                                     <b>
+                                                                        Data do Evento:
+                                                                        <o:p></o:p>
+                                                                     </b>
+                                                                  </p>
+                                                               </td>
+                                                               <td style='padding:2.25pt 2.25pt 2.25pt 2.25pt'>
+                                                                  <p class=MsoNormal>
+                                                                     %s
+                                                                     <o:p></o:p>
+                                                                  </p>
+                                                               </td>
+                                                            </tr>
+                                                            <tr>
+                                                               <td style='padding:2.25pt 2.25pt 2.25pt 2.25pt'>
+                                                                  <p class=MsoNormal>
+                                                                     <b>
+                                                                        Hora do Evento:
+                                                                        <o:p></o:p>
+                                                                     </b>
+                                                                  </p>
+                                                               </td>
+                                                               <td style='padding:2.25pt 2.25pt 2.25pt 2.25pt'>
+                                                                  <p class=MsoNormal>
+                                                                     %s
+                                                                     <o:p></o:p>
+                                                                  </p>
+                                                               </td>
+                                                            </tr>
+                                                            <tr>
+                                                               <td style='padding:2.25pt 2.25pt 2.25pt 2.25pt'>
+                                                                  <p class=MsoNormal>
+                                                                     <b>
+                                                                        Identificador do Evento:
+                                                                        <o:p></o:p>
+                                                                     </b>
+                                                                  </p>
+                                                               </td>
+                                                               <td style='padding:2.25pt 2.25pt 2.25pt 2.25pt'>
+                                                                  <p class=MsoNormal>
+                                                                     %s
+                                                                     <o:p></o:p>
+                                                                  </p>
+                                                               </td>
+                                                            </tr>
+                                                         </table>
+                                                      </td>
+                                                   </tr>
+                                                </table>
+                                             </td>
+                                          </tr>
+                                       </table>
+                                    </td>
+                                 </tr>
+                                 <tr>
+                                    <td style='padding:0cm 0cm 0cm 0cm'>
+                                       <table class=MsoNormalTable border=0 cellspacing=0 cellpadding=0 width="100%%" style='width:100.0%%;background:#E1E4E8'>
+                                          <tr>
+                                             <td style='padding:0cm 10.5pt 7.5pt 10.5pt'>
+                                                <table class=MsoNormalTable border=0 cellspacing=0 cellpadding=0 width="100%%" style='width:100.0%%'>
+                                                   <tr>
+                                                      <td style='background:#646D7E;padding:7.5pt 0cm 7.5pt 0cm'>
+                                                         <p class=MsoNormal align=center style='text-align:center'>
+                                                            <span style='font-size:10.0pt;font-family:"Verdana",sans-serif;color:white'>- Service Desk -</span>
+                                                            <span style='color:white'>
+                                                               <o:p></o:p>
+                                                            </span>
+                                                         </p>
+                                                      </td>
+                                                   </tr>
+                                                </table>
+                                             </td>
+                                          </tr>
+                                       </table>
+                                    </td>
+                                 </tr>
+                              </table>
+                           </div>
+                        </td>
+                     </tr>
+                  </table>
+               </div>
+            </td>
+         </tr>
+      </table>
+      <p class=MsoNormal>
+         <o:p>&nbsp;</o:p>
+      </p>
       </div>
-      <div class="content">
-        <p>Ola prezados,</p>
-        <p>Informamos que estamos com o seguinte alerta em nosso monitoramento que gerou o chamado <b>%s</b>.
-        Estamos verificando e em breve retornaremos com mais atualizacoes.</p>
-        <div class="ticket">Assunto do chamado: <b>%s</b></div>
-        <table class="grid">
-          <tr><td>Status</td><td>%s</td></tr>
-          <tr><td>Host</td><td>%s</td></tr>
-          <tr><td>Trigger</td><td>%s</td></tr>
-          <tr><td>Valor do evento</td><td>%s</td></tr>
-          <tr><td>Severidade</td><td>%s</td></tr>
-          <tr><td>Data do evento</td><td>%s</td></tr>
-          <tr><td>Hora do evento</td><td>%s</td></tr>
-          <tr><td>Event ID</td><td>%s</td></tr>
-          <tr><td>Trigger ID</td><td>%s</td></tr>
-        </table>
-        <p style="margin-top:14px;">Atenciosamente,<br>Equipe de Suporte e Monitoramento Teltec</p>
-      </div>
-      <div class="foot">- Service Desk -</div>
-    </div>
-  </body>
+   </body>
 </html>`,
+		htmlEscape(empty(p.Cliente, "-")),
 		htmlEscape(empty(contractResolved, "-")),
-		htmlEscape(empty(ticketID, "-")),
-		htmlEscape(empty(ticketID, "-")),
 		htmlEscape(empty(p.Status, "-")),
 		htmlEscape(empty(p.Host, "-")),
 		htmlEscape(empty(p.Trigger, "-")),
@@ -122,7 +349,6 @@ func OpeningEmailHTML(ticketID string, p rawdata.Payload, contractResolved strin
 		htmlEscape(empty(FormatDateBR(p.Date), p.Date)),
 		htmlEscape(empty(p.Hour, "-")),
 		htmlEscape(empty(p.EventID, "-")),
-		htmlEscape(empty(p.TriggerID, "-")),
 	)
 }
 
