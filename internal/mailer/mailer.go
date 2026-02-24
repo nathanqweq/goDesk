@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/smtp"
 	"strings"
+	"time"
 )
 
 type Config struct {
@@ -79,8 +80,11 @@ func buildMIME(from string, to []string, cc []string, subject string, htmlBody s
 		b.WriteString("Cc: " + strings.Join(cc, ", ") + "\r\n")
 	}
 	b.WriteString("Subject: " + subject + "\r\n")
+	b.WriteString("Date: " + time.Now().Format(time.RFC1123Z) + "\r\n")
 	b.WriteString("MIME-Version: 1.0\r\n")
 	b.WriteString("Content-Type: text/html; charset=UTF-8\r\n")
+	b.WriteString("Content-Transfer-Encoding: 8bit\r\n")
+	b.WriteString("X-Mailer: goDesk\r\n")
 	b.WriteString("\r\n")
 	b.WriteString(htmlBody)
 	return b.String()
