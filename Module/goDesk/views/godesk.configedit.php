@@ -88,6 +88,17 @@ echo '<div class="gd-row gd-sendmore-box"'.$def_send_more_hidden.'>';
 echo '<div class="gd-field"><label>Texto sendmore (puro)</label><textarea class="gd-sendmore-text" name="default[topdesk][more_info_text]" rows="4">'.h($def_td['more_info_text'] ?? '').'</textarea></div>';
 echo '</div>';
 
+$def_add_cresol = !empty($def_td['adicional_cresol']) ? 'checked' : '';
+echo '<div class="gd-row">';
+echo '<div class="gd-field gd-field-tight">
+	<label>Adicional cresol</label>
+	<div class="gd-check">
+		<input type="checkbox" name="default[topdesk][adicional_cresol]" value="1" '.$def_add_cresol.'>
+		<span class="gd-muted">enviar optionalFields1 no create</span>
+	</div>
+</div>';
+echo '</div>';
+
 $def_send_email = !empty($def_td['send_email']) ? 'checked' : '';
 $def_send_email_hidden = !empty($def_td['send_email']) ? '' : ' style="display:none"';
 echo '<div class="gd-row">';
@@ -179,6 +190,17 @@ foreach ($clients as $c) {
 	echo '</div>';
 	echo '<div class="gd-row gd-sendmore-box"'.$send_more_hidden.'>';
 	echo '<div class="gd-field"><label>Texto sendmore (puro)</label><textarea class="gd-sendmore-text" name="clients['.$idx.'][topdesk][more_info_text]" rows="4">'.h($td['more_info_text'] ?? '').'</textarea></div>';
+	echo '</div>';
+
+	$add_cresol = !empty($td['adicional_cresol']) ? 'checked' : '';
+	echo '<div class="gd-row">';
+	echo '<div class="gd-field gd-field-tight">
+		<label>Adicional cresol</label>
+		<div class="gd-check">
+			<input type="checkbox" name="clients['.$idx.'][topdesk][adicional_cresol]" value="1" '.$add_cresol.'>
+			<span class="gd-muted">enviar optionalFields1 no create</span>
+		</div>
+	</div>';
 	echo '</div>';
 
 	$send_email = !empty($td['send_email']) ? 'checked' : '';

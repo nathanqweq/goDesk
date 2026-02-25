@@ -176,6 +176,16 @@
 
         <div class="gd-row">
           <div class="gd-field gd-field-tight">
+            <label>Adicional cresol</label>
+            <div class="gd-check">
+              <input type="checkbox" name="clients[${i}][topdesk][adicional_cresol]" value="1">
+              <span class="gd-muted">enviar optionalFields1 no create</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="gd-row">
+          <div class="gd-field gd-field-tight">
             <label>Enviar email</label>
             <div class="gd-check">
               <input type="checkbox" class="gd-sendemail-toggle" name="clients[${i}][topdesk][send_email]" value="1">

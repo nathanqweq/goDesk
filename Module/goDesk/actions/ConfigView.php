@@ -53,6 +53,7 @@ class ConfigView extends CController {
 		$parsed['default']['topdesk'] ??= [];
 		$parsed['default']['topdesk']['send_more_info'] ??= false;
 		$parsed['default']['topdesk']['more_info_text'] ??= '';
+		$parsed['default']['topdesk']['adicional_cresol'] ??= false;
 		$parsed['default']['topdesk']['send_email'] ??= false;
 		$parsed['default']['topdesk']['email_to'] ??= '';
 		$parsed['default']['topdesk']['email_cc'] ??= '';
@@ -66,6 +67,7 @@ class ConfigView extends CController {
 			$parsed['clients'][$rule]['topdesk'] ??= [];
 			$parsed['clients'][$rule]['topdesk']['send_more_info'] ??= false;
 			$parsed['clients'][$rule]['topdesk']['more_info_text'] ??= '';
+			$parsed['clients'][$rule]['topdesk']['adicional_cresol'] ??= false;
 			$parsed['clients'][$rule]['topdesk']['send_email'] ??= false;
 			$parsed['clients'][$rule]['topdesk']['email_to'] ??= '';
 			$parsed['clients'][$rule]['topdesk']['email_cc'] ??= '';

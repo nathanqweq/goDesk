@@ -16,6 +16,7 @@ default:
     sub_category: "Monitoramento CONTRATO_PADRAO"
     send_more_info: false
     more_info_text: ""
+    adicional_cresol: false
     send_email: false
     email_to: ""
     email_cc: ""
@@ -40,6 +41,7 @@ clients:
       sub_category: "Monitoramento CRESOL"
       send_more_info: false
       more_info_text: ""
+      adicional_cresol: false
       send_email: false
       email_to: ""
       email_cc: ""

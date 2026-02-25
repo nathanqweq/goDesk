@@ -111,6 +111,8 @@ func Run(cfg config.RuntimeConfig) error {
 			subCategory,
 			callType,
 			priority,
+			p.Hour,
+			p.Severity,
 		)
 
 		created, err := td.CreateTicket(payload)
@@ -203,7 +205,7 @@ func buildCreatePayload(
 	ticketName, msgHTML string,
 	pol config.Policy,
 	contract, operator, operGrp, mainCaller, secCaller string,
-	slaID, category, subCategory, callType, priority string,
+	slaID, category, subCategory, callType, priority, hour, severity string,
 ) map[string]any {
 	brief := ticketName
 	if len(brief) > 79 {
@@ -244,6 +246,14 @@ func buildCreatePayload(
 	// Secondary caller só é enviado quando existir valor válido.
 	if v := strings.TrimSpace(secCaller); v != "" && !strings.EqualFold(v, "null") {
 		payload["optionalFields2"] = map[string]any{"memo2": v}
+	}
+
+	if pol.TopDesk.AdicionalCresol {
+		payload["optionalFields1"] = map[string]any{
+			"text1": strings.TrimSpace(hour),
+			"text2": strings.TrimSpace(ticketName),
+			"text3": strings.TrimSpace(severity),
+		}
 	}
 
 	// ✅ Impact só vai se existir (evita 400 por name inexistente/vazio)
