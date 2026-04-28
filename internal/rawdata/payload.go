@@ -13,6 +13,7 @@ type Payload struct {
 	Hour      string `json:"hour"`
 
 	TriggerID  string `json:"trigger_id"`
+	HostID     string `json:"host_id"`
 	EventID    string `json:"event_id"`
 	EventValue string `json:"event_value"` // 1 problem / 0 recovery
 

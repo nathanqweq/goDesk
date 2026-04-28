@@ -9,6 +9,7 @@
  "date":"{EVENT.DATE}",
  "hour":"{EVENT.TIME}",
  "trigger_id":"{TRIGGER.ID}",
+ "host_id":"{HOST.ID}",
  "event_id":"{EVENT.ID}",
  "contract":"{EVENT.TAGS.Contrato}",
  "oper_group":"{EVENT.TAGS.OperGrp}",

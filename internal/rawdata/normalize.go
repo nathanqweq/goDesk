@@ -12,6 +12,7 @@ func Normalize(p *Payload) {
 	p.Date = clean(p.Date)
 	p.Hour = clean(p.Hour)
 	p.TriggerID = clean(p.TriggerID)
+	p.HostID = clean(p.HostID)
 	p.EventID = clean(p.EventID)
 	p.EventValue = clean(p.EventValue)
 

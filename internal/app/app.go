@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"godesk/internal/config"
 	"godesk/internal/mailer"
@@ -85,10 +86,11 @@ func Run(cfg config.RuntimeConfig) error {
 	}
 
 	eventKind := rawdata.EventKind(p)
+	briefDescription := buildBriefDescription(cfg.TicketName, p.HostID)
 	log.Printf("[app] kind=%s rule=%q cliente=%q autoclose=%v urgency=%q impact=%q priority=%q ticket=%q\n",
-		eventKind, p.RuleName, p.Cliente, pol.AutoClose, pol.Urgency, pol.Impact, priority, cfg.TicketName)
+		eventKind, p.RuleName, p.Cliente, pol.AutoClose, pol.Urgency, pol.Impact, priority, briefDescription)
 
-	exists, ticketID, status, err := td.TicketExists(cfg.TicketName)
+	exists, ticketID, status, err := td.TicketExists(briefDescription)
 	if err != nil {
 		return err
 	}
@@ -98,6 +100,7 @@ func Run(cfg config.RuntimeConfig) error {
 		msgHTML := topdesk.CreateHTML(p, contract)
 
 		payload := buildCreatePayload(
+			briefDescription,
 			cfg.TicketName,
 			msgHTML,
 			pol,
@@ -202,16 +205,11 @@ func Run(cfg config.RuntimeConfig) error {
 }
 
 func buildCreatePayload(
-	ticketName, msgHTML string,
+	briefDescription, ticketName, msgHTML string,
 	pol config.Policy,
 	contract, operator, operGrp, mainCaller, secCaller string,
 	slaID, category, subCategory, callType, priority, hour, severity string,
 ) map[string]any {
-	brief := ticketName
-	if len(brief) > 79 {
-		brief = brief[:79]
-	}
-
 	// defaults (mantém seu padrão atual)
 	entryTypeName := "Web"
 	callTypeName := "Resolução de incidente"
@@ -232,7 +230,7 @@ func buildCreatePayload(
 
 	payload := map[string]any{
 		"callerLookup":     map[string]any{"email": mainCaller},
-		"briefDescription": brief,
+		"briefDescription": briefDescription,
 		"request":          msgHTML,
 		"entryType":        map[string]any{"name": entryTypeName},
 		"callType":         map[string]any{"name": callTypeName},
@@ -285,4 +283,35 @@ func buildUpdatePayload(action, currentStatus string) map[string]any {
 		payload["processingStatus"] = map[string]any{"id": ClosedStatusID}
 	}
 	return payload
+}
+
+func buildBriefDescription(ticketName, hostID string) string {
+	const maxLen = 80
+
+	base := strings.TrimSpace(ticketName)
+	hostID = strings.TrimSpace(hostID)
+	if hostID == "" {
+		return truncateRunes(base, maxLen)
+	}
+
+	suffix := " " + hostID
+	suffixLen := utf8.RuneCountInString(suffix)
+	if suffixLen >= maxLen {
+		return truncateRunes(hostID, maxLen)
+	}
+
+	baseLen := maxLen - suffixLen
+	return truncateRunes(base, baseLen) + suffix
+}
+
+func truncateRunes(s string, limit int) string {
+	if limit <= 0 {
+		return ""
+	}
+
+	runes := []rune(s)
+	if len(runes) <= limit {
+		return s
+	}
+	return string(runes[:limit])
 }
