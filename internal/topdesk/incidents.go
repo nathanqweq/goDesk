@@ -12,7 +12,7 @@ import (
 
 func (c Client) TicketExists(briefDescription string) (exists bool, ticketID string, status string, err error) {
 	base := strings.TrimRight(c.BaseURL, "/")
-	q := fmt.Sprintf(`processingStatus.name!=Fechado;briefDescription=="%s"`, escapeQuery(ticketName))
+	q := fmt.Sprintf(`processingStatus.name!=Fechado;briefDescription=="%s"`, escapeQuery(briefDescription))
 
 	// URL encode do query inteiro
 	url := base + "/tas/api/incidents?query=" + url.QueryEscape(q)
