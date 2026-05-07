@@ -12,7 +12,7 @@ import (
 
 func (c Client) TicketExists(ticketName string) (exists bool, ticketID string, status string, err error) {
 	base := strings.TrimRight(c.BaseURL, "/")
-	q := fmt.Sprintf(`processingStatus.name!=Fechado;briefDescription=="%s"`, ticketName)
+	q := fmt.Sprintf(`processingStatus.name!=Fechado;briefDescription=="%s"`, escapeQuery(ticketName))
 
 	// URL encode do query inteiro
 	url := base + "/tas/api/incidents?query=" + url.QueryEscape(q)
@@ -36,14 +36,14 @@ func (c Client) TicketExists(ticketName string) (exists bool, ticketID string, s
 		return false, "", "", fmt.Errorf("TopDesk TicketExists HTTP %d: %s", resp.StatusCode, string(body))
 	}
 
-	var arr []Incident
-	if err := json.Unmarshal(body, &arr); err != nil {
+	incidents, err := parseIncidentList(body)
+	if err != nil {
 		return false, "", "", fmt.Errorf("TopDesk TicketExists JSON: %w body=%s", err, string(body))
 	}
-	if len(arr) == 0 {
+	if len(incidents) == 0 {
 		return false, "", "", nil
 	}
-	return true, arr[0].Number, arr[0].ProcessingStatus.Name, nil
+	return true, incidents[0].Number, incidents[0].ProcessingStatus.Name, nil
 }
 
 func (c Client) CreateTicket(payload any) (string, error) {
@@ -98,4 +98,37 @@ func (c Client) PatchTicket(ticketID string, payload any) error {
 
 func escapeQuery(s string) string {
 	return strings.ReplaceAll(s, `"`, `\"`)
+}
+
+func parseIncidentList(body []byte) ([]Incident, error) {
+	var arr []Incident
+	if err := json.Unmarshal(body, &arr); err == nil {
+		return arr, nil
+	}
+
+	var single Incident
+	if err := json.Unmarshal(body, &single); err == nil {
+		if single.Number != "" || single.ProcessingStatus.Name != "" {
+			return []Incident{single}, nil
+		}
+	}
+
+	var wrapped struct {
+		Results []Incident `json:"results"`
+		Data    []Incident `json:"data"`
+		Items   []Incident `json:"items"`
+	}
+	if err := json.Unmarshal(body, &wrapped); err == nil {
+		switch {
+		case len(wrapped.Results) > 0:
+			return wrapped.Results, nil
+		case len(wrapped.Data) > 0:
+			return wrapped.Data, nil
+		case len(wrapped.Items) > 0:
+			return wrapped.Items, nil
+		}
+		return nil, nil
+	}
+
+	return nil, fmt.Errorf("unexpected response format")
 }
