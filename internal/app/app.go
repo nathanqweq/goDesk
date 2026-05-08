@@ -86,11 +86,11 @@ func Run(cfg config.RuntimeConfig) error {
 	}
 
 	eventKind := rawdata.EventKind(p)
-	briefDescription := buildBriefDescription(cfg.TicketName, p.HostID)
+	ticketName := buildTicketName(p.Cliente, p.Trigger, p.HostID)
 	log.Printf("[app] kind=%s rule=%q cliente=%q autoclose=%v urgency=%q impact=%q priority=%q ticket=%q\n",
-		eventKind, p.RuleName, p.Cliente, pol.AutoClose, pol.Urgency, pol.Impact, priority, briefDescription)
+		eventKind, p.RuleName, p.Cliente, pol.AutoClose, pol.Urgency, pol.Impact, priority, ticketName)
 
-	exists, ticketID, status, err := td.TicketExists(briefDescription)
+	exists, ticketID, status, err := td.TicketExists(ticketName)
 	if err != nil {
 		return err
 	}
@@ -100,8 +100,8 @@ func Run(cfg config.RuntimeConfig) error {
 		msgHTML := topdesk.CreateHTML(p, contract)
 
 		payload := buildCreatePayload(
-			briefDescription,
-			cfg.TicketName,
+			ticketName,
+			ticketName,
 			msgHTML,
 			pol,
 			contract,
@@ -142,7 +142,7 @@ func Run(cfg config.RuntimeConfig) error {
 			if len(to) == 0 {
 				log.Printf("[email] WARN: send_email ativo sem destinatario TO (rule=%q)\n", p.RuleName)
 			} else {
-				subject := fmt.Sprintf("%s - %s", cfg.TicketName, created)
+				subject := fmt.Sprintf("%s - %s", ticketName, created)
 				body := topdesk.OpeningEmailHTML(created, p, contract)
 				err := mailer.SendHTML(
 					mailer.Config{
@@ -285,23 +285,34 @@ func buildUpdatePayload(action, currentStatus string) map[string]any {
 	return payload
 }
 
-func buildBriefDescription(ticketName, hostID string) string {
+func buildTicketName(clientName, triggerName, hostID string) string {
 	const maxLen = 80
 
-	base := strings.TrimSpace(ticketName)
+	clientName = strings.TrimSpace(clientName)
+	triggerName = strings.TrimSpace(triggerName)
 	hostID = strings.TrimSpace(hostID)
+
+	prefix := fmt.Sprintf("[%s]: ", clientName)
 	if hostID == "" {
-		return truncateRunes(base, maxLen)
+		name := prefix + triggerName
+		return truncateRunes(strings.TrimSpace(name), maxLen)
 	}
 
-	suffix := " " + hostID
+	suffix := " - " + hostID
 	suffixLen := utf8.RuneCountInString(suffix)
 	if suffixLen >= maxLen {
-		return truncateRunes(hostID, maxLen)
+		return truncateRunesFromEnd(hostID, maxLen)
 	}
 
-	baseLen := maxLen - suffixLen
-	return truncateRunes(base, baseLen) + suffix
+	prefixLen := utf8.RuneCountInString(prefix)
+	if prefixLen+suffixLen >= maxLen {
+		prefix = truncateRunes(prefix, maxLen-suffixLen)
+		return strings.TrimRight(prefix, " ") + suffix
+	}
+
+	triggerLen := maxLen - prefixLen - suffixLen
+	triggerName = strings.TrimRight(truncateRunes(triggerName, triggerLen), " ")
+	return prefix + triggerName + suffix
 }
 
 func truncateRunes(s string, limit int) string {
@@ -314,4 +325,16 @@ func truncateRunes(s string, limit int) string {
 		return s
 	}
 	return string(runes[:limit])
+}
+
+func truncateRunesFromEnd(s string, limit int) string {
+	if limit <= 0 {
+		return ""
+	}
+
+	runes := []rune(s)
+	if len(runes) <= limit {
+		return s
+	}
+	return string(runes[len(runes)-limit:])
 }
