@@ -66,3 +66,15 @@ func TestBuildTicketNameFitsTopDeskBriefDescriptionLimit(t *testing.T) {
 		t.Fatalf("expected ticket name with 80 chars, got %d", utf8.RuneCountInString(got))
 	}
 }
+
+func TestBuildTicketNameNeverPasses80IncludingHostID(t *testing.T) {
+	hostID := "12345"
+	got := buildTicketName("[CRESOL]: " + strings.Repeat("A", 200) + " - " + hostID)
+
+	if utf8.RuneCountInString(got) > 80 {
+		t.Fatalf("expected ticket name with at most 80 chars, got %d: %q", utf8.RuneCountInString(got), got)
+	}
+	if !strings.HasSuffix(got, " - "+hostID) {
+		t.Fatalf("expected ticket name to keep host ID at end, got %q", got)
+	}
+}

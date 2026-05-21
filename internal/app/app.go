@@ -302,11 +302,15 @@ func buildTicketName(subject string) string {
 	prefix := subject[:prefixEnd]
 	eventName := subject[prefixEnd:suffixStart]
 	suffix := subject[suffixStart:]
-	removeCount := runeCount(subject) - maxLen
-	eventMaxLen := runeCount(eventName) - removeCount
+	eventMaxLen := maxLen - runeCount(prefix) - runeCount(suffix)
 	eventName = strings.TrimRight(truncateRunes(eventName, eventMaxLen), " ")
 
-	return prefix + eventName + suffix
+	ticketName := prefix + eventName + suffix
+	if runeCount(ticketName) <= maxLen {
+		return ticketName
+	}
+
+	return truncateRunesKeepingEnd(ticketName, maxLen, suffix)
 }
 
 func truncateRunes(s string, limit int) string {
@@ -323,4 +327,29 @@ func truncateRunes(s string, limit int) string {
 
 func runeCount(s string) int {
 	return len([]rune(s))
+}
+
+func truncateRunesKeepingEnd(s string, limit int, end string) string {
+	if limit <= 0 {
+		return ""
+	}
+
+	endLen := runeCount(end)
+	if endLen >= limit {
+		return truncateRunesFromEnd(end, limit)
+	}
+
+	return truncateRunes(s, limit-endLen) + end
+}
+
+func truncateRunesFromEnd(s string, limit int) string {
+	if limit <= 0 {
+		return ""
+	}
+
+	runes := []rune(s)
+	if len(runes) <= limit {
+		return s
+	}
+	return string(runes[len(runes)-limit:])
 }
