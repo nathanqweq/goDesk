@@ -285,7 +285,7 @@ func buildUpdatePayload(action, currentStatus string) map[string]any {
 }
 
 func buildTicketName(subject string) string {
-	const maxLen = 85
+	const maxLen = 80
 
 	subject = strings.TrimSpace(subject)
 	if runeCount(subject) <= maxLen {

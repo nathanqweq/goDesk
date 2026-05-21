@@ -17,15 +17,15 @@ func TestBuildTicketNameKeepsSubjectWhenWithin85Chars(t *testing.T) {
 	}
 }
 
-func TestBuildTicketNameTrimsOnlyEventNameWhenSubjectPasses85Chars(t *testing.T) {
+func TestBuildTicketNameTrimsOnlyEventNameWhenSubjectPasses80Chars(t *testing.T) {
 	eventName := strings.Repeat("A", 100)
 	hostID := "12345"
 	subject := fmt.Sprintf("[TELTEC]: %s - %s", eventName, hostID)
 
 	got := buildTicketName(subject)
 
-	if utf8.RuneCountInString(got) != 85 {
-		t.Fatalf("expected ticket name with 85 chars, got %d: %q", utf8.RuneCountInString(got), got)
+	if utf8.RuneCountInString(got) != 80 {
+		t.Fatalf("expected ticket name with 80 chars, got %d: %q", utf8.RuneCountInString(got), got)
 	}
 	if !strings.HasPrefix(got, "[TELTEC]: ") {
 		t.Fatalf("expected ticket name to keep client prefix, got %q", got)
@@ -38,19 +38,31 @@ func TestBuildTicketNameTrimsOnlyEventNameWhenSubjectPasses85Chars(t *testing.T)
 func TestBuildTicketNameUsesExpectedPattern(t *testing.T) {
 	got := buildTicketName("[TELTEC]: Interface Vl150(## VLAN UCS MGMT ##): High inbound bandwidth usage - 10293847")
 
-	want := "[TELTEC]: Interface Vl150(## VLAN UCS MGMT ##): High inbound bandwidth usa - 10293847"
+	want := "[TELTEC]: Interface Vl150(## VLAN UCS MGMT ##): High inbound bandwidt - 10293847"
 	if got != want {
 		t.Fatalf("expected %q, got %q", want, got)
 	}
-	if utf8.RuneCountInString(got) != 85 {
-		t.Fatalf("expected ticket name with 85 chars, got %d", utf8.RuneCountInString(got))
+	if utf8.RuneCountInString(got) != 80 {
+		t.Fatalf("expected ticket name with 80 chars, got %d", utf8.RuneCountInString(got))
 	}
 }
 
 func TestBuildTicketNameFallbackTruncatesUnexpectedPattern(t *testing.T) {
 	got := buildTicketName(strings.Repeat("B", 90))
 
-	if utf8.RuneCountInString(got) != 85 {
-		t.Fatalf("expected fallback ticket name with 85 chars, got %d", utf8.RuneCountInString(got))
+	if utf8.RuneCountInString(got) != 80 {
+		t.Fatalf("expected fallback ticket name with 80 chars, got %d", utf8.RuneCountInString(got))
+	}
+}
+
+func TestBuildTicketNameFitsTopDeskBriefDescriptionLimit(t *testing.T) {
+	got := buildTicketName("[CRESOL]: Este alerta é apenas um teste para verificar a correção nos limites - 16149")
+
+	want := "[CRESOL]: Este alerta é apenas um teste para verificar a correção nos li - 16149"
+	if got != want {
+		t.Fatalf("expected %q, got %q", want, got)
+	}
+	if utf8.RuneCountInString(got) != 80 {
+		t.Fatalf("expected ticket name with 80 chars, got %d", utf8.RuneCountInString(got))
 	}
 }
