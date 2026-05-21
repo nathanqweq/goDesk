@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"godesk/internal/config"
 	"godesk/internal/mailer"
@@ -86,7 +85,7 @@ func Run(cfg config.RuntimeConfig) error {
 	}
 
 	eventKind := rawdata.EventKind(p)
-	ticketName := buildTicketName(p.Cliente, p.Trigger, p.HostID)
+	ticketName := buildTicketName(cfg.TicketName)
 	log.Printf("[app] kind=%s rule=%q cliente=%q autoclose=%v urgency=%q impact=%q priority=%q ticket=%q\n",
 		eventKind, p.RuleName, p.Cliente, pol.AutoClose, pol.Urgency, pol.Impact, priority, ticketName)
 
@@ -285,34 +284,29 @@ func buildUpdatePayload(action, currentStatus string) map[string]any {
 	return payload
 }
 
-func buildTicketName(clientName, triggerName, hostID string) string {
-	const maxLen = 80
+func buildTicketName(subject string) string {
+	const maxLen = 85
 
-	clientName = strings.TrimSpace(clientName)
-	triggerName = strings.TrimSpace(triggerName)
-	hostID = strings.TrimSpace(hostID)
-
-	prefix := fmt.Sprintf("[%s]: ", clientName)
-	if hostID == "" {
-		name := prefix + triggerName
-		return truncateRunes(strings.TrimSpace(name), maxLen)
+	subject = strings.TrimSpace(subject)
+	if runeCount(subject) <= maxLen {
+		return subject
 	}
 
-	suffix := " - " + hostID
-	suffixLen := utf8.RuneCountInString(suffix)
-	if suffixLen >= maxLen {
-		return truncateRunesFromEnd(hostID, maxLen)
+	prefixEnd := strings.Index(subject, "]: ")
+	suffixStart := strings.LastIndex(subject, " - ")
+	if prefixEnd == -1 || suffixStart == -1 || suffixStart < prefixEnd {
+		return truncateRunes(subject, maxLen)
 	}
 
-	prefixLen := utf8.RuneCountInString(prefix)
-	if prefixLen+suffixLen >= maxLen {
-		prefix = truncateRunes(prefix, maxLen-suffixLen)
-		return strings.TrimRight(prefix, " ") + suffix
-	}
+	prefixEnd += len("]: ")
+	prefix := subject[:prefixEnd]
+	eventName := subject[prefixEnd:suffixStart]
+	suffix := subject[suffixStart:]
+	removeCount := runeCount(subject) - maxLen
+	eventMaxLen := runeCount(eventName) - removeCount
+	eventName = strings.TrimRight(truncateRunes(eventName, eventMaxLen), " ")
 
-	triggerLen := maxLen - prefixLen - suffixLen
-	triggerName = strings.TrimRight(truncateRunes(triggerName, triggerLen), " ")
-	return prefix + triggerName + suffix
+	return prefix + eventName + suffix
 }
 
 func truncateRunes(s string, limit int) string {
@@ -327,14 +321,6 @@ func truncateRunes(s string, limit int) string {
 	return string(runes[:limit])
 }
 
-func truncateRunesFromEnd(s string, limit int) string {
-	if limit <= 0 {
-		return ""
-	}
-
-	runes := []rune(s)
-	if len(runes) <= limit {
-		return s
-	}
-	return string(runes[len(runes)-limit:])
+func runeCount(s string) int {
+	return len([]rune(s))
 }
