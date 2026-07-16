@@ -1,0 +1,12 @@
+Package: godesk
+Version: __VERSION__
+Section: net
+Priority: optional
+Architecture: amd64
+Maintainer: Nathan Quadros <nathanq_@hotmail.com>
+Depends: systemd
+Homepage: https://github.com/nathanqweq/goDesk
+Description: goDesk - automacao Zabbix + TopDesk
+ Integra alertas do Zabbix com criacao/atualizacao automatica de
+ chamados no TopDesk. Inclui modo CLI one-shot (alertscript) e
+ modo servico systemd (HTTP, godesk serve).

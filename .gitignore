@@ -1,3 +1,4 @@
 .gocache
 /build/
 packaging/.secrets/
+.claude/

@@ -1,0 +1,18 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+  remove)
+    if command -v systemctl >/dev/null 2>&1; then
+      systemctl disable --now godesk.service || true
+      systemctl daemon-reload || true
+    fi
+    ;;
+  purge)
+    if command -v systemctl >/dev/null 2>&1; then
+      systemctl daemon-reload || true
+    fi
+    ;;
+esac
+
+exit 0

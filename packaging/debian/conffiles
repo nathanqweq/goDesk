@@ -1,0 +1,3 @@
+/etc/zabbix/godesk/godesk-config.yaml
+/etc/zabbix/godesk/godesk-smtp-config.env
+/etc/zabbix/godesk/godesk-service.env
