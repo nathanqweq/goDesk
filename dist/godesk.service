@@ -1,0 +1,20 @@
+[Unit]
+Description=goDesk - servico de automacao Zabbix/TopDesk
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/lib/zabbix/alertscripts/godesk serve
+EnvironmentFile=-/etc/zabbix/godesk/godesk-service.env
+EnvironmentFile=-/etc/zabbix/godesk/godesk-smtp-config.env
+Restart=on-failure
+RestartSec=5
+User=zabbix
+Group=zabbix
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

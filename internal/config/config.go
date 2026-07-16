@@ -35,16 +35,24 @@ func FromArgs(argv []string) (RuntimeConfig, error) {
 		return RuntimeConfig{}, errors.New("parâmetros insuficientes: esperado 7 args (DOMAIN USER PASS TICKET_NAME RAWDATA ZABBIX_URL ZABBIX_KEY)")
 	}
 
+	return FromValues(argv[1], argv[2], argv[3], argv[4], argv[5], argv[6], argv[7]), nil
+}
+
+// FromValues monta o RuntimeConfig a partir dos mesmos 7 valores que hoje
+// chegam via argv (modo CLI/one-shot) ou via corpo da requisição HTTP
+// (modo serviço). As demais opções (log, timeout, SMTP, etc.) continuam
+// vindo do ambiente do processo em ambos os casos.
+func FromValues(domain, user, pass, ticketName, rawData, zabbixURL, zabbixKey string) RuntimeConfig {
 	smtpFromFile := loadEnvFile(smtpConfigEnvPath)
 
 	cfg := RuntimeConfig{
-		Domain:     argv[1],
-		User:       argv[2],
-		Pass:       argv[3],
-		TicketName: argv[4],
-		RawData:    argv[5],
-		ZabbixURL:  argv[6],
-		ZabbixKey:  argv[7],
+		Domain:     domain,
+		User:       user,
+		Pass:       pass,
+		TicketName: ticketName,
+		RawData:    rawData,
+		ZabbixURL:  zabbixURL,
+		ZabbixKey:  zabbixKey,
 
 		LogFile:    getenv("TOPDESK_LOG_FILE", "/tmp/goDesk-integration.log"),
 		ConfigFile: getenv("TOPDESK_CONFIG", "/etc/zabbix/godesk/godesk-config.yaml"),
@@ -60,7 +68,25 @@ func FromArgs(argv []string) (RuntimeConfig, error) {
 	cfg.Domain = strings.TrimRight(cfg.Domain, "/")
 	cfg.ZabbixURL = strings.TrimRight(cfg.ZabbixURL, "/")
 
-	return cfg, nil
+	return cfg
+}
+
+// ServiceConfig contém as opções do modo serviço (`godesk serve`).
+type ServiceConfig struct {
+	ListenAddr string
+	Token      string
+	LogFile    string
+}
+
+// ServiceConfigFromEnv lê as opções do modo serviço a partir do ambiente do
+// processo. Em produção, o systemd injeta essas variáveis via
+// EnvironmentFile= antes de iniciar o binário.
+func ServiceConfigFromEnv() ServiceConfig {
+	return ServiceConfig{
+		ListenAddr: getenv("GODESK_LISTEN_ADDR", "127.0.0.1:8787"),
+		Token:      getenv("GODESK_SERVICE_TOKEN", ""),
+		LogFile:    getenv("TOPDESK_LOG_FILE", "/var/log/godesk/godesk-service.log"),
+	}
 }
 
 func getenv(k, def string) string {

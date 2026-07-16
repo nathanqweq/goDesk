@@ -22,6 +22,13 @@ SRC_CFG_SMTP="$SRC_DIST/godesk-smtp-config.env"
 DEST_CFG_YAML="$DEST_CFG_DIR/godesk-config.yaml"
 DEST_CFG_SMTP="$DEST_CFG_DIR/godesk-smtp-config.env"
 
+# --- SERVICO SYSTEMD (opcional) ---
+SRC_SERVICE_UNIT="$SRC_DIST/godesk.service"
+SRC_SERVICE_ENV="$SRC_DIST/godesk-service.env"
+DEST_SERVICE_UNIT="/etc/systemd/system/godesk.service"
+DEST_SERVICE_ENV="$DEST_CFG_DIR/godesk-service.env"
+SERVICE_LOG_DIR="/var/log/godesk"
+
 if [ "${EUID:-$(id -u)}" -ne 0 ]; then
   echo "rode como root: sudo $0"
   exit 1
@@ -224,14 +231,46 @@ install_binary() {
   echo "ok: binario instalado: $DEST_BIN"
 }
 
+install_service() {
+  echo
+  echo "==> Instalando servico systemd (godesk.service)"
+  check_file "$SRC_SERVICE_UNIT"
+  check_file "$SRC_SERVICE_ENV"
+
+  if [ ! -x "$DEST_BIN" ]; then
+    echo "ERRO: binario nao esta instalado em $DEST_BIN (rode a opcao de binario antes)"
+    exit 1
+  fi
+
+  echo "criando diretorio de log ($SERVICE_LOG_DIR)..."
+  mkdir -p "$SERVICE_LOG_DIR"
+  chown zabbix:zabbix "$SERVICE_LOG_DIR" 2>/dev/null || true
+
+  echo "instalando unit systemd..."
+  cp -f "$SRC_SERVICE_UNIT" "$DEST_SERVICE_UNIT"
+
+  echo "instalando env do servico (sem sobrescrever se ja existir)..."
+  mkdir -p "$DEST_CFG_DIR"
+  cp -n "$SRC_SERVICE_ENV" "$DEST_SERVICE_ENV"
+  chown root:root "$DEST_SERVICE_ENV"
+  chmod 640 "$DEST_SERVICE_ENV"
+
+  echo "recarregando systemd e habilitando o servico..."
+  systemctl daemon-reload
+  systemctl enable --now godesk.service
+
+  echo "ok: servico instalado e iniciado (godesk.service)"
+}
+
 echo
 echo "Selecione o que deseja instalar:"
 echo "  1) Apenas modulo (frontend)"
 echo "  2) Apenas binario + configs (alertscripts)"
 echo "  3) Ambos (modulo + binario + configs)"
 echo "  4) Apenas configs (/etc/zabbix/godesk)"
+echo "  5) Servico systemd (godesk.service) - requer binario ja instalado"
 echo
-read -r -p "Opcao [1-4]: " OPT
+read -r -p "Opcao [1-5]: " OPT
 
 case "${OPT:-}" in
   1)
@@ -249,8 +288,11 @@ case "${OPT:-}" in
   4)
     ensure_configs
     ;;
+  5)
+    install_service
+    ;;
   *)
-    echo "ERRO: opcao invalida. Use 1, 2, 3 ou 4."
+    echo "ERRO: opcao invalida. Use 1, 2, 3, 4 ou 5."
     exit 1
     ;;
 esac
@@ -268,3 +310,8 @@ echo "Disable/Enable goDesk se precisar"
 echo "Ctrl+F5 no navegador"
 echo
 echo "No Media Type, aponte o Script name para: $DEST_BIN"
+echo
+echo "Servico systemd (opcional, opcao 5 deste instalador):"
+echo "  systemctl status godesk"
+echo "  journalctl -u godesk -f"
+echo "  Endpoint: POST http://127.0.0.1:8787/alert (token em $DEST_SERVICE_ENV)"
