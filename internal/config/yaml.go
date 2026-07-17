@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -48,8 +49,15 @@ func LoadPolicies(path string) (PoliciesFile, error) {
 		return PoliciesFile{}, err
 	}
 
+	return ParsePolicies(b)
+}
+
+// ParsePolicies faz o parse de um YAML de políticas já em memória (usado
+// tanto por LoadPolicies quanto pelo handler POST /config do modo serviço,
+// que recebe o conteúdo pela rede antes de gravar em disco).
+func ParsePolicies(data []byte) (PoliciesFile, error) {
 	var pf PoliciesFile
-	if err := yaml.Unmarshal(b, &pf); err != nil {
+	if err := yaml.Unmarshal(data, &pf); err != nil {
 		return PoliciesFile{}, err
 	}
 
@@ -65,6 +73,35 @@ func LoadPolicies(path string) (PoliciesFile, error) {
 	}
 
 	return pf, nil
+}
+
+// SaveFile grava data em path de forma atômica (escreve em arquivo
+// temporário e faz rename), preservando uma cópia do conteúdo anterior em
+// "<path>.bak.<timestamp>" quando o arquivo já existir. Retorna o caminho
+// do backup criado (vazio se não havia arquivo anterior).
+func SaveFile(path string, data []byte) (string, error) {
+	backupPath := ""
+
+	if prev, err := os.ReadFile(path); err == nil {
+		backupPath = path + ".bak." + time.Now().Format("20060102-150405")
+		if err := os.WriteFile(backupPath, prev, 0644); err != nil {
+			return "", err
+		}
+	} else if !os.IsNotExist(err) {
+		return "", err
+	}
+
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0644); err != nil {
+		return "", err
+	}
+
+	if err := os.Rename(tmp, path); err != nil {
+		os.Remove(tmp)
+		return "", err
+	}
+
+	return backupPath, nil
 }
 
 // ResolvePolicy agora recebe RULE NAME (key em clients:)

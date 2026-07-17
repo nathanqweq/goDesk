@@ -1,24 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Atualiza o repositorio APT (branch gh-pages) com um novo .deb: copia para
-# o pool, regenera os indices (Packages/Release) e assina (InRelease /
-# Release.gpg). Nao faz commit/push — isso fica a cargo do workflow.
+# Atualiza o repositorio APT (branch gh-pages) com um ou mais .deb: copia
+# cada um para o pool (uma subpasta por pacote), regenera os indices
+# (Packages/Release) e assina (InRelease / Release.gpg). Nao faz
+# commit/push — isso fica a cargo do workflow.
 #
 # Variaveis obrigatorias:
-#   DEB_FILE             caminho do .deb recem-buildado
-#   GHPAGES_DIR           checkout local do branch gh-pages
-#   APT_GPG_PRIVATE_KEY   chave privada GPG, armored + base64 (secret do CI)
-#   APT_GPG_PASSPHRASE    passphrase da chave
+#   DEB_FILES             caminho(s) do(s) .deb recem-buildado(s), separados por espaco
+#   GHPAGES_DIR            checkout local do branch gh-pages
+#   APT_GPG_PRIVATE_KEY    chave privada GPG, armored + base64 (secret do CI)
+#   APT_GPG_PASSPHRASE     passphrase da chave
 
-: "${DEB_FILE:?defina DEB_FILE}"
+: "${DEB_FILES:?defina DEB_FILES}"
 : "${GHPAGES_DIR:?defina GHPAGES_DIR}"
 : "${APT_GPG_PRIVATE_KEY:?defina APT_GPG_PRIVATE_KEY}"
 : "${APT_GPG_PASSPHRASE:?defina APT_GPG_PASSPHRASE}"
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SUITE="stable"
-POOL_DIR="$GHPAGES_DIR/pool/main/g/godesk"
 DIST_DIR="$GHPAGES_DIR/dists/$SUITE"
 BINARY_DIR="$DIST_DIR/main/binary-amd64"
 
@@ -35,9 +35,14 @@ if [ -z "$KEY_ID" ]; then
   exit 1
 fi
 
-echo "==> copiando .deb para o pool"
-mkdir -p "$POOL_DIR" "$BINARY_DIR"
-cp "$DEB_FILE" "$POOL_DIR/"
+echo "==> copiando .deb(s) para o pool"
+mkdir -p "$BINARY_DIR"
+for deb in $DEB_FILES; do
+  pkg_name="$(basename "$deb" | cut -d_ -f1)"
+  pool_dir="$GHPAGES_DIR/pool/main/g/$pkg_name"
+  mkdir -p "$pool_dir"
+  cp "$deb" "$pool_dir/"
+done
 
 echo "==> regenerando indice Packages"
 (cd "$GHPAGES_DIR" && dpkg-scanpackages pool /dev/null) > "$BINARY_DIR/Packages"

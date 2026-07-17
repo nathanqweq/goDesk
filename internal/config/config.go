@@ -43,7 +43,7 @@ func FromArgs(argv []string) (RuntimeConfig, error) {
 // (modo serviço). As demais opções (log, timeout, SMTP, etc.) continuam
 // vindo do ambiente do processo em ambos os casos.
 func FromValues(domain, user, pass, ticketName, rawData, zabbixURL, zabbixKey string) RuntimeConfig {
-	smtpFromFile := loadEnvFile(smtpConfigEnvPath)
+	smtpFromFile := LoadEnvFile(smtpConfigEnvPath)
 
 	cfg := RuntimeConfig{
 		Domain:     domain,
@@ -76,6 +76,7 @@ type ServiceConfig struct {
 	ListenAddr string
 	Token      string
 	LogFile    string
+	ConfigFile string
 }
 
 // ServiceConfigFromEnv lê as opções do modo serviço a partir do ambiente do
@@ -86,6 +87,7 @@ func ServiceConfigFromEnv() ServiceConfig {
 		ListenAddr: getenv("GODESK_LISTEN_ADDR", "127.0.0.1:8787"),
 		Token:      getenv("GODESK_SERVICE_TOKEN", ""),
 		LogFile:    getenv("TOPDESK_LOG_FILE", "/var/log/godesk/godesk-service.log"),
+		ConfigFile: getenv("TOPDESK_CONFIG", "/etc/zabbix/godesk/godesk-config.yaml"),
 	}
 }
 
@@ -105,7 +107,11 @@ func pickDefault(primary, fallback string) string {
 	return fallback
 }
 
-func loadEnvFile(path string) map[string]string {
+// LoadEnvFile lê um arquivo estilo ".env" (KEY=value, comentários com #,
+// prefixo opcional "export "). Usado tanto para o env do SMTP quanto pelo
+// cmd/godesk-client, que precisa ler seu próprio arquivo de configuração
+// já que quem o invoca (PHP via exec()) não repassa variáveis de ambiente.
+func LoadEnvFile(path string) map[string]string {
 	out := map[string]string{}
 	f, err := os.Open(path)
 	if err != nil {

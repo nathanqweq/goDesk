@@ -1,0 +1,11 @@
+Package: godesk-client
+Version: __VERSION__
+Section: net
+Priority: optional
+Architecture: amd64
+Maintainer: Nathan Quadros <nathanq_@hotmail.com>
+Homepage: https://github.com/nathanqweq/goDesk
+Description: goDesk Client - sincronizacao de config para o servidor goDesk
+ Valida o godesk-config.yaml salvo pelo modulo Zabbix e envia para o
+ servidor goDesk (godesk serve) quando frontend e servidor estao em
+ hosts separados. CLI one-shot, sem servico residente.

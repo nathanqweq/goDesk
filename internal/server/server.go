@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"log"
 	"net/http"
 	"os/signal"
@@ -34,6 +35,7 @@ func Run(opts config.ServiceConfig) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", handleHealth)
 	mux.HandleFunc("POST /alert", handleAlert(opts.Token))
+	mux.HandleFunc("POST /config", handleConfig(opts.Token, opts.ConfigFile))
 
 	srv := &http.Server{
 		Addr:         opts.ListenAddr,
@@ -93,6 +95,36 @@ func handleAlert(token string) http.HandlerFunc {
 		}
 
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	}
+}
+
+func handleConfig(token, configFile string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !authorized(r, token) {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+
+		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "falha ao ler corpo: " + err.Error()})
+			return
+		}
+
+		if _, err := config.ParsePolicies(body); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "yaml inválido: " + err.Error()})
+			return
+		}
+
+		backup, err := config.SaveFile(configFile, body)
+		if err != nil {
+			log.Printf("[server] ERRO ao gravar config (%s): %v\n", configFile, err)
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+
+		log.Printf("[server] config atualizada (%s, backup=%q)\n", configFile, backup)
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "backup": backup})
 	}
 }
 

@@ -26,6 +26,12 @@ if (!empty($data['status'])) {
 if (!empty($data['error'])) {
 	echo '<div class="gd-banner gd-err"><b>Erro:</b> '.h($data['error']).'</div>';
 }
+if (!empty($data['sync_status'])) {
+	echo '<div class="gd-banner gd-ok">'.h($data['sync_status']).'</div>';
+}
+if (!empty($data['sync_error'])) {
+	echo '<div class="gd-banner gd-err"><b>Sincronização:</b> '.h($data['sync_error']).'</div>';
+}
 
 echo '<form method="post" action="zabbix.php?action=godesk.config.edit">';
 echo '<input type="hidden" name="save" value="1">';

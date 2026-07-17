@@ -196,6 +196,27 @@ class ConfigEdit extends CController {
 		return ['ok' => true, 'error' => null];
 	}
 
+	/**
+	 * Envia o YAML recém-salvo para o godesk-client, que valida e repassa
+	 * pro godesk serve remoto (usado quando o servidor que roda o godesk
+	 * está em host diferente deste frontend). Best-effort: se o pacote
+	 * godesk-client não estiver instalado neste host, retorna null e o
+	 * fluxo de save local continua igual ao de antes.
+	 */
+	private function pushToServer(): ?array {
+		$bin = '/usr/bin/godesk-client';
+
+		if (!is_file($bin) || !is_executable($bin)) {
+			return null;
+		}
+
+		$output = [];
+		$exit_code = 0;
+		exec(escapeshellarg($bin).' 2>&1', $output, $exit_code);
+
+		return ['ok' => ($exit_code === 0), 'output' => trim(implode("\n", $output))];
+	}
+
 	private function saveYamlAtomic(string $yaml_text): array {
 		$dir = dirname($this->config_path);
 
@@ -238,6 +259,8 @@ class ConfigEdit extends CController {
 		$status = null;
 		$error = null;
 		$backup = null;
+		$sync_status = null;
+		$sync_error = null;
 
 		if ($save) {
 			if (!function_exists('yaml_emit')) {
@@ -264,6 +287,16 @@ class ConfigEdit extends CController {
 					else {
 						$status = 'Config salva com sucesso.';
 						$backup = $wr['backup'] ?? null;
+
+						$sync = $this->pushToServer();
+						if ($sync !== null) {
+							if ($sync['ok']) {
+								$sync_status = 'Config enviada para o servidor goDesk com sucesso.';
+							}
+							else {
+								$sync_error = 'Falha ao enviar config para o servidor goDesk: '.$sync['output'];
+							}
+						}
 					}
 				}
 			}
@@ -296,6 +329,8 @@ class ConfigEdit extends CController {
 			'status' => $status,
 			'error' => $error,
 			'backup' => $backup,
+			'sync_status' => $sync_status,
+			'sync_error' => $sync_error,
 			'default' => (array)($cfg['default'] ?? []),
 			'clients' => $clients_list
 		]));
