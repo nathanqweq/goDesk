@@ -4,8 +4,11 @@ Section: net
 Priority: optional
 Architecture: amd64
 Maintainer: Nathan Quadros <nathanq_@hotmail.com>
+Recommends: php-yaml
 Homepage: https://github.com/nathanqweq/goDesk
-Description: goDesk Client - sincronizacao de config para o servidor goDesk
- Valida o godesk-config.yaml salvo pelo modulo Zabbix e envia para o
- servidor goDesk (godesk serve) quando frontend e servidor estao em
- hosts separados. CLI one-shot, sem servico residente.
+Description: goDesk Client - modulo Zabbix + sincronizacao de config
+ Instala o modulo frontend do Zabbix (edicao/visualizacao do
+ godesk-config.yaml) e o binario godesk-client, que valida esse YAML e
+ o envia para o servidor goDesk (godesk serve) sempre que o admin salva
+ pela UI. Use este pacote no host que roda o frontend do Zabbix; use o
+ pacote "godesk" no host que roda o godesk serve/alertscripts.

@@ -14,18 +14,24 @@ Isso instala:
 - `/usr/lib/systemd/system/godesk.service` (habilitado e iniciado automaticamente)
 - `/etc/zabbix/godesk/{godesk-config.yaml,godesk-smtp-config.env,godesk-service.env}` (conffiles — edições locais são preservadas em upgrades)
 
-O módulo frontend do Zabbix ([Module/goDesk](../Module/goDesk)) não faz parte deste pacote; continue instalando-o com `install.sh` (opção 1).
+O módulo frontend do Zabbix ([Module/goDesk](../Module/goDesk)) não faz parte deste pacote — ele vem no `godesk-client` (abaixo). Se preferir não usar apt para o módulo, `install.sh` (opção 1) continua funcionando igual.
 
-### godesk-client (só quando frontend e servidor estão em hosts separados)
+### godesk-client (host do frontend Zabbix)
 
-O módulo Zabbix (PHP) salva `godesk-config.yaml` no disco do host que roda o **frontend**. Se o `godesk serve` roda em outro host (topologia comum: Zabbix server separado do frontend web), esse arquivo nunca chega até ele. O `godesk-client` resolve isso: instale-o **no host do frontend**, ele valida o YAML salvo e envia pro `godesk serve` remoto automaticamente toda vez que o admin salva a config pela UI.
+Pacote para instalar **no host que roda a UI do Zabbix** (pode ser o mesmo host do `godesk serve` ou um host separado). Ele instala:
+- o módulo frontend ([Module/goDesk](../Module/goDesk)) em `/usr/share/zabbix/ui/modules/goDesk`
+- o binário `/usr/bin/godesk-client` e o conffile `/etc/zabbix/godesk/godesk-client.env`
+
+Quando o admin salva a config pela UI do Zabbix, o módulo chama o `godesk-client`, que valida o YAML e o envia pro `godesk serve` — isso importa principalmente quando **frontend e servidor estão em hosts separados** (o `godesk-config.yaml` salvo pelo PHP fica só no disco do frontend; sem esse envio, o `godesk serve` remoto nunca veria a mudança). Se `godesk` e o frontend estiverem no mesmo host, o envio ainda acontece mas é redundante (o arquivo já é o mesmo).
 
 ```bash
 sudo apt install godesk-client
+sudo apt install php-yaml   # se o apt não resolver via Recommends
 sudo nano /etc/zabbix/godesk/godesk-client.env   # GODESK_SERVER_URL + GODESK_SERVICE_TOKEN (mesmo token do dist/godesk-service.env do servidor)
 ```
+Depois, em Administration → Modules → Scan directory, habilite o goDesk (mesmo passo manual de sempre no Zabbix).
 
-Sem esse pacote instalado, o comportamento continua exatamente como antes (save só local) — o módulo detecta a ausência do binário e não tenta sincronizar.
+Se `godesk-client.env` não estiver configurado (`GODESK_SERVER_URL`/`GODESK_SERVICE_TOKEN` vazios), o envio falha e a UI mostra o erro — mas o save local continua funcionando normalmente.
 
 ## Publicar uma nova versão (mantenedor)
 
