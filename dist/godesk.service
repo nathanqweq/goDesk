@@ -15,6 +15,7 @@ Group=zabbix
 NoNewPrivileges=true
 ProtectSystem=full
 ProtectHome=true
+ReadWritePaths=/etc/zabbix/godesk
 
 [Install]
 WantedBy=multi-user.target
