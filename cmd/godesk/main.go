@@ -26,7 +26,7 @@ func main() {
 
 	cfg, err := config.FromArgs(os.Args)
 	if err != nil {
-		log.Fatalln(err)
+		fail(err)
 	}
 
 	if err := config.SetupLogger(cfg.LogFile); err != nil {
@@ -34,8 +34,22 @@ func main() {
 	}
 
 	if err := app.Run(cfg); err != nil {
-		log.Fatalln(err)
+		log.Printf("[app] ERRO: %v\n", err)
+		fail(err)
 	}
+}
+
+// fail imprime uma mensagem curta em stderr — sempre visível pro Zabbix no
+// Action log (Reports → Action log), independente de o log detalhado
+// (log.Printf acima) ter ido pro arquivo configurado via SetupLogger ou
+// ainda estar em stderr — e sai com código != 0, marcando a action como
+// falha. Só é chamado no caminho fatal (RAWDATA inválido, YAML de
+// política ilegível, ou falha ao consultar/criar o chamado no TopDesk);
+// falhas de efeito colateral (email, ack, send_more_info) continuam só
+// logadas, sem afetar o exit code.
+func fail(err error) {
+	fmt.Fprintln(os.Stderr, "godesk: "+err.Error())
+	os.Exit(1)
 }
 
 func runServe() {
