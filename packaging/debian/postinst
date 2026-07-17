@@ -8,7 +8,10 @@ case "$1" in
 
     if command -v systemctl >/dev/null 2>&1; then
       systemctl daemon-reload || true
-      systemctl enable --now godesk.service || true
+      systemctl enable godesk.service || true
+      # restart (nao so "enable --now"): garante que upgrades apliquem o
+      # binario/unit novos mesmo se o servico ja estava rodando
+      systemctl restart godesk.service || true
     fi
     ;;
 esac
