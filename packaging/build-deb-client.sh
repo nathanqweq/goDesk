@@ -43,6 +43,8 @@ echo "==> metadados DEBIAN"
 mkdir -p "$PKG_ROOT/DEBIAN"
 sed "s/__VERSION__/${VERSION}/" "$PROJECT_ROOT/packaging/debian-client/control.template" > "$PKG_ROOT/DEBIAN/control"
 cp "$PROJECT_ROOT/packaging/debian-client/conffiles" "$PKG_ROOT/DEBIAN/conffiles"
+cp "$PROJECT_ROOT/packaging/debian-client/postinst" "$PKG_ROOT/DEBIAN/postinst"
+chmod 0755 "$PKG_ROOT/DEBIAN/postinst"
 
 echo "==> gerando .deb"
 dpkg-deb --build --root-owner-group "$PKG_ROOT" "$BUILD_DIR/godesk-client_${VERSION}_amd64.deb"

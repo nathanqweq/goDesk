@@ -1,0 +1,14 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+  configure)
+    mkdir -p /etc/zabbix/godesk
+    # o PHP-FPM/Apache do frontend precisa conseguir criar/escrever o
+    # godesk-config.yaml (que não vem no pacote — é gerado no primeiro
+    # save pela UI do Zabbix). Mesma permissão que o install.sh já usa.
+    chmod 777 /etc/zabbix/godesk
+    ;;
+esac
+
+exit 0
