@@ -1,0 +1,18 @@
+Package: godesk
+Version: 1.0.0
+Architecture: amd64
+Maintainer: Nathan Quadros <nathanq_@hotmail.com>
+Depends: systemd
+Filename: pool/main/g/godesk/godesk_1.0.0_amd64.deb
+Size: 5064760
+MD5sum: e34e27da70d368a25177a67a93bc1b75
+SHA1: a9c2d5229afcb2738db8da5836c0b4681fb01d08
+SHA256: d84e3edf5562af6be509f28bd8b7f96914d362312518ddb9cc3ccfd13797f201
+Section: net
+Priority: optional
+Homepage: https://github.com/nathanqweq/goDesk
+Description: goDesk - automacao Zabbix + TopDesk
+ Integra alertas do Zabbix com criacao/atualizacao automatica de
+ chamados no TopDesk. Inclui modo CLI one-shot (alertscript) e
+ modo servico systemd (HTTP, godesk serve).
+

@@ -1,0 +1,23 @@
+Architectures: amd64
+Codename: stable
+Components: main
+Date: Fri, 17 Jul 2026 13:59:01 +0000
+Label: goDesk
+Origin: goDesk
+Suite: stable
+MD5Sum:
+ 8201fbbefffeef457584c0e5b0d8b36a              136 Release
+ 01360a2c30acbb6d391e7c2f681ad194              646 main/binary-amd64/Packages
+ 63bd576f0ce7a034fa747b450293329c              471 main/binary-amd64/Packages.gz
+SHA1:
+ 69c48da86d9f9a5b9e774546369450819520bd4a              136 Release
+ 4136550d722028d6b751c3626034ad6c23202867              646 main/binary-amd64/Packages
+ ba9c3a1a19344de9a0c105e072e7964593f8ad4c              471 main/binary-amd64/Packages.gz
+SHA256:
+ 859133ff95962464324a3a86a432733e96cdb0afe0256117b9b37dcbde622d95              136 Release
+ 140b76ab3d7bb7659d28d77881cc180cbbf89ebd3cc953648a4c2f1df989d48c              646 main/binary-amd64/Packages
+ 407346d4fac5b7852db3e815536352fbea332c135a5404219b42240637f405e0              471 main/binary-amd64/Packages.gz
+SHA512:
+ 529dcf9de60a81964917cdd35999b8d6c366cdea1eab17999b05fb30bbc95af155adaba360e2d8770f38d9c52488807e258c37825732b4f7dabbf7add779e802              136 Release
+ 6d31251582853c41dfa4233f0cd1fe78943ddbcc72964fcca84285ce1592f6b5df688c0b7c7cfadf396d9eeca678808fa876a90bfffdc96236bd82afc6a5830d              646 main/binary-amd64/Packages
+ e2d1f82839addda0df9cea22f29b53bc79d891079b0708d8fa5a243685f5f849396359a182eef6d149d775e9c7c1c2460ec0828b6476da2456171610c612d801              471 main/binary-amd64/Packages.gz
