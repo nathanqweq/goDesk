@@ -30,7 +30,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y dpkg-dev gnupg
 
       - name: Build .deb
-        run: packaging/build-deb.sh "${{ steps.version.outputs.version }}"
+        run: bash packaging/build-deb.sh "${{ steps.version.outputs.version }}"
 
       - name: Prepare gh-pages worktree
         run: |
@@ -47,7 +47,7 @@ jobs:
           GHPAGES_DIR: ${{ github.workspace }}/gh-pages-checkout
           APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
           APT_GPG_PASSPHRASE: ${{ secrets.APT_GPG_PASSPHRASE }}
-        run: packaging/publish-apt-repo.sh
+        run: bash packaging/publish-apt-repo.sh
 
       - name: Commit and push gh-pages
         working-directory: gh-pages-checkout
