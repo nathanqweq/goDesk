@@ -1,13 +1,13 @@
 Package: godesk
-Version: 1.2.0
+Version: 1.2.1
 Architecture: amd64
 Maintainer: Nathan Quadros <nathanq_@hotmail.com>
 Depends: systemd
-Filename: pool/main/g/godesk/godesk_1.2.0_amd64.deb
-Size: 5091690
-MD5sum: 180483a643f546a05c97725287f1cbfc
-SHA1: ac3da5bd2a4dd6e781064e1af7baa9659bc62e4e
-SHA256: 0575da6f1ec7f2721032824155cfe1b80c2f268e3558c2e6db15eb93f8c950bf
+Filename: pool/main/g/godesk/godesk_1.2.1_amd64.deb
+Size: 5092476
+MD5sum: 221940625dbf4308cec1f02bb7511189
+SHA1: c1a97b7a29e745cf1d4b95e973e060f214082363
+SHA256: f8b4cfac546fb80f708f964e4af9f13aa4b737a42f3063fc0d69e39e7bce56f9
 Section: net
 Priority: optional
 Homepage: https://github.com/nathanqweq/goDesk
@@ -17,15 +17,15 @@ Description: goDesk - automacao Zabbix + TopDesk
  modo servico systemd (HTTP, godesk serve).
 
 Package: godesk-client
-Version: 1.2.0
+Version: 1.2.1
 Architecture: amd64
 Maintainer: Nathan Quadros <nathanq_@hotmail.com>
 Recommends: php-yaml
-Filename: pool/main/g/godesk-client/godesk-client_1.2.0_amd64.deb
-Size: 4526530
-MD5sum: f96b4f2b2b13dbb08b5e0c45f693a91f
-SHA1: 5ee6c6e985324fe8c065efce364d3b44444af960
-SHA256: 8f807bc06f5659a51b2f5834062d42fd6547097b73372d25eee9d0064632c93f
+Filename: pool/main/g/godesk-client/godesk-client_1.2.1_amd64.deb
+Size: 4526598
+MD5sum: 20a2b406ab8b5ce91a05162abb3ca355
+SHA1: e3feb9d70e42a01acd8b0edfba93f6ba99350822
+SHA256: cd5f4df5c2813a477f76ba641e12b04db4ede2cdb93bc49bb31738f714d131b9
 Section: net
 Priority: optional
 Homepage: https://github.com/nathanqweq/goDesk
