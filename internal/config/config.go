@@ -33,43 +33,31 @@ const smtpConfigEnvPath = "/etc/zabbix/godesk/godesk-smtp-config.env"
 const serviceConfigEnvPath = "/etc/zabbix/godesk/godesk-service.env"
 
 func FromArgs(argv []string) (RuntimeConfig, error) {
-	// DOMAIN USER PASS TICKET_NAME RAWDATA ZABBIX_URL ZABBIX_KEY
-	if len(argv) < 8 {
-		return RuntimeConfig{}, errors.New("parâmetros insuficientes: esperado 7 args (DOMAIN USER PASS TICKET_NAME RAWDATA ZABBIX_URL ZABBIX_KEY)")
+	// TICKET_NAME RAWDATA — DOMAIN/USER/PASS/ZABBIX_URL/ZABBIX_KEY não são
+	// mais parâmetros: vêm só de godesk-service.env (ServiceConfigFromEnv,
+	// carregado uma vez aqui).
+	if len(argv) < 3 {
+		return RuntimeConfig{}, errors.New("parâmetros insuficientes: esperado 2 args (TICKET_NAME RAWDATA)")
 	}
 
-	return FromValues(argv[1], argv[2], argv[3], argv[4], argv[5], argv[6], argv[7]), nil
+	svc := ServiceConfigFromEnv()
+	return FromValues(svc, argv[1], argv[2]), nil
 }
 
-// FromValues monta o RuntimeConfig a partir dos mesmos 7 valores que hoje
-// chegam via argv (modo CLI/one-shot) ou via corpo da requisição HTTP
-// (modo serviço). As demais opções (log, timeout, SMTP, etc.) continuam
-// vindo do ambiente do processo em ambos os casos.
-func FromValues(domain, user, pass, ticketName, rawData, zabbixURL, zabbixKey string) RuntimeConfig {
+// FromValues monta o RuntimeConfig a partir do ServiceConfig já carregado
+// (uma vez, no início do processo — ver ServiceConfigFromEnv) mais os dois
+// valores que de fato mudam por alerta: ticketName e rawData.
+func FromValues(svc ServiceConfig, ticketName, rawData string) RuntimeConfig {
 	smtpFromFile := LoadEnvFile(smtpConfigEnvPath)
-	serviceFromFile := LoadEnvFile(serviceConfigEnvPath)
-
-	// DOMAIN/USER/PASS não são mais obrigatórios vindos do Zabbix: se o
-	// alerta mandar vazio, cai pro TopDesk padrão configurado em
-	// godesk-service.env (mesma prioridade já usada pro SMTP: valor do
-	// alerta vence se vier preenchido).
-	domain = pickDefault(domain, getenv("GODESK_TOPDESK_DOMAIN", serviceFromFile["GODESK_TOPDESK_DOMAIN"]))
-	user = pickDefault(user, getenv("GODESK_TOPDESK_USER", serviceFromFile["GODESK_TOPDESK_USER"]))
-	pass = pickDefault(pass, getenv("GODESK_TOPDESK_PASS", serviceFromFile["GODESK_TOPDESK_PASS"]))
-
-	// mesma coisa pro Zabbix (URL da API + token): opcional no alerta,
-	// cai pro padrão do serviço se vier vazio.
-	zabbixURL = pickDefault(zabbixURL, getenv("GODESK_ZABBIX_URL", serviceFromFile["GODESK_ZABBIX_URL"]))
-	zabbixKey = pickDefault(zabbixKey, getenv("GODESK_ZABBIX_KEY", serviceFromFile["GODESK_ZABBIX_KEY"]))
 
 	cfg := RuntimeConfig{
-		Domain:     domain,
-		User:       user,
-		Pass:       pass,
+		Domain:     svc.TopdeskDomain,
+		User:       svc.TopdeskUser,
+		Pass:       svc.TopdeskPass,
 		TicketName: ticketName,
 		RawData:    rawData,
-		ZabbixURL:  zabbixURL,
-		ZabbixKey:  zabbixKey,
+		ZabbixURL:  svc.ZabbixURL,
+		ZabbixKey:  svc.ZabbixKey,
 
 		LogFile:     getenv("TOPDESK_LOG_FILE", "/tmp/goDesk-integration.log"),
 		ConfigFile:  getenv("TOPDESK_CONFIG", "/etc/zabbix/godesk/godesk-config.yaml"),
@@ -89,39 +77,53 @@ func FromValues(domain, user, pass, ticketName, rawData, zabbixURL, zabbixKey st
 	return cfg
 }
 
-// ServiceConfig contém as opções do modo serviço (`godesk serve`).
+// ServiceConfig é a configuração central do goDesk — carregada uma única
+// vez no início do processo (ServiceConfigFromEnv) e reaproveitada dali em
+// diante, tanto pelo godesk serve quanto pelo modo one-shot (FromArgs).
 type ServiceConfig struct {
 	ListenAddr string
 	Token      string
 	LogFile    string
 	ConfigFile string
 
-	// TopDesk padrão do serviço, usado pelo healthcheck em background (que
-	// não tem um alerta pra tirar credenciais) e como fallback em
-	// FromValues quando o alerta não manda DOMAIN/USER/PASS.
+	// TopDesk padrão do serviço — não vem mais de alerta nenhum, é sempre
+	// daqui (usado tanto pra criar/atualizar chamados quanto pelo
+	// healthcheck em background).
 	TopdeskDomain string
 	TopdeskUser   string
 	TopdeskPass   string
+
+	// Zabbix padrão do serviço (URL da API + token do event.acknowledge).
+	ZabbixURL string
+	ZabbixKey string
 
 	// HealthCheckInterval <= 0 desliga o healthcheck periódico do TopDesk.
 	HealthCheckInterval time.Duration
 }
 
-// ServiceConfigFromEnv lê as opções do modo serviço a partir do ambiente do
-// processo. Em produção, o systemd injeta essas variáveis via
-// EnvironmentFile= antes de iniciar o binário.
+// ServiceConfigFromEnv monta o ServiceConfig a partir do ambiente do
+// processo, com godesk-service.env como fallback pra cada chave (systemd
+// injeta via EnvironmentFile= quando roda como serviço; o modo one-shot,
+// que não passa pelo systemd, lê o arquivo direto). Chame uma vez só, no
+// início do processo — não é pra recarregar a cada alerta.
 func ServiceConfigFromEnv() ServiceConfig {
+	fromFile := LoadEnvFile(serviceConfigEnvPath)
+	get := func(key, def string) string { return getenv(key, pickDefault(fromFile[key], def)) }
+
 	return ServiceConfig{
-		ListenAddr: getenv("GODESK_LISTEN_ADDR", "127.0.0.1:8787"),
-		Token:      getenv("GODESK_SERVICE_TOKEN", ""),
-		LogFile:    getenv("TOPDESK_LOG_FILE", "/var/log/godesk/godesk-service.log"),
-		ConfigFile: getenv("TOPDESK_CONFIG", "/etc/zabbix/godesk/godesk-config.yaml"),
+		ListenAddr: get("GODESK_LISTEN_ADDR", "127.0.0.1:8787"),
+		Token:      get("GODESK_SERVICE_TOKEN", ""),
+		LogFile:    get("TOPDESK_LOG_FILE", "/var/log/godesk/godesk-service.log"),
+		ConfigFile: get("TOPDESK_CONFIG", "/etc/zabbix/godesk/godesk-config.yaml"),
 
-		TopdeskDomain: getenv("GODESK_TOPDESK_DOMAIN", ""),
-		TopdeskUser:   getenv("GODESK_TOPDESK_USER", ""),
-		TopdeskPass:   getenv("GODESK_TOPDESK_PASS", ""),
+		TopdeskDomain: get("GODESK_TOPDESK_DOMAIN", ""),
+		TopdeskUser:   get("GODESK_TOPDESK_USER", ""),
+		TopdeskPass:   get("GODESK_TOPDESK_PASS", ""),
 
-		HealthCheckInterval: parseDurationDefault(getenv("GODESK_HEALTHCHECK_INTERVAL", ""), 0),
+		ZabbixURL: get("GODESK_ZABBIX_URL", ""),
+		ZabbixKey: get("GODESK_ZABBIX_KEY", ""),
+
+		HealthCheckInterval: parseDurationDefault(get("GODESK_HEALTHCHECK_INTERVAL", ""), 0),
 	}
 }
 

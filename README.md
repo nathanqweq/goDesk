@@ -57,9 +57,9 @@ No frontend do Zabbix: **Administration → General → Modules → Scan directo
 
 ### 5. Apontar o Media Type do Zabbix
 
-Em **Alerts → Media types**, configure um Media Type do tipo Script apontando para `/usr/lib/zabbix/alertscripts/godesk`, com os parâmetros `DOMAIN USER PASS TICKET_NAME RAWDATA ZABBIX_URL ZABBIX_KEY` (veja [dist/message.json](dist/message.json) para o template do `RAWDATA`).
+Em **Alerts → Media types**, configure um Media Type do tipo Script apontando para `/usr/lib/zabbix/alertscripts/godesk`, com **apenas 2 parâmetros, nesta ordem**: `TICKET_NAME RAWDATA` (veja [dist/message.json](dist/message.json) para o template do `RAWDATA`).
 
-`DOMAIN`/`USER`/`PASS` e `ZABBIX_URL`/`ZABBIX_KEY` são opcionais desde que `GODESK_TOPDESK_DOMAIN/USER/PASS` e `GODESK_ZABBIX_URL/KEY` estejam configurados em `godesk-service.env` — pode deixar esses parâmetros do Media Type em branco (o Zabbix ainda precisa mandar os 7 parâmetros, só que vazios) que o goDesk usa os valores padrão do serviço. Se o Media Type mandar algum valor não-vazio, ele tem prioridade sobre o padrão.
+> **Atenção, mudança de versão:** até a `v1.2.x` o Media Type precisava de 7 parâmetros (`DOMAIN USER PASS TICKET_NAME RAWDATA ZABBIX_URL ZABBIX_KEY`). A partir daqui `DOMAIN`/`USER`/`PASS`/`ZABBIX_URL`/`ZABBIX_KEY` **não são mais parâmetros do Media Type** — vêm exclusivamente de `GODESK_TOPDESK_DOMAIN/USER/PASS` e `GODESK_ZABBIX_URL/KEY` em `godesk-service.env`, carregados uma vez quando o `godesk`/`godesk serve` inicia. Se seu Media Type ainda estiver com os 7 parâmetros antigos, o `godesk` vai interpretar `DOMAIN` como se fosse `TICKET_NAME` — **edite o Media Type pra deixar só `TICKET_NAME RAWDATA`, nessa ordem, antes de atualizar**.
 
 ### 6. (Opcional) Healthcheck do TopDesk
 

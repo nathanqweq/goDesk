@@ -19,14 +19,12 @@ import (
 // runFn permite substituir app.Run em testes.
 var runFn = app.Run
 
+// alertRequest só carrega o que de fato muda por alerta — TopDesk e
+// Zabbix (domain/user/pass/url/key) vêm do ServiceConfig do processo,
+// carregado uma vez em Run (ver config.ServiceConfigFromEnv).
 type alertRequest struct {
-	Domain     string `json:"domain"`
-	User       string `json:"user"`
-	Pass       string `json:"pass"`
 	TicketName string `json:"ticket_name"`
 	RawData    string `json:"rawdata"`
-	ZabbixURL  string `json:"zabbix_url"`
-	ZabbixKey  string `json:"zabbix_key"`
 }
 
 // Run sobe o servidor HTTP do goDesk e bloqueia até receber SIGINT/SIGTERM,
@@ -34,7 +32,7 @@ type alertRequest struct {
 func Run(opts config.ServiceConfig) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", handleHealth)
-	mux.HandleFunc("POST /alert", handleAlert(opts.Token))
+	mux.HandleFunc("POST /alert", handleAlert(opts))
 	mux.HandleFunc("POST /config", handleConfig(opts.Token, opts.ConfigFile))
 
 	srv := &http.Server{
@@ -77,9 +75,9 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-func handleAlert(token string) http.HandlerFunc {
+func handleAlert(opts config.ServiceConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !authorized(r, token) {
+		if !authorized(r, opts.Token) {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 			return
 		}
@@ -92,7 +90,7 @@ func handleAlert(token string) http.HandlerFunc {
 			return
 		}
 
-		cfg := config.FromValues(req.Domain, req.User, req.Pass, req.TicketName, req.RawData, req.ZabbixURL, req.ZabbixKey)
+		cfg := config.FromValues(opts, req.TicketName, req.RawData)
 
 		if err := runFn(cfg); err != nil {
 			log.Printf("[server] ERRO ao processar alerta: %v\n", err)
