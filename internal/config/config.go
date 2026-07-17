@@ -57,6 +57,11 @@ func FromValues(domain, user, pass, ticketName, rawData, zabbixURL, zabbixKey st
 	user = pickDefault(user, getenv("GODESK_TOPDESK_USER", serviceFromFile["GODESK_TOPDESK_USER"]))
 	pass = pickDefault(pass, getenv("GODESK_TOPDESK_PASS", serviceFromFile["GODESK_TOPDESK_PASS"]))
 
+	// mesma coisa pro Zabbix (URL da API + token): opcional no alerta,
+	// cai pro padrão do serviço se vier vazio.
+	zabbixURL = pickDefault(zabbixURL, getenv("GODESK_ZABBIX_URL", serviceFromFile["GODESK_ZABBIX_URL"]))
+	zabbixKey = pickDefault(zabbixKey, getenv("GODESK_ZABBIX_KEY", serviceFromFile["GODESK_ZABBIX_KEY"]))
+
 	cfg := RuntimeConfig{
 		Domain:     domain,
 		User:       user,
