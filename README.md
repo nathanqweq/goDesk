@@ -43,7 +43,7 @@ Arquivos em `/etc/zabbix/godesk/` (criados com valores de exemplo na instalaçã
 |---|---|---|
 | `godesk-config.yaml` | host do servidor | regras de roteamento (urgência, impacto, operador, cliente) — normalmente editado pela UI do Zabbix, não à mão |
 | `godesk-smtp-config.env` | host do servidor | credenciais SMTP, se `send_email` estiver ativo em alguma regra |
-| `godesk-service.env` | host do servidor | `GODESK_LISTEN_ADDR` e `GODESK_SERVICE_TOKEN` do `godesk serve` |
+| `godesk-service.env` | host do servidor | `GODESK_LISTEN_ADDR`/`GODESK_SERVICE_TOKEN` do `godesk serve`, TopDesk padrão (`GODESK_TOPDESK_DOMAIN/USER/PASS`) e intervalo do healthcheck (`GODESK_HEALTHCHECK_INTERVAL`) |
 | `godesk-client.env` | host do frontend (só se `godesk-client` estiver instalado) | `GODESK_SERVER_URL` e `GODESK_SERVICE_TOKEN` — precisa bater com o token do `godesk-service.env` do servidor |
 
 Depois de editar `godesk-service.env`, reinicie o serviço:
@@ -58,6 +58,12 @@ No frontend do Zabbix: **Administration → General → Modules → Scan directo
 ### 5. Apontar o Media Type do Zabbix
 
 Em **Alerts → Media types**, configure um Media Type do tipo Script apontando para `/usr/lib/zabbix/alertscripts/godesk`, com os parâmetros `DOMAIN USER PASS TICKET_NAME RAWDATA ZABBIX_URL ZABBIX_KEY` (veja [dist/message.json](dist/message.json) para o template do `RAWDATA`).
+
+`DOMAIN`/`USER`/`PASS` são opcionais desde que `GODESK_TOPDESK_DOMAIN/USER/PASS` estejam configurados em `godesk-service.env` — pode deixar esses 3 parâmetros do Media Type em branco (o Zabbix ainda precisa mandar os 7 parâmetros, só que vazios) que o goDesk usa o TopDesk padrão do serviço. Se o Media Type mandar algum valor não-vazio, ele tem prioridade sobre o padrão.
+
+### 6. (Opcional) Healthcheck do TopDesk
+
+Com `GODESK_TOPDESK_DOMAIN/USER/PASS` e `GODESK_HEALTHCHECK_INTERVAL` configurados em `godesk-service.env`, o `godesk serve` testa `GET /tas/api/incidents?pageSize=1` nesse intervalo, em background (não interfere no processamento de alertas), registrando sucesso/erro e latência nos logs e em `godesk --monitoring`.
 
 ## Instalação manual (sem apt)
 

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"strings"
+	"time"
 )
 
 type RuntimeConfig struct {
@@ -29,6 +30,7 @@ type RuntimeConfig struct {
 }
 
 const smtpConfigEnvPath = "/etc/zabbix/godesk/godesk-smtp-config.env"
+const serviceConfigEnvPath = "/etc/zabbix/godesk/godesk-service.env"
 
 func FromArgs(argv []string) (RuntimeConfig, error) {
 	// DOMAIN USER PASS TICKET_NAME RAWDATA ZABBIX_URL ZABBIX_KEY
@@ -45,6 +47,15 @@ func FromArgs(argv []string) (RuntimeConfig, error) {
 // vindo do ambiente do processo em ambos os casos.
 func FromValues(domain, user, pass, ticketName, rawData, zabbixURL, zabbixKey string) RuntimeConfig {
 	smtpFromFile := LoadEnvFile(smtpConfigEnvPath)
+	serviceFromFile := LoadEnvFile(serviceConfigEnvPath)
+
+	// DOMAIN/USER/PASS não são mais obrigatórios vindos do Zabbix: se o
+	// alerta mandar vazio, cai pro TopDesk padrão configurado em
+	// godesk-service.env (mesma prioridade já usada pro SMTP: valor do
+	// alerta vence se vier preenchido).
+	domain = pickDefault(domain, getenv("GODESK_TOPDESK_DOMAIN", serviceFromFile["GODESK_TOPDESK_DOMAIN"]))
+	user = pickDefault(user, getenv("GODESK_TOPDESK_USER", serviceFromFile["GODESK_TOPDESK_USER"]))
+	pass = pickDefault(pass, getenv("GODESK_TOPDESK_PASS", serviceFromFile["GODESK_TOPDESK_PASS"]))
 
 	cfg := RuntimeConfig{
 		Domain:     domain,
@@ -79,6 +90,16 @@ type ServiceConfig struct {
 	Token      string
 	LogFile    string
 	ConfigFile string
+
+	// TopDesk padrão do serviço, usado pelo healthcheck em background (que
+	// não tem um alerta pra tirar credenciais) e como fallback em
+	// FromValues quando o alerta não manda DOMAIN/USER/PASS.
+	TopdeskDomain string
+	TopdeskUser   string
+	TopdeskPass   string
+
+	// HealthCheckInterval <= 0 desliga o healthcheck periódico do TopDesk.
+	HealthCheckInterval time.Duration
 }
 
 // ServiceConfigFromEnv lê as opções do modo serviço a partir do ambiente do
@@ -90,7 +111,27 @@ func ServiceConfigFromEnv() ServiceConfig {
 		Token:      getenv("GODESK_SERVICE_TOKEN", ""),
 		LogFile:    getenv("TOPDESK_LOG_FILE", "/var/log/godesk/godesk-service.log"),
 		ConfigFile: getenv("TOPDESK_CONFIG", "/etc/zabbix/godesk/godesk-config.yaml"),
+
+		TopdeskDomain: getenv("GODESK_TOPDESK_DOMAIN", ""),
+		TopdeskUser:   getenv("GODESK_TOPDESK_USER", ""),
+		TopdeskPass:   getenv("GODESK_TOPDESK_PASS", ""),
+
+		HealthCheckInterval: parseDurationDefault(getenv("GODESK_HEALTHCHECK_INTERVAL", ""), 0),
 	}
+}
+
+// parseDurationDefault interpreta strings tipo "5m"/"30s"; vazio ou
+// inválido devolve def sem erro (nunca derruba o serviço por causa disso).
+func parseDurationDefault(s string, def time.Duration) time.Duration {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return def
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return def
+	}
+	return d
 }
 
 // MetricsFileFromEnv devolve o caminho do arquivo de métricas persistentes

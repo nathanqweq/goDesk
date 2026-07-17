@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"encoding/json"
+	"log"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -30,6 +31,13 @@ type Snapshot struct {
 	ZabbixAckErrors    int64 `json:"zabbix_ack_errors_total"`
 	EmailSendErrors    int64 `json:"email_send_errors_total"`
 	SendMoreInfoErrors int64 `json:"send_more_info_errors_total"`
+
+	TopdeskHealthChecksTotal        int64     `json:"topdesk_healthchecks_total"`
+	TopdeskHealthCheckErrors        int64     `json:"topdesk_healthcheck_errors_total"`
+	TopdeskHealthCheckLastOK        bool      `json:"topdesk_healthcheck_last_ok"`
+	TopdeskHealthCheckLastAt        time.Time `json:"topdesk_healthcheck_last_at"`
+	TopdeskHealthCheckLastLatencyMs int64     `json:"topdesk_healthcheck_last_latency_ms"`
+	TopdeskHealthCheckLastError     string    `json:"topdesk_healthcheck_last_error,omitempty"`
 }
 
 // Record lê o snapshot atual em path (criando um zerado se o arquivo ainda
@@ -80,6 +88,16 @@ func Record(path string, fn func(*Snapshot)) (Snapshot, error) {
 	}
 
 	return snap, nil
+}
+
+// RecordAndLog é um atalho pra Record que só loga (não propaga) erro de
+// gravação — usado nos pontos de instrumentação que não devem alterar o
+// resultado do fluxo principal (processar alerta, healthcheck) por causa
+// de uma falha ao persistir métricas.
+func RecordAndLog(path string, fn func(*Snapshot)) {
+	if _, err := Record(path, fn); err != nil {
+		log.Printf("[metrics] WARN: falha ao gravar métricas (%s): %v\n", path, err)
+	}
 }
 
 // Read lê o snapshot atual sem lock — seguro porque Record sempre escreve

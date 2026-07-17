@@ -258,7 +258,9 @@ install_service() {
   echo "instalando env do servico (sem sobrescrever se ja existir)..."
   mkdir -p "$DEST_CFG_DIR"
   cp -n "$SRC_SERVICE_ENV" "$DEST_SERVICE_ENV"
-  chown root:root "$DEST_SERVICE_ENV"
+  # dono zabbix (nao root): o servico roda como zabbix e agora esse arquivo
+  # pode conter credenciais do TopDesk (GODESK_TOPDESK_USER/PASS)
+  chown zabbix:zabbix "$DEST_SERVICE_ENV" 2>/dev/null || chown root:root "$DEST_SERVICE_ENV"
   chmod 640 "$DEST_SERVICE_ENV"
 
   echo "recarregando systemd e habilitando o servico..."

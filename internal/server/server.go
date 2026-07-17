@@ -47,6 +47,12 @@ func Run(opts config.ServiceConfig) error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	if opts.HealthCheckInterval > 0 && opts.TopdeskDomain != "" {
+		go runTopdeskHealthCheck(ctx, opts)
+	} else {
+		log.Println("[healthcheck] desabilitado (GODESK_HEALTHCHECK_INTERVAL ou GODESK_TOPDESK_DOMAIN não configurados)")
+	}
+
 	errCh := make(chan error, 1)
 	go func() {
 		log.Printf("[server] ouvindo em %s\n", opts.ListenAddr)

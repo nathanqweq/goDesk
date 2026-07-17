@@ -16,6 +16,14 @@ case "$1" in
     mkdir -p /etc/zabbix/godesk
     chmod 777 /etc/zabbix/godesk
 
+    # godesk-service.env pode conter credenciais do TopDesk
+    # (GODESK_TOPDESK_USER/PASS) desde que passou a ser o padrao do
+    # servico — restringe a leitura a root + zabbix
+    if [ -f /etc/zabbix/godesk/godesk-service.env ]; then
+      chown zabbix:zabbix /etc/zabbix/godesk/godesk-service.env 2>/dev/null || true
+      chmod 640 /etc/zabbix/godesk/godesk-service.env
+    fi
+
     if command -v systemctl >/dev/null 2>&1; then
       systemctl daemon-reload || true
       systemctl enable godesk.service || true
