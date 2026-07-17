@@ -6,6 +6,11 @@ case "$1" in
     mkdir -p /var/log/godesk
     chown zabbix:zabbix /var/log/godesk 2>/dev/null || true
 
+    # estado persistente (godesk-metrics.json, lido por "godesk --monitoring")
+    mkdir -p /var/lib/godesk
+    chown zabbix:zabbix /var/lib/godesk 2>/dev/null || true
+    chmod 755 /var/lib/godesk
+
     # o servico roda como "zabbix" (User=zabbix na unit) e precisa gravar
     # godesk-config.yaml + backup nessa pasta (endpoint POST /config)
     mkdir -p /etc/zabbix/godesk

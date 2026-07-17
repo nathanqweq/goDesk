@@ -16,9 +16,10 @@ type RuntimeConfig struct {
 	ZabbixURL  string
 	ZabbixKey  string
 
-	LogFile    string
-	ConfigFile string
-	TimeoutSec int
+	LogFile     string
+	ConfigFile  string
+	MetricsFile string
+	TimeoutSec  int
 
 	SMTPHost string
 	SMTPPort string
@@ -54,14 +55,15 @@ func FromValues(domain, user, pass, ticketName, rawData, zabbixURL, zabbixKey st
 		ZabbixURL:  zabbixURL,
 		ZabbixKey:  zabbixKey,
 
-		LogFile:    getenv("TOPDESK_LOG_FILE", "/tmp/goDesk-integration.log"),
-		ConfigFile: getenv("TOPDESK_CONFIG", "/etc/zabbix/godesk/godesk-config.yaml"),
-		TimeoutSec: atoiDefault(getenv("TOPDESK_TIMEOUT_SEC", "15"), 15),
-		SMTPHost:   getenv("TOPDESK_SMTP_HOST", smtpFromFile["TOPDESK_SMTP_HOST"]),
-		SMTPPort:   getenv("TOPDESK_SMTP_PORT", pickDefault(smtpFromFile["TOPDESK_SMTP_PORT"], "25")),
-		SMTPUser:   getenv("TOPDESK_SMTP_USER", smtpFromFile["TOPDESK_SMTP_USER"]),
-		SMTPPass:   getenv("TOPDESK_SMTP_PASS", smtpFromFile["TOPDESK_SMTP_PASS"]),
-		SMTPFrom:   getenv("TOPDESK_SMTP_FROM", smtpFromFile["TOPDESK_SMTP_FROM"]),
+		LogFile:     getenv("TOPDESK_LOG_FILE", "/tmp/goDesk-integration.log"),
+		ConfigFile:  getenv("TOPDESK_CONFIG", "/etc/zabbix/godesk/godesk-config.yaml"),
+		MetricsFile: MetricsFileFromEnv(),
+		TimeoutSec:  atoiDefault(getenv("TOPDESK_TIMEOUT_SEC", "15"), 15),
+		SMTPHost:    getenv("TOPDESK_SMTP_HOST", smtpFromFile["TOPDESK_SMTP_HOST"]),
+		SMTPPort:    getenv("TOPDESK_SMTP_PORT", pickDefault(smtpFromFile["TOPDESK_SMTP_PORT"], "25")),
+		SMTPUser:    getenv("TOPDESK_SMTP_USER", smtpFromFile["TOPDESK_SMTP_USER"]),
+		SMTPPass:    getenv("TOPDESK_SMTP_PASS", smtpFromFile["TOPDESK_SMTP_PASS"]),
+		SMTPFrom:    getenv("TOPDESK_SMTP_FROM", smtpFromFile["TOPDESK_SMTP_FROM"]),
 	}
 
 	// sane
@@ -89,6 +91,14 @@ func ServiceConfigFromEnv() ServiceConfig {
 		LogFile:    getenv("TOPDESK_LOG_FILE", "/var/log/godesk/godesk-service.log"),
 		ConfigFile: getenv("TOPDESK_CONFIG", "/etc/zabbix/godesk/godesk-config.yaml"),
 	}
+}
+
+// MetricsFileFromEnv devolve o caminho do arquivo de métricas persistentes
+// (internal/metrics), usado tanto pelo modo one-shot/serve (que gravam)
+// quanto por `godesk --monitoring` (que só lê) — mesma env var e default
+// nos três casos, pra garantir que todos apontem pro mesmo arquivo.
+func MetricsFileFromEnv() string {
+	return getenv("GODESK_METRICS_FILE", "/var/lib/godesk/godesk-metrics.json")
 }
 
 func getenv(k, def string) string {

@@ -9,12 +9,22 @@ import (
 
 	"godesk/internal/config"
 	"godesk/internal/mailer"
+	"godesk/internal/metrics"
 	"godesk/internal/rawdata"
 	"godesk/internal/topdesk"
 	"godesk/internal/zabbix"
 )
 
-func Run(cfg config.RuntimeConfig) error {
+func Run(cfg config.RuntimeConfig) (err error) {
+	defer func() {
+		recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) {
+			m.AlertsProcessed++
+			if err != nil {
+				m.AlertsFailed++
+			}
+		})
+	}()
+
 	p, err := rawdata.Parse(cfg.RawData)
 	if err != nil {
 		return err
@@ -89,6 +99,12 @@ func Run(cfg config.RuntimeConfig) error {
 	log.Printf("[app] kind=%s rule=%q cliente=%q autoclose=%v urgency=%q impact=%q priority=%q ticket=%q\n",
 		eventKind, p.RuleName, p.Cliente, pol.AutoClose, pol.Urgency, pol.Impact, priority, ticketName)
 
+	// serializa por ticketName: evita duas requisições concorrentes (mesmo
+	// trigger disparando quase junto) verem "não existe" ao mesmo tempo e
+	// criarem chamado duplicado.
+	unlock := lockTicket(ticketName)
+	defer unlock()
+
 	exists, ticketID, status, err := td.TicketExists(ticketName)
 	if err != nil {
 		return err
@@ -119,8 +135,11 @@ func Run(cfg config.RuntimeConfig) error {
 
 		created, err := td.CreateTicket(payload)
 		if err != nil {
+			recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.TicketsCreateErrors++ })
 			return err
 		}
+		recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.TicketsCreated++ })
+
 		if pol.TopDesk.SendMoreInfo {
 			infoMsg := strings.TrimSpace(pol.TopDesk.MoreInfoText)
 			if infoMsg != "" && !strings.EqualFold(infoMsg, "null") {
@@ -128,6 +147,7 @@ func Run(cfg config.RuntimeConfig) error {
 					"action":                   infoMsg,
 					"actionInvisibleForCaller": true,
 				}); err != nil {
+					recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.SendMoreInfoErrors++ })
 					log.Printf("[topdesk] WARN: falha ao enviar send_more_info ticket=%s: %v\n", created, err)
 				}
 			} else {
@@ -157,24 +177,34 @@ func Run(cfg config.RuntimeConfig) error {
 					body,
 				)
 				if err != nil {
+					recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.EmailSendErrors++ })
 					log.Printf("[email] WARN: falha ao enviar email ticket=%s: %v\n", created, err)
 				}
 			}
 		}
 		if err := zx.Acknowledge(p.EventID, "Chamado criado: "+created); err != nil {
+			recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.ZabbixAckErrors++ })
 			log.Printf("[zabbix] ACK ERROR: %v\n", err)
 		}
 
 	case exists && eventKind == "ProblemStart":
 		action := "Recebemos novamente o alerta " + p.Trigger + " em nosso Zabbix."
-		_ = td.PatchTicket(ticketID, buildUpdatePayload(action, status))
+		if err := td.PatchTicket(ticketID, buildUpdatePayload(action, status)); err != nil {
+			recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.TicketsUpdateErrors++ })
+			log.Printf("[topdesk] WARN: falha ao atualizar chamado %s: %v\n", ticketID, err)
+		} else {
+			recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.TicketsUpdated++ })
+		}
 		if err := zx.Acknowledge(p.EventID, "Chamado já existe: "+ticketID); err != nil {
+			recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.ZabbixAckErrors++ })
 			log.Printf("[zabbix] ACK ERROR: %v\n", err)
 		}
 
 	case exists && eventKind == "ProblemRecovery":
 		if strings.EqualFold(status, "Fechado") {
+			recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.TicketsAlreadyClosed++ })
 			if err := zx.Acknowledge(p.EventID, "Chamado já estava fechado: "+ticketID); err != nil {
+				recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.ZabbixAckErrors++ })
 				log.Printf("[zabbix] ACK ERROR: %v\n", err)
 			}
 			return nil
@@ -182,19 +212,31 @@ func Run(cfg config.RuntimeConfig) error {
 
 		if pol.AutoClose {
 			closeMsg := topdesk.CloseHTML(ticketID, p)
-			_ = td.PatchTicket(ticketID, map[string]any{
+			if err := td.PatchTicket(ticketID, map[string]any{
 				"action": closeMsg,
 				"processingStatus": map[string]any{
 					"name": "Fechado",
 				},
-			})
+			}); err != nil {
+				recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.TicketsCloseErrors++ })
+				log.Printf("[topdesk] WARN: falha ao encerrar chamado %s: %v\n", ticketID, err)
+			} else {
+				recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.TicketsClosed++ })
+			}
 			if err := zx.Acknowledge(p.EventID, "Chamado encerrado: "+ticketID); err != nil {
+				recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.ZabbixAckErrors++ })
 				log.Printf("[zabbix] ACK ERROR: %v\n", err)
 			}
 		} else {
 			action := "Recebemos a normalização do alerta " + p.Trigger + " em nosso Zabbix."
-			_ = td.PatchTicket(ticketID, buildUpdatePayload(action, status))
+			if err := td.PatchTicket(ticketID, buildUpdatePayload(action, status)); err != nil {
+				recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.TicketsUpdateErrors++ })
+				log.Printf("[topdesk] WARN: falha ao atualizar chamado %s: %v\n", ticketID, err)
+			} else {
+				recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.TicketsUpdated++ })
+			}
 			if err := zx.Acknowledge(p.EventID, "Normalização recebida (sem autoclose): "+ticketID); err != nil {
+				recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.ZabbixAckErrors++ })
 				log.Printf("[zabbix] ACK ERROR: %v\n", err)
 			}
 		}

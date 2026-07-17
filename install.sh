@@ -28,6 +28,7 @@ SRC_SERVICE_ENV="$SRC_DIST/godesk-service.env"
 DEST_SERVICE_UNIT="/etc/systemd/system/godesk.service"
 DEST_SERVICE_ENV="$DEST_CFG_DIR/godesk-service.env"
 SERVICE_LOG_DIR="/var/log/godesk"
+SERVICE_DATA_DIR="/var/lib/godesk"
 
 if [ "${EUID:-$(id -u)}" -ne 0 ]; then
   echo "rode como root: sudo $0"
@@ -245,6 +246,11 @@ install_service() {
   echo "criando diretorio de log ($SERVICE_LOG_DIR)..."
   mkdir -p "$SERVICE_LOG_DIR"
   chown zabbix:zabbix "$SERVICE_LOG_DIR" 2>/dev/null || true
+
+  echo "criando diretorio de estado ($SERVICE_DATA_DIR)..."
+  mkdir -p "$SERVICE_DATA_DIR"
+  chown zabbix:zabbix "$SERVICE_DATA_DIR" 2>/dev/null || true
+  chmod 755 "$SERVICE_DATA_DIR"
 
   echo "instalando unit systemd..."
   cp -f "$SRC_SERVICE_UNIT" "$DEST_SERVICE_UNIT"
