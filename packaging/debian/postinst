@@ -6,6 +6,11 @@ case "$1" in
     mkdir -p /var/log/godesk
     chown zabbix:zabbix /var/log/godesk 2>/dev/null || true
 
+    # o servico roda como "zabbix" (User=zabbix na unit) e precisa gravar
+    # godesk-config.yaml + backup nessa pasta (endpoint POST /config)
+    mkdir -p /etc/zabbix/godesk
+    chmod 777 /etc/zabbix/godesk
+
     if command -v systemctl >/dev/null 2>&1; then
       systemctl daemon-reload || true
       systemctl enable godesk.service || true
