@@ -27,6 +27,7 @@ func Run(cfg config.RuntimeConfig) (err error) {
 
 	p, err := rawdata.Parse(cfg.RawData)
 	if err != nil {
+		log.Printf("[app] ERRO ao parsear RAWDATA: %v\nRAWDATA completo recebido: %s\n", err, cfg.RawData)
 		return err
 	}
 
