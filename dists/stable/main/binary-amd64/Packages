@@ -1,13 +1,13 @@
 Package: godesk
-Version: 1.0.0
+Version: 1.0.1
 Architecture: amd64
 Maintainer: Nathan Quadros <nathanq_@hotmail.com>
 Depends: systemd
-Filename: pool/main/g/godesk/godesk_1.0.0_amd64.deb
-Size: 5064760
-MD5sum: e34e27da70d368a25177a67a93bc1b75
-SHA1: a9c2d5229afcb2738db8da5836c0b4681fb01d08
-SHA256: d84e3edf5562af6be509f28bd8b7f96914d362312518ddb9cc3ccfd13797f201
+Filename: pool/main/g/godesk/godesk_1.0.1_amd64.deb
+Size: 5070488
+MD5sum: 2921d4c6d1f22e699bbf1ecbfe9a9e6e
+SHA1: 0e94db822ca7604239600eb2b7a46902155b9e4b
+SHA256: 41b4d85cde91fc13229fc8c2787271456342b3bf4ee46dd867a8f37f33f303fd
 Section: net
 Priority: optional
 Homepage: https://github.com/nathanqweq/goDesk
@@ -15,4 +15,24 @@ Description: goDesk - automacao Zabbix + TopDesk
  Integra alertas do Zabbix com criacao/atualizacao automatica de
  chamados no TopDesk. Inclui modo CLI one-shot (alertscript) e
  modo servico systemd (HTTP, godesk serve).
+
+Package: godesk-client
+Version: 1.0.1
+Architecture: amd64
+Maintainer: Nathan Quadros <nathanq_@hotmail.com>
+Recommends: php-yaml
+Filename: pool/main/g/godesk-client/godesk-client_1.0.1_amd64.deb
+Size: 4525738
+MD5sum: dbedbb9a1422cbfce5547919d4dbf06f
+SHA1: 30827a829d3ca2c42b603d791e8ff0383ee4ac34
+SHA256: 65bff1928e4f9ae29807896ae96b8511b167e2858e95e16d6f73759c1deba086
+Section: net
+Priority: optional
+Homepage: https://github.com/nathanqweq/goDesk
+Description: goDesk Client - modulo Zabbix + sincronizacao de config
+ Instala o modulo frontend do Zabbix (edicao/visualizacao do
+ godesk-config.yaml) e o binario godesk-client, que valida esse YAML e
+ o envia para o servidor goDesk (godesk serve) sempre que o admin salva
+ pela UI. Use este pacote no host que roda o frontend do Zabbix; use o
+ pacote "godesk" no host que roda o godesk serve/alertscripts.
 
