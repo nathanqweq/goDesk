@@ -22,14 +22,11 @@ default:
     email_cc: ""
     call_type: "Resolucao de incidente"
 
+# Clientes nomeados: cadastre um cliente uma vez e todas as rules que o
+# referenciam (abaixo, em "rules") herdam esse TopDesk sem precisar
+# repetir contract/operator/oper_group/sla/etc em cada regra.
 clients:
-  CRESOL-AP-SW: # precisa bater com RAWDATA.rule_name
-    client: "Cresol"
-    urgency: "Baixa"
-    impact: "Sem impacto"
-    priority: "" # opcional
-    autoclose: false
-
+  CRESOL:
     topdesk:
       contract: "CONTRATO_CRESOL"
       operator: "ID_OPERADOR_CRESOL"
@@ -46,3 +43,20 @@ clients:
       email_to: ""
       email_cc: ""
       call_type: "Resolucao de incidente"
+
+# Rules: a chave precisa bater com RAWDATA.rule_name (EVENT.TAGS.RuleName
+# no Zabbix). "client" referencia um nome cadastrado em "clients:" acima —
+# só é preciso preencher aqui o que de fato varia por regra (urgency,
+# impact, priority, autoclose, e overrides pontuais de topdesk como
+# more_info_text). Campos de topdesk vazios herdam do cliente; os 3
+# booleanos (send_more_info/adicional_cresol/send_email) sempre vem do
+# cliente quando "client" está preenchido.
+rules:
+  CRESOL-AP-SW:
+    client: "CRESOL"
+    urgency: "Baixa"
+    impact: "Sem impacto"
+    priority: "" # opcional
+    autoclose: false
+    topdesk:
+      more_info_text: ""

@@ -43,6 +43,35 @@ type PoliciesFile struct {
 	Clients map[string]Policy `yaml:"clients"`
 }
 
+// ClientPolicy é um cliente nomeado no formato novo do YAML (clientes +
+// rules) — só carrega o TopDesk compartilhado por todas as rules que o
+// referenciam.
+type ClientPolicy struct {
+	TopDesk TopDeskDefaults `yaml:"topdesk"`
+}
+
+// RulePolicy é uma regra no formato novo: referencia um ClientPolicy (pelo
+// nome, chave em policiesFileV2.Clients) e só carrega o que de fato varia
+// por regra — urgency/impact/priority/autoclose e overrides de texto do
+// TopDesk (o mais comum sendo more_info_text).
+type RulePolicy struct {
+	Client    string          `yaml:"client"`
+	Priority  string          `yaml:"priority"`
+	Urgency   string          `yaml:"urgency"`
+	Impact    string          `yaml:"impact"`
+	AutoClose bool            `yaml:"autoclose"`
+	TopDesk   TopDeskDefaults `yaml:"topdesk"`
+}
+
+// policiesFileV2 é o formato novo do YAML — só usado internamente durante
+// o parse, nunca exposto fora deste pacote. Detectado pela presença da
+// chave "rules" (ver ParsePolicies).
+type policiesFileV2 struct {
+	Default Policy                  `yaml:"default"`
+	Clients map[string]ClientPolicy `yaml:"clients"`
+	Rules   map[string]RulePolicy   `yaml:"rules"`
+}
+
 func LoadPolicies(path string) (PoliciesFile, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -55,9 +84,29 @@ func LoadPolicies(path string) (PoliciesFile, error) {
 // ParsePolicies faz o parse de um YAML de políticas já em memória (usado
 // tanto por LoadPolicies quanto pelo handler POST /config do modo serviço,
 // que recebe o conteúdo pela rede antes de gravar em disco).
+//
+// Aceita dois formatos: o antigo — "clients: {ruleName: {...topdesk
+// completo...}}" — e o novo — "clients: {clientName: {topdesk}}" +
+// "rules: {ruleName: {client: clientName, overrides}}" — que elimina a
+// duplicação do bloco topdesk quando várias regras pertencem ao mesmo
+// cliente. O formato novo é detectado pela presença da chave "rules" não
+// vazia; sem ela, o comportamento é idêntico ao de sempre.
 func ParsePolicies(data []byte) (PoliciesFile, error) {
+	var probe struct {
+		Rules map[string]RulePolicy `yaml:"rules"`
+	}
+	if err := yaml.Unmarshal(data, &probe); err != nil {
+		return PoliciesFile{}, err
+	}
+
 	var pf PoliciesFile
-	if err := yaml.Unmarshal(data, &pf); err != nil {
+	if len(probe.Rules) > 0 {
+		var v2 policiesFileV2
+		if err := yaml.Unmarshal(data, &v2); err != nil {
+			return PoliciesFile{}, err
+		}
+		pf = flattenRules(v2)
+	} else if err := yaml.Unmarshal(data, &pf); err != nil {
 		return PoliciesFile{}, err
 	}
 
@@ -73,6 +122,52 @@ func ParsePolicies(data []byte) (PoliciesFile, error) {
 	}
 
 	return pf, nil
+}
+
+// flattenRules resolve o formato "clientes + rules" para o
+// map[string]Policy achatado que ResolvePolicy já sabe consumir — cada
+// regra herda o topdesk do cliente referenciado (incluindo os 3 campos
+// booleanos send_more_info/adicional_cresol/send_email) e só pode
+// sobrescrever o que de fato varia por regra: urgency/impact/priority/
+// autoclose e os campos de texto do topdesk. Quando a regra referencia um
+// cliente válido, os 3 booleanos do topdesk vêm sempre do cliente — bool
+// não distingue "não informado" de "false", então permitir override por
+// regra apagaria silenciosamente o que o cliente configurou assim que a
+// regra não preenchesse esses campos. Regras sem cliente (referência
+// vazia ou inexistente) continuam funcionando como o formato antigo: o
+// topdesk da própria regra é aplicado por completo, booleanos inclusos.
+func flattenRules(v2 policiesFileV2) PoliciesFile {
+	out := make(map[string]Policy, len(v2.Rules))
+
+	for ruleName, rule := range v2.Rules {
+		p := v2.Default
+
+		cp, hasClient := v2.Clients[rule.Client]
+		hasClient = hasClient && rule.Client != ""
+
+		if hasClient {
+			p.TopDesk = mergeTopDesk(p.TopDesk, cp.TopDesk)
+			p.Client = rule.Client
+			p.TopDesk = mergeTopDeskTextOverrides(p.TopDesk, rule.TopDesk)
+		} else {
+			p.TopDesk = mergeTopDesk(p.TopDesk, rule.TopDesk)
+		}
+
+		if strings.TrimSpace(rule.Urgency) != "" {
+			p.Urgency = rule.Urgency
+		}
+		if strings.TrimSpace(rule.Impact) != "" {
+			p.Impact = rule.Impact
+		}
+		if strings.TrimSpace(rule.Priority) != "" {
+			p.Priority = rule.Priority
+		}
+		p.AutoClose = rule.AutoClose
+
+		out[ruleName] = p
+	}
+
+	return PoliciesFile{Default: v2.Default, Clients: out}
 }
 
 // SaveFile grava data em path de forma atômica (escreve em arquivo
@@ -144,46 +239,65 @@ func mergePolicy(def Policy, over Policy) Policy {
 	// autoclose do cliente manda (se existir bloco do cliente)
 	def.AutoClose = over.AutoClose
 
-	// topdesk: só sobrescreve se cliente tiver valor
-	if strings.TrimSpace(over.TopDesk.Contract) != "" {
-		def.TopDesk.Contract = over.TopDesk.Contract
-	}
-	if strings.TrimSpace(over.TopDesk.Operator) != "" {
-		def.TopDesk.Operator = over.TopDesk.Operator
-	}
-	if strings.TrimSpace(over.TopDesk.OperGroup) != "" {
-		def.TopDesk.OperGroup = over.TopDesk.OperGroup
-	}
-	if strings.TrimSpace(over.TopDesk.MainCaller) != "" {
-		def.TopDesk.MainCaller = over.TopDesk.MainCaller
-	}
-	if strings.TrimSpace(over.TopDesk.SecundaryCaller) != "" {
-		def.TopDesk.SecundaryCaller = over.TopDesk.SecundaryCaller
-	}
-	if strings.TrimSpace(over.TopDesk.Sla) != "" {
-		def.TopDesk.Sla = over.TopDesk.Sla
-	}
-	if strings.TrimSpace(over.TopDesk.Category) != "" {
-		def.TopDesk.Category = over.TopDesk.Category
-	}
-	if strings.TrimSpace(over.TopDesk.SubCategory) != "" {
-		def.TopDesk.SubCategory = over.TopDesk.SubCategory
-	}
-	if strings.TrimSpace(over.TopDesk.CallType) != "" {
-		def.TopDesk.CallType = over.TopDesk.CallType
-	}
-	def.TopDesk.SendMoreInfo = over.TopDesk.SendMoreInfo
-	if over.TopDesk.MoreInfoText != "" {
-		def.TopDesk.MoreInfoText = over.TopDesk.MoreInfoText
-	}
-	def.TopDesk.AdicionalCresol = over.TopDesk.AdicionalCresol
-	def.TopDesk.SendEmail = over.TopDesk.SendEmail
-	if over.TopDesk.EmailTo != "" {
-		def.TopDesk.EmailTo = over.TopDesk.EmailTo
-	}
-	if over.TopDesk.EmailCc != "" {
-		def.TopDesk.EmailCc = over.TopDesk.EmailCc
-	}
+	def.TopDesk = mergeTopDesk(def.TopDesk, over.TopDesk)
 
 	return def
+}
+
+// mergeTopDesk aplica over sobre base como uma política completa: campos
+// de texto só sobrescrevem se vierem preenchidos; os 3 booleanos
+// (send_more_info, adicional_cresol, send_email) sempre vêm de over. Use
+// isso quando over representa uma política inteira (cliente do YAML
+// antigo, ou cliente nomeado do YAML novo) — para overrides parciais de
+// regra, veja mergeTopDeskTextOverrides.
+func mergeTopDesk(base, over TopDeskDefaults) TopDeskDefaults {
+	base = mergeTopDeskTextOverrides(base, over)
+	base.SendMoreInfo = over.SendMoreInfo
+	base.AdicionalCresol = over.AdicionalCresol
+	base.SendEmail = over.SendEmail
+	return base
+}
+
+// mergeTopDeskTextOverrides aplica só os campos de texto de over sobre
+// base (inclui more_info_text), deliberadamente sem tocar nos 3 booleanos
+// — usado pelo override de uma regra sobre o que já foi resolvido do
+// cliente/default.
+func mergeTopDeskTextOverrides(base, over TopDeskDefaults) TopDeskDefaults {
+	if strings.TrimSpace(over.Contract) != "" {
+		base.Contract = over.Contract
+	}
+	if strings.TrimSpace(over.Operator) != "" {
+		base.Operator = over.Operator
+	}
+	if strings.TrimSpace(over.OperGroup) != "" {
+		base.OperGroup = over.OperGroup
+	}
+	if strings.TrimSpace(over.MainCaller) != "" {
+		base.MainCaller = over.MainCaller
+	}
+	if strings.TrimSpace(over.SecundaryCaller) != "" {
+		base.SecundaryCaller = over.SecundaryCaller
+	}
+	if strings.TrimSpace(over.Sla) != "" {
+		base.Sla = over.Sla
+	}
+	if strings.TrimSpace(over.Category) != "" {
+		base.Category = over.Category
+	}
+	if strings.TrimSpace(over.SubCategory) != "" {
+		base.SubCategory = over.SubCategory
+	}
+	if strings.TrimSpace(over.CallType) != "" {
+		base.CallType = over.CallType
+	}
+	if over.MoreInfoText != "" {
+		base.MoreInfoText = over.MoreInfoText
+	}
+	if over.EmailTo != "" {
+		base.EmailTo = over.EmailTo
+	}
+	if over.EmailCc != "" {
+		base.EmailCc = over.EmailCc
+	}
+	return base
 }

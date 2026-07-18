@@ -4,16 +4,25 @@
  *
  * Editor de configuração do goDesk.
  *
- * Schema:
+ * Schema (formato novo — clientes nomeados + rules referenciando eles):
  * default:
  *   client, urgency, impact, priority, autoclose
  *   topdesk: { contract, operator, oper_group, main_caller, secundary_caller, sla, category, sub_category, call_type, send_more_info, more_info_text, adicional_cresol, send_email, email_to, email_cc }
  *
  * clients:
+ *   <NOME_DO_CLIENTE>:
+ *     topdesk: { ... compartilhado por todas as rules desse cliente ... }
+ *
+ * rules:
  *   <RULE_NAME>:
- *     client: "Nome do cliente"
+ *     client: "NOME_DO_CLIENTE"   # referencia clients.<NOME_DO_CLIENTE>
  *     urgency, impact, priority, autoclose
- *     topdesk: { ... }
+ *     topdesk: { ... só overrides de texto (ex: more_info_text) ... }
+ *
+ * Formato antigo (clients: {RULE_NAME: {...topdesk completo...}}, sem
+ * "rules") continua sendo lido normalmente — ver loadConfig(). A partir do
+ * primeiro save por este módulo, o arquivo sempre é regravado no formato
+ * novo.
  */
 
 namespace Modules\GoDesk\Actions;
@@ -33,7 +42,8 @@ class ConfigEdit extends CController {
 		$fields = [
 			'save' => 'in 0,1',
 			'default' => 'array',
-			'clients' => 'array'
+			'clients' => 'array',
+			'named_clients' => 'array'
 		];
 
 		return $this->validateInput($fields);
@@ -43,54 +53,72 @@ class ConfigEdit extends CController {
 		return (isset(\CWebUser::$data['type']) && \CWebUser::$data['type'] == USER_TYPE_SUPER_ADMIN);
 	}
 
+	private function fillTopdeskDefaults(array &$td): void {
+		$td['send_more_info'] ??= false;
+		$td['more_info_text'] ??= '';
+		$td['adicional_cresol'] ??= false;
+		$td['send_email'] ??= false;
+		$td['email_to'] ??= '';
+		$td['email_cc'] ??= '';
+	}
+
 	private function loadConfig(): array {
 		if (!file_exists($this->config_path)) {
-			return ['default' => [], 'clients' => []];
+			return ['default' => [], 'rules' => [], 'named_clients' => []];
 		}
 
 		if (!is_readable($this->config_path)) {
-			return ['default' => [], 'clients' => [], '_error' => 'Sem permissão de leitura: '.$this->config_path];
+			return ['default' => [], 'rules' => [], 'named_clients' => [], '_error' => 'Sem permissão de leitura: '.$this->config_path];
 		}
 
 		if (!function_exists('yaml_parse_file')) {
-			return ['default' => [], 'clients' => [], '_error' => 'Extensão PHP yaml não instalada (yaml_parse_file).'];
+			return ['default' => [], 'rules' => [], 'named_clients' => [], '_error' => 'Extensão PHP yaml não instalada (yaml_parse_file).'];
 		}
 
 		$parsed = @yaml_parse_file($this->config_path);
 
 		if ($parsed === false || !is_array($parsed)) {
-			return ['default' => [], 'clients' => [], '_error' => 'YAML inválido ou vazio.'];
+			return ['default' => [], 'rules' => [], 'named_clients' => [], '_error' => 'YAML inválido ou vazio.'];
 		}
 
 		$parsed['default'] ??= [];
-		$parsed['clients'] ??= [];
-
 		$parsed['default']['client'] ??= '';
 		$parsed['default']['priority'] ??= '';
 		$parsed['default']['topdesk'] ??= [];
-		$parsed['default']['topdesk']['send_more_info'] ??= false;
-		$parsed['default']['topdesk']['more_info_text'] ??= '';
-		$parsed['default']['topdesk']['adicional_cresol'] ??= false;
-		$parsed['default']['topdesk']['send_email'] ??= false;
-		$parsed['default']['topdesk']['email_to'] ??= '';
-		$parsed['default']['topdesk']['email_cc'] ??= '';
+		$this->fillTopdeskDefaults($parsed['default']['topdesk']);
 
-		foreach ($parsed['clients'] as $rule => $v) {
-			if (!is_array($v)) {
-				$parsed['clients'][$rule] = [];
+		$is_new_format = !empty($parsed['rules']) && is_array($parsed['rules']);
+
+		if ($is_new_format) {
+			$named_clients = is_array($parsed['clients'] ?? null) ? $parsed['clients'] : [];
+			foreach ($named_clients as $name => $c) {
+				if (!is_array($c)) {
+					$named_clients[$name] = [];
+				}
+				$named_clients[$name]['topdesk'] ??= [];
+				$this->fillTopdeskDefaults($named_clients[$name]['topdesk']);
 			}
-			$parsed['clients'][$rule]['client'] ??= '';
-			$parsed['clients'][$rule]['priority'] ??= '';
-			$parsed['clients'][$rule]['topdesk'] ??= [];
-			$parsed['clients'][$rule]['topdesk']['send_more_info'] ??= false;
-			$parsed['clients'][$rule]['topdesk']['more_info_text'] ??= '';
-			$parsed['clients'][$rule]['topdesk']['adicional_cresol'] ??= false;
-			$parsed['clients'][$rule]['topdesk']['send_email'] ??= false;
-			$parsed['clients'][$rule]['topdesk']['email_to'] ??= '';
-			$parsed['clients'][$rule]['topdesk']['email_cc'] ??= '';
+
+			$rules = $parsed['rules'];
+		}
+		else {
+			// formato antigo: "clients" é a lista de rules (chave = rule_name,
+			// topdesk completo, sem cliente nomeado nenhum ainda)
+			$named_clients = [];
+			$rules = is_array($parsed['clients'] ?? null) ? $parsed['clients'] : [];
 		}
 
-		return $parsed;
+		foreach ($rules as $rule => $r) {
+			if (!is_array($r)) {
+				$rules[$rule] = [];
+			}
+			$rules[$rule]['client'] ??= '';
+			$rules[$rule]['priority'] ??= '';
+			$rules[$rule]['topdesk'] ??= [];
+			$this->fillTopdeskDefaults($rules[$rule]['topdesk']);
+		}
+
+		return ['default' => $parsed['default'], 'rules' => $rules, 'named_clients' => $named_clients];
 	}
 
 	private function toBool($v): bool {
@@ -101,7 +129,33 @@ class ConfigEdit extends CController {
 		return (string)$v;
 	}
 
-	private function normalizeConfigFromPost(array $post_default, array $post_clients): array {
+	private function normalizeTopdeskFromPost(array $td): array {
+		return [
+			'contract' => (string)($td['contract'] ?? ''),
+			'operator' => (string)($td['operator'] ?? ''),
+			'oper_group' => (string)($td['oper_group'] ?? ''),
+			'main_caller' => (string)($td['main_caller'] ?? ''),
+			'secundary_caller' => $this->normalizeNullString($td['secundary_caller'] ?? ''),
+			'sla' => (string)($td['sla'] ?? ''),
+			'category' => (string)($td['category'] ?? ''),
+			'sub_category' => (string)($td['sub_category'] ?? ''),
+			'call_type' => (string)($td['call_type'] ?? ''),
+			'send_more_info' => $this->toBool($td['send_more_info'] ?? false),
+			'more_info_text' => (string)($td['more_info_text'] ?? ''),
+			'adicional_cresol' => $this->toBool($td['adicional_cresol'] ?? false),
+			'send_email' => $this->toBool($td['send_email'] ?? false),
+			'email_to' => (string)($td['email_to'] ?? ''),
+			'email_cc' => (string)($td['email_cc'] ?? '')
+		];
+	}
+
+	/**
+	 * Monta o config a partir do POST. Sempre grava no formato novo
+	 * (clients = nomeados, rules = por rule_name) — é assim que a migração
+	 * do formato antigo acontece: no primeiro save pela UI, o arquivo
+	 * inteiro é reescrito no formato novo.
+	 */
+	private function normalizeConfigFromPost(array $post_default, array $post_named_clients, array $post_rules): array {
 		$def_td = (array)($post_default['topdesk'] ?? []);
 
 		$config = [
@@ -111,58 +165,38 @@ class ConfigEdit extends CController {
 				'impact' => (string)($post_default['impact'] ?? ''),
 				'priority' => (string)($post_default['priority'] ?? ''),
 				'autoclose' => $this->toBool($post_default['autoclose'] ?? false),
-				'topdesk' => [
-					'contract' => (string)($def_td['contract'] ?? ''),
-					'operator' => (string)($def_td['operator'] ?? ''),
-					'oper_group' => (string)($def_td['oper_group'] ?? ''),
-					'main_caller' => (string)($def_td['main_caller'] ?? ''),
-					'secundary_caller' => $this->normalizeNullString($def_td['secundary_caller'] ?? ''),
-					'sla' => (string)($def_td['sla'] ?? ''),
-					'category' => (string)($def_td['category'] ?? ''),
-					'sub_category' => (string)($def_td['sub_category'] ?? ''),
-					'call_type' => (string)($def_td['call_type'] ?? ''),
-					'send_more_info' => $this->toBool($def_td['send_more_info'] ?? false),
-					'more_info_text' => (string)($def_td['more_info_text'] ?? ''),
-					'adicional_cresol' => $this->toBool($def_td['adicional_cresol'] ?? false),
-					'send_email' => $this->toBool($def_td['send_email'] ?? false),
-					'email_to' => (string)($def_td['email_to'] ?? ''),
-					'email_cc' => (string)($def_td['email_cc'] ?? '')
-				]
+				'topdesk' => $this->normalizeTopdeskFromPost($def_td)
 			],
-			'clients' => []
+			'clients' => [],
+			'rules' => []
 		];
 
-		foreach ($post_clients as $row) {
+		foreach ($post_named_clients as $row) {
+			$name = trim((string)($row['name'] ?? ''));
+			if ($name === '') {
+				continue;
+			}
+
+			$td = (array)($row['topdesk'] ?? []);
+			$config['clients'][$name] = [
+				'topdesk' => $this->normalizeTopdeskFromPost($td)
+			];
+		}
+
+		foreach ($post_rules as $row) {
 			$rule_name = trim((string)($row['rule_name'] ?? ''));
 			if ($rule_name === '') {
 				continue;
 			}
 
 			$td = (array)($row['topdesk'] ?? []);
-
-			$config['clients'][$rule_name] = [
+			$config['rules'][$rule_name] = [
 				'client' => (string)($row['client'] ?? ''),
 				'autoclose' => $this->toBool($row['autoclose'] ?? false),
 				'urgency' => (string)($row['urgency'] ?? ''),
 				'impact' => (string)($row['impact'] ?? ''),
 				'priority' => (string)($row['priority'] ?? ''),
-				'topdesk' => [
-					'contract' => (string)($td['contract'] ?? ''),
-					'operator' => (string)($td['operator'] ?? ''),
-					'oper_group' => (string)($td['oper_group'] ?? ''),
-					'main_caller' => (string)($td['main_caller'] ?? ''),
-					'secundary_caller' => $this->normalizeNullString($td['secundary_caller'] ?? ''),
-					'sla' => (string)($td['sla'] ?? ''),
-					'category' => (string)($td['category'] ?? ''),
-					'sub_category' => (string)($td['sub_category'] ?? ''),
-					'call_type' => (string)($td['call_type'] ?? ''),
-					'send_more_info' => $this->toBool($td['send_more_info'] ?? false),
-					'more_info_text' => (string)($td['more_info_text'] ?? ''),
-					'adicional_cresol' => $this->toBool($td['adicional_cresol'] ?? false),
-					'send_email' => $this->toBool($td['send_email'] ?? false),
-					'email_to' => (string)($td['email_to'] ?? ''),
-					'email_cc' => (string)($td['email_cc'] ?? '')
-				]
+				'topdesk' => $this->normalizeTopdeskFromPost($td)
 			];
 		}
 
@@ -170,8 +204,8 @@ class ConfigEdit extends CController {
 	}
 
 	private function validateConfig(array $cfg): array {
-		if (!isset($cfg['default']) || !isset($cfg['clients'])) {
-			return ['ok' => false, 'error' => 'Config inválida: faltam as chaves default/clients.'];
+		if (!isset($cfg['default']) || !isset($cfg['clients']) || !isset($cfg['rules'])) {
+			return ['ok' => false, 'error' => 'Config inválida: faltam as chaves default/clients/rules.'];
 		}
 
 		if (!isset($cfg['default']['topdesk']) || !is_array($cfg['default']['topdesk'])) {
@@ -184,12 +218,15 @@ class ConfigEdit extends CController {
 			}
 		}
 
-		foreach ($cfg['clients'] as $rule => $c) {
-			if (!isset($c['client'])) {
-				return ['ok' => false, 'error' => 'Config inválida: clients.'.$rule.'.client ausente.'];
-			}
+		foreach ($cfg['clients'] as $name => $c) {
 			if (!isset($c['topdesk']) || !is_array($c['topdesk'])) {
-				return ['ok' => false, 'error' => 'Config inválida: clients.'.$rule.'.topdesk ausente.'];
+				return ['ok' => false, 'error' => 'Config inválida: clients.'.$name.'.topdesk ausente.'];
+			}
+		}
+
+		foreach ($cfg['rules'] as $rule => $r) {
+			if (!isset($r['topdesk']) || !is_array($r['topdesk'])) {
+				return ['ok' => false, 'error' => 'Config inválida: rules.'.$rule.'.topdesk ausente.'];
 			}
 		}
 
@@ -269,9 +306,10 @@ class ConfigEdit extends CController {
 			}
 			else {
 				$post_default = $this->getInput('default', []);
-				$post_clients = $this->getInput('clients', []);
+				$post_named_clients = $this->getInput('named_clients', []);
+				$post_rules = $this->getInput('clients', []);
 
-				$cfg = $this->normalizeConfigFromPost($post_default, $post_clients);
+				$cfg = $this->normalizeConfigFromPost($post_default, $post_named_clients, $post_rules);
 
 				$val = $this->validateConfig($cfg);
 				if (!$val['ok']) {
@@ -308,16 +346,26 @@ class ConfigEdit extends CController {
 			}
 		}
 
-		$clients_list = [];
-		if (isset($cfg['clients']) && is_array($cfg['clients'])) {
-			foreach ($cfg['clients'] as $rule_name => $c) {
-				$clients_list[] = [
+		$rules_list = [];
+		if (isset($cfg['rules']) && is_array($cfg['rules'])) {
+			foreach ($cfg['rules'] as $rule_name => $r) {
+				$rules_list[] = [
 					'rule_name' => $rule_name,
-					'client' => (string)($c['client'] ?? ''),
-					'autoclose' => (bool)($c['autoclose'] ?? false),
-					'urgency' => (string)($c['urgency'] ?? ''),
-					'impact' => (string)($c['impact'] ?? ''),
-					'priority' => (string)($c['priority'] ?? ''),
+					'client' => (string)($r['client'] ?? ''),
+					'autoclose' => (bool)($r['autoclose'] ?? false),
+					'urgency' => (string)($r['urgency'] ?? ''),
+					'impact' => (string)($r['impact'] ?? ''),
+					'priority' => (string)($r['priority'] ?? ''),
+					'topdesk' => (array)($r['topdesk'] ?? [])
+				];
+			}
+		}
+
+		$named_clients_list = [];
+		if (isset($cfg['named_clients']) && is_array($cfg['named_clients'])) {
+			foreach ($cfg['named_clients'] as $name => $c) {
+				$named_clients_list[] = [
+					'name' => $name,
 					'topdesk' => (array)($c['topdesk'] ?? [])
 				];
 			}
@@ -332,7 +380,8 @@ class ConfigEdit extends CController {
 			'sync_status' => $sync_status,
 			'sync_error' => $sync_error,
 			'default' => (array)($cfg['default'] ?? []),
-			'clients' => $clients_list
+			'named_clients' => $named_clients_list,
+			'rules' => $rules_list
 		]));
 	}
 }

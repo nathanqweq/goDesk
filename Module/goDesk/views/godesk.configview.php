@@ -8,7 +8,8 @@ function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 $config = $data['config'] ?? [];
 $def = $config['default'] ?? [];
 $def_td = $def['topdesk'] ?? [];
-$clients = $config['clients'] ?? [];
+$named_clients = $config['named_clients'] ?? [];
+$rules = $config['rules'] ?? [];
 
 echo '<div class="godesk-module">';
 echo '<div class="gd-wrap">';
@@ -58,13 +59,49 @@ if (!empty($def_td['more_info_text'])) {
 echo '</div>';
 
 echo '<div class="gd-card">';
+echo '<h2>🏢 Clientes</h2>';
+
+if (!is_array($named_clients) || count($named_clients) === 0) {
+	echo '<div class="gd-muted">Nenhum cliente cadastrado (rules usam TopDesk próprio, formato antigo).</div>';
+}
+else {
+	foreach ($named_clients as $name => $nc) {
+		$td = $nc['topdesk'] ?? [];
+
+		echo '<div class="gd-client-card">';
+		echo '<div class="gd-client-name">🏢 '.h($name).'</div>';
+
+		echo '<div class="gd-tags" style="margin-top:10px;">';
+		foreach (['contract','operator','oper_group','main_caller','secundary_caller','sla','category','sub_category','call_type'] as $k) {
+			$v = $td[$k] ?? '';
+			echo '<span class="gd-tag">'.h($k).': '.h($v).'</span>';
+		}
+		echo '<span class="gd-tag">send_more_info: '.(!empty($td['send_more_info']) ? 'true' : 'false').'</span>';
+		echo '<span class="gd-tag">adicional_cresol: '.(!empty($td['adicional_cresol']) ? 'true' : 'false').'</span>';
+		echo '<span class="gd-tag">send_email: '.(!empty($td['send_email']) ? 'true' : 'false').'</span>';
+		echo '<span class="gd-tag">email_to: '.h($td['email_to'] ?? '').'</span>';
+		echo '<span class="gd-tag">email_cc: '.h($td['email_cc'] ?? '').'</span>';
+		echo '</div>';
+		if (!empty($td['more_info_text'])) {
+			echo '<div class="gd-row" style="margin-top:10px;">';
+			echo '<div class="gd-kv"><span class="gd-k">more_info_text</span><span class="gd-v">'.nl2br(h($td['more_info_text'])).'</span></div>';
+			echo '</div>';
+		}
+
+		echo '</div>';
+	}
+}
+
+echo '</div>';
+
+echo '<div class="gd-card">';
 echo '<h2>👥 Rules</h2>';
 
-if (!is_array($clients) || count($clients) === 0) {
+if (!is_array($rules) || count($rules) === 0) {
 	echo '<div class="gd-muted">Nenhuma rule cadastrada.</div>';
 }
 else {
-	foreach ($clients as $rule_name => $c) {
+	foreach ($rules as $rule_name => $c) {
 		$td = $c['topdesk'] ?? [];
 
 		echo '<div class="gd-client-card">';

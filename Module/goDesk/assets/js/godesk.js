@@ -79,6 +79,7 @@
   function removeClient(btn) {
     const card = btn.closest(".gd-client");
     if (card) card.remove();
+    syncClientSelects();
   }
 
   function nextClientIndex() {
@@ -89,6 +90,159 @@
       if (!Number.isNaN(idx) && idx > max) max = idx;
     });
     return max + 1;
+  }
+
+  function removeNamedClient(btn) {
+    const card = btn.closest(".gd-named-client");
+    if (card) card.remove();
+    syncClientSelects();
+  }
+
+  function nextNamedClientIndex() {
+    let max = -1;
+    document.querySelectorAll(".gd-named-client").forEach((el) => {
+      const idx = parseInt(el.getAttribute("data-idx") || "-1", 10);
+      if (!Number.isNaN(idx) && idx > max) max = idx;
+    });
+    return max + 1;
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  // Mantém as opções de "Cliente" de toda rule em sincronia com os nomes
+  // atualmente digitados nos cards de Clientes (adicionar/remover/renomear
+  // um cliente reflete em todos os <select> na hora).
+  function currentClientNames() {
+    const names = new Set();
+    document.querySelectorAll(".gd-named-client-name").forEach((inp) => {
+      const v = inp.value.trim();
+      if (v) names.add(v);
+    });
+    return Array.from(names).sort();
+  }
+
+  function syncClientSelects() {
+    const names = currentClientNames();
+    document.querySelectorAll(".gd-client-select").forEach((sel) => {
+      const current = sel.value;
+      const orphanCurrent = current && !names.includes(current);
+
+      let html = '<option value="">— nenhum / customizado —</option>';
+      names.forEach((n) => {
+        const selected = n === current ? " selected" : "";
+        html += `<option value="${escapeHtml(n)}"${selected}>${escapeHtml(n)}</option>`;
+      });
+      if (orphanCurrent) {
+        html += `<option value="${escapeHtml(current)}" selected>${escapeHtml(current)} (não cadastrado)</option>`;
+      }
+
+      sel.innerHTML = html;
+    });
+  }
+
+  function addNamedClient() {
+    const host = document.getElementById("gd-named-clients");
+    if (!host) return;
+
+    const i = nextNamedClientIndex();
+
+    const html = `
+      <div class="gd-client-card gd-named-client" data-idx="${i}">
+        <div class="gd-client-head">
+          <div class="gd-client-name">🏢 Cliente</div>
+          <button class="gd-btn gd-btn-danger" type="button" data-gd-remove-named-client>Remover</button>
+        </div>
+
+        <div class="gd-row">
+          <div class="gd-field">
+            <label>Nome do cliente (chave do YAML)</label>
+            <input type="text" class="gd-named-client-name" name="named_clients[${i}][name]" value="">
+          </div>
+        </div>
+
+        <div class="gd-divider"></div>
+        <div class="gd-small-title">🎫 TopDesk (compartilhado por todas as rules deste cliente)</div>
+
+        <div class="gd-row">
+          <div class="gd-field"><label>contract</label><input type="text" name="named_clients[${i}][topdesk][contract]" value=""></div>
+          <div class="gd-field"><label>operator</label><input type="text" name="named_clients[${i}][topdesk][operator]" value=""></div>
+          <div class="gd-field"><label>oper_group</label><input type="text" name="named_clients[${i}][topdesk][oper_group]" value=""></div>
+        </div>
+
+        <div class="gd-row">
+          <div class="gd-field"><label>main_caller</label><input type="text" name="named_clients[${i}][topdesk][main_caller]" value=""></div>
+          <div class="gd-field"><label>secundary_caller</label><input type="text" name="named_clients[${i}][topdesk][secundary_caller]" value=""></div>
+          <div class="gd-field"><label>sla</label><input type="text" class="gd-sla" name="named_clients[${i}][topdesk][sla]" value=""></div>
+        </div>
+
+        <div class="gd-row">
+          <div class="gd-field"><label>category</label><input type="text" name="named_clients[${i}][topdesk][category]" value=""></div>
+          <div class="gd-field"><label>sub_category</label><input type="text" name="named_clients[${i}][topdesk][sub_category]" value=""></div>
+          <div class="gd-field"><label>call_type</label><input type="text" name="named_clients[${i}][topdesk][call_type]" value=""></div>
+        </div>
+
+        <div class="gd-row">
+          <div class="gd-field gd-field-tight">
+            <label>Sendmore info</label>
+            <div class="gd-check">
+              <input type="checkbox" class="gd-sendmore-toggle" name="named_clients[${i}][topdesk][send_more_info]" value="1">
+              <span class="gd-muted">comentar após criar o chamado</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="gd-row gd-sendmore-box" style="display:none">
+          <div class="gd-field">
+            <label>Texto sendmore (padrão do cliente)</label>
+            <textarea class="gd-sendmore-text" name="named_clients[${i}][topdesk][more_info_text]" rows="4" disabled></textarea>
+          </div>
+        </div>
+
+        <div class="gd-row">
+          <div class="gd-field gd-field-tight">
+            <label>Adicional cresol</label>
+            <div class="gd-check">
+              <input type="checkbox" name="named_clients[${i}][topdesk][adicional_cresol]" value="1">
+              <span class="gd-muted">enviar optionalFields1 no create</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="gd-row">
+          <div class="gd-field gd-field-tight">
+            <label>Enviar email</label>
+            <div class="gd-check">
+              <input type="checkbox" class="gd-sendemail-toggle" name="named_clients[${i}][topdesk][send_email]" value="1">
+              <span class="gd-muted">enviar email apos criar o chamado</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="gd-row gd-sendemail-box" style="display:none">
+          <div class="gd-field">
+            <label>Email para</label>
+            <input type="text" class="gd-email-to" name="named_clients[${i}][topdesk][email_to]" value="" disabled>
+          </div>
+          <div class="gd-field">
+            <label>Email copia</label>
+            <input type="text" class="gd-email-cc" name="named_clients[${i}][topdesk][email_cc]" value="" disabled>
+          </div>
+        </div>
+      </div>
+    `;
+
+    host.insertAdjacentHTML("beforeend", html);
+
+    initSlaLocks();
+    initSendMoreToggles();
+    initSendEmailToggles();
+    syncClientSelects();
   }
 
   function addClient() {
@@ -110,8 +264,10 @@
             <input type="text" name="clients[${i}][rule_name]" value="">
           </div>
           <div class="gd-field">
-            <label>Client (nome do cliente)</label>
-            <input type="text" name="clients[${i}][client]" value="">
+            <label>Cliente</label>
+            <select class="gd-client-select" name="clients[${i}][client]">
+              <option value="">— nenhum / customizado —</option>
+            </select>
           </div>
           <div class="gd-field">
             <label>Urgency</label>
@@ -213,6 +369,7 @@
     initSlaLocks();
     initSendMoreToggles();
     initSendEmailToggles();
+    syncClientSelects();
   }
 
   // Event delegation (sem precisar onclick inline)
@@ -229,6 +386,26 @@
       e.preventDefault();
       removeClient(rmBtn);
       return;
+    }
+
+    const addNamedBtn = e.target.closest("[data-gd-add-named-client]");
+    if (addNamedBtn) {
+      e.preventDefault();
+      addNamedClient();
+      return;
+    }
+
+    const rmNamedBtn = e.target.closest("[data-gd-remove-named-client]");
+    if (rmNamedBtn) {
+      e.preventDefault();
+      removeNamedClient(rmNamedBtn);
+      return;
+    }
+  });
+
+  document.addEventListener("input", (e) => {
+    if (e.target.closest(".gd-named-client-name")) {
+      syncClientSelects();
     }
   });
 
@@ -247,5 +424,6 @@
     initSlaLocks();
     initSendMoreToggles();
     initSendEmailToggles();
+    syncClientSelects();
   });
 })();

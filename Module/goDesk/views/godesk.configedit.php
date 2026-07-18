@@ -7,7 +7,8 @@ function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 
 $def = $data['default'] ?? [];
 $def_td = $def['topdesk'] ?? [];
-$clients = $data['clients'] ?? [];
+$named_clients = $data['named_clients'] ?? [];
+$rules = $data['rules'] ?? [];
 
 echo '<div class="godesk-module">';
 echo '<div class="gd-wrap">';
@@ -123,6 +124,104 @@ echo '</div>';
 
 echo '</div>';
 
+// ===================== CLIENTES (compartilham TopDesk entre várias rules) =====================
+echo '<div class="gd-card">';
+echo '<div class="gd-client-head">';
+echo '<h2 style="margin:0">🏢 Clientes</h2>';
+echo '<button class="gd-btn" type="button" data-gd-add-named-client>＋ Adicionar cliente</button>';
+echo '</div>';
+echo '<div class="gd-muted" style="margin-bottom:10px">Cadastre um cliente aqui pra não repetir o mesmo TopDesk em várias rules — cada rule abaixo escolhe um cliente e só precisa preencher o que for diferente (ex: more_info_text do circuito).</div>';
+
+echo '<div id="gd-named-clients">';
+
+$nidx = 0;
+foreach ($named_clients as $nc) {
+	$name = $nc['name'] ?? '';
+	$td = $nc['topdesk'] ?? [];
+
+	echo '<div class="gd-client-card gd-named-client" data-idx="'.$nidx.'">';
+
+	echo '<div class="gd-client-head">';
+	echo '<div class="gd-client-name">🏢 Cliente</div>';
+	echo '<button class="gd-btn gd-btn-danger" type="button" data-gd-remove-named-client>Remover</button>';
+	echo '</div>';
+
+	echo '<div class="gd-row">';
+	echo '<div class="gd-field"><label>Nome do cliente (chave do YAML)</label><input type="text" class="gd-named-client-name" name="named_clients['.$nidx.'][name]" value="'.h($name).'"></div>';
+	echo '</div>';
+
+	echo '<div class="gd-divider"></div>';
+	echo '<div class="gd-small-title">🎫 TopDesk (compartilhado por todas as rules deste cliente)</div>';
+
+	echo '<div class="gd-row">';
+	echo '<div class="gd-field"><label>contract</label><input type="text" name="named_clients['.$nidx.'][topdesk][contract]" value="'.h($td['contract'] ?? '').'"></div>';
+	echo '<div class="gd-field"><label>operator</label><input type="text" name="named_clients['.$nidx.'][topdesk][operator]" value="'.h($td['operator'] ?? '').'"></div>';
+	echo '<div class="gd-field"><label>oper_group</label><input type="text" name="named_clients['.$nidx.'][topdesk][oper_group]" value="'.h($td['oper_group'] ?? '').'"></div>';
+	echo '</div>';
+
+	echo '<div class="gd-row">';
+	echo '<div class="gd-field"><label>main_caller</label><input type="text" name="named_clients['.$nidx.'][topdesk][main_caller]" value="'.h($td['main_caller'] ?? '').'"></div>';
+	echo '<div class="gd-field"><label>secundary_caller</label><input type="text" name="named_clients['.$nidx.'][topdesk][secundary_caller]" value="'.h($td['secundary_caller'] ?? '').'"></div>';
+	echo '<div class="gd-field"><label>sla</label><input type="text" class="gd-sla" name="named_clients['.$nidx.'][topdesk][sla]" value="'.h($td['sla'] ?? '').'"></div>';
+	echo '</div>';
+
+	echo '<div class="gd-row">';
+	echo '<div class="gd-field"><label>category</label><input type="text" name="named_clients['.$nidx.'][topdesk][category]" value="'.h($td['category'] ?? '').'"></div>';
+	echo '<div class="gd-field"><label>sub_category</label><input type="text" name="named_clients['.$nidx.'][topdesk][sub_category]" value="'.h($td['sub_category'] ?? '').'"></div>';
+	echo '<div class="gd-field"><label>call_type</label><input type="text" name="named_clients['.$nidx.'][topdesk][call_type]" value="'.h($td['call_type'] ?? '').'"></div>';
+	echo '</div>';
+
+	$nc_send_more = !empty($td['send_more_info']) ? 'checked' : '';
+	$nc_send_more_hidden = !empty($td['send_more_info']) ? '' : ' style="display:none"';
+	echo '<div class="gd-row">';
+	echo '<div class="gd-field gd-field-tight">
+		<label>Sendmore info</label>
+		<div class="gd-check">
+			<input type="checkbox" class="gd-sendmore-toggle" name="named_clients['.$nidx.'][topdesk][send_more_info]" value="1" '.$nc_send_more.'>
+			<span class="gd-muted">comentar após criar o chamado</span>
+		</div>
+	</div>';
+	echo '</div>';
+	echo '<div class="gd-row gd-sendmore-box"'.$nc_send_more_hidden.'>';
+	echo '<div class="gd-field"><label>Texto sendmore (padrão do cliente)</label><textarea class="gd-sendmore-text" name="named_clients['.$nidx.'][topdesk][more_info_text]" rows="4">'.h($td['more_info_text'] ?? '').'</textarea></div>';
+	echo '</div>';
+
+	$nc_add_cresol = !empty($td['adicional_cresol']) ? 'checked' : '';
+	echo '<div class="gd-row">';
+	echo '<div class="gd-field gd-field-tight">
+		<label>Adicional cresol</label>
+		<div class="gd-check">
+			<input type="checkbox" name="named_clients['.$nidx.'][topdesk][adicional_cresol]" value="1" '.$nc_add_cresol.'>
+			<span class="gd-muted">enviar optionalFields1 no create</span>
+		</div>
+	</div>';
+	echo '</div>';
+
+	$nc_send_email = !empty($td['send_email']) ? 'checked' : '';
+	$nc_send_email_hidden = !empty($td['send_email']) ? '' : ' style="display:none"';
+	echo '<div class="gd-row">';
+	echo '<div class="gd-field gd-field-tight">
+		<label>Enviar email</label>
+		<div class="gd-check">
+			<input type="checkbox" class="gd-sendemail-toggle" name="named_clients['.$nidx.'][topdesk][send_email]" value="1" '.$nc_send_email.'>
+			<span class="gd-muted">enviar email apos criar o chamado</span>
+		</div>
+	</div>';
+	echo '</div>';
+	echo '<div class="gd-row gd-sendemail-box"'.$nc_send_email_hidden.'>';
+	echo '<div class="gd-field"><label>Email para</label><input type="text" class="gd-email-to" name="named_clients['.$nidx.'][topdesk][email_to]" value="'.h($td['email_to'] ?? '').'"></div>';
+	echo '<div class="gd-field"><label>Email copia</label><input type="text" class="gd-email-cc" name="named_clients['.$nidx.'][topdesk][email_cc]" value="'.h($td['email_cc'] ?? '').'"></div>';
+	echo '</div>';
+
+	echo '</div>';
+
+	$nidx++;
+}
+
+echo '</div>';
+echo '</div>';
+
+// ===================== RULES =====================
 echo '<div class="gd-card">';
 echo '<div class="gd-client-head">';
 echo '<h2 style="margin:0">👥 Rules</h2>';
@@ -132,7 +231,7 @@ echo '</div>';
 echo '<div id="gd-clients">';
 
 $idx = 0;
-foreach ($clients as $c) {
+foreach ($rules as $c) {
 	$rule_name = $c['rule_name'] ?? '';
 	$client_name = $c['client'] ?? '';
 	$td = $c['topdesk'] ?? [];
@@ -147,7 +246,25 @@ foreach ($clients as $c) {
 
 	echo '<div class="gd-row">';
 	echo '<div class="gd-field"><label>Rule name (chave do YAML)</label><input type="text" name="clients['.$idx.'][rule_name]" value="'.h($rule_name).'"></div>';
-	echo '<div class="gd-field"><label>Client (nome do cliente)</label><input type="text" name="clients['.$idx.'][client]" value="'.h($client_name).'"></div>';
+
+	echo '<div class="gd-field"><label>Cliente</label><select class="gd-client-select" name="clients['.$idx.'][client]">';
+	echo '<option value="">— nenhum / customizado —</option>';
+	$seen_current = false;
+	foreach ($named_clients as $nc) {
+		$nc_name = $nc['name'] ?? '';
+		if ($nc_name === '') {
+			continue;
+		}
+		$sel = ($nc_name === $client_name) ? ' selected' : '';
+		if ($sel !== '') { $seen_current = true; }
+		echo '<option value="'.h($nc_name).'"'.$sel.'>'.h($nc_name).'</option>';
+	}
+	if ($client_name !== '' && !$seen_current) {
+		// valor atual não bate com nenhum cliente cadastrado (ex: dado antigo) — mantém pra não perder
+		echo '<option value="'.h($client_name).'" selected>'.h($client_name).' (não cadastrado)</option>';
+	}
+	echo '</select></div>';
+
 	echo '<div class="gd-field"><label>Urgency</label><input type="text" name="clients['.$idx.'][urgency]" value="'.h($c['urgency'] ?? '').'"></div>';
 	echo '</div>';
 
@@ -163,7 +280,7 @@ foreach ($clients as $c) {
 	echo '</div>';
 
 	echo '<div class="gd-divider"></div>';
-	echo '<div class="gd-small-title">🎫 TopDesk</div>';
+	echo '<div class="gd-small-title">🎫 TopDesk <span class="gd-muted">(vazio = herda do cliente escolhido acima; preenchido = sobrescreve só nesta rule)</span></div>';
 
 	echo '<div class="gd-row">';
 	echo '<div class="gd-field"><label>contract</label><input type="text" name="clients['.$idx.'][topdesk][contract]" value="'.h($td['contract'] ?? '').'"></div>';
@@ -190,7 +307,7 @@ foreach ($clients as $c) {
 		<label>Sendmore info</label>
 		<div class="gd-check">
 			<input type="checkbox" class="gd-sendmore-toggle" name="clients['.$idx.'][topdesk][send_more_info]" value="1" '.$send_more.'>
-			<span class="gd-muted">comentar após criar o chamado</span>
+			<span class="gd-muted">comentar após criar o chamado (só se não tiver cliente escolhido — em rule com cliente, quem manda é o cliente)</span>
 		</div>
 	</div>';
 	echo '</div>';
@@ -204,7 +321,7 @@ foreach ($clients as $c) {
 		<label>Adicional cresol</label>
 		<div class="gd-check">
 			<input type="checkbox" name="clients['.$idx.'][topdesk][adicional_cresol]" value="1" '.$add_cresol.'>
-			<span class="gd-muted">enviar optionalFields1 no create</span>
+			<span class="gd-muted">enviar optionalFields1 no create (só se não tiver cliente escolhido)</span>
 		</div>
 	</div>';
 	echo '</div>';
@@ -216,7 +333,7 @@ foreach ($clients as $c) {
 		<label>Enviar email</label>
 		<div class="gd-check">
 			<input type="checkbox" class="gd-sendemail-toggle" name="clients['.$idx.'][topdesk][send_email]" value="1" '.$send_email.'>
-			<span class="gd-muted">enviar email apos criar o chamado</span>
+			<span class="gd-muted">enviar email apos criar o chamado (só se não tiver cliente escolhido)</span>
 		</div>
 	</div>';
 	echo '</div>';

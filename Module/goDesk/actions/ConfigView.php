@@ -26,6 +26,15 @@ class ConfigView extends CController {
 		return true;
 	}
 
+	private function fillTopdeskDefaults(array &$td): void {
+		$td['send_more_info'] ??= false;
+		$td['more_info_text'] ??= '';
+		$td['adicional_cresol'] ??= false;
+		$td['send_email'] ??= false;
+		$td['email_to'] ??= '';
+		$td['email_cc'] ??= '';
+	}
+
 	private function loadConfig(): array {
 		if (!file_exists($this->config_path)) {
 			return ['_error' => 'Arquivo não encontrado: '.$this->config_path];
@@ -46,34 +55,41 @@ class ConfigView extends CController {
 		}
 
 		$parsed['default'] ??= [];
-		$parsed['clients'] ??= [];
-
 		$parsed['default']['client'] ??= '';
 		$parsed['default']['priority'] ??= '';
 		$parsed['default']['topdesk'] ??= [];
-		$parsed['default']['topdesk']['send_more_info'] ??= false;
-		$parsed['default']['topdesk']['more_info_text'] ??= '';
-		$parsed['default']['topdesk']['adicional_cresol'] ??= false;
-		$parsed['default']['topdesk']['send_email'] ??= false;
-		$parsed['default']['topdesk']['email_to'] ??= '';
-		$parsed['default']['topdesk']['email_cc'] ??= '';
+		$this->fillTopdeskDefaults($parsed['default']['topdesk']);
 
-		foreach ($parsed['clients'] as $rule => $c) {
-			if (!is_array($c)) {
-				$parsed['clients'][$rule] = [];
+		$is_new_format = !empty($parsed['rules']) && is_array($parsed['rules']);
+
+		if ($is_new_format) {
+			$named_clients = is_array($parsed['clients'] ?? null) ? $parsed['clients'] : [];
+			foreach ($named_clients as $name => $c) {
+				if (!is_array($c)) {
+					$named_clients[$name] = [];
+				}
+				$named_clients[$name]['topdesk'] ??= [];
+				$this->fillTopdeskDefaults($named_clients[$name]['topdesk']);
 			}
-			$parsed['clients'][$rule]['client'] ??= '';
-			$parsed['clients'][$rule]['priority'] ??= '';
-			$parsed['clients'][$rule]['topdesk'] ??= [];
-			$parsed['clients'][$rule]['topdesk']['send_more_info'] ??= false;
-			$parsed['clients'][$rule]['topdesk']['more_info_text'] ??= '';
-			$parsed['clients'][$rule]['topdesk']['adicional_cresol'] ??= false;
-			$parsed['clients'][$rule]['topdesk']['send_email'] ??= false;
-			$parsed['clients'][$rule]['topdesk']['email_to'] ??= '';
-			$parsed['clients'][$rule]['topdesk']['email_cc'] ??= '';
+
+			$rules = $parsed['rules'];
+		}
+		else {
+			$named_clients = [];
+			$rules = is_array($parsed['clients'] ?? null) ? $parsed['clients'] : [];
 		}
 
-		return $parsed;
+		foreach ($rules as $rule => $r) {
+			if (!is_array($r)) {
+				$rules[$rule] = [];
+			}
+			$rules[$rule]['client'] ??= '';
+			$rules[$rule]['priority'] ??= '';
+			$rules[$rule]['topdesk'] ??= [];
+			$this->fillTopdeskDefaults($rules[$rule]['topdesk']);
+		}
+
+		return ['default' => $parsed['default'], 'rules' => $rules, 'named_clients' => $named_clients];
 	}
 
 	protected function doAction(): void {
