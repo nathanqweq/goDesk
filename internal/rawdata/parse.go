@@ -16,7 +16,7 @@ func Parse(raw string) (Payload, error) {
 
 	var p Payload
 	if err := json.Unmarshal([]byte(raw), &p); err != nil {
-		return Payload{}, fmt.Errorf("RAWDATA não é JSON válido: %w", err)
+		return Payload{}, fmt.Errorf("RAWDATA não é JSON válido: %w%s", err, mediaTypeHint(raw))
 	}
 
 	Normalize(&p)
@@ -49,6 +49,20 @@ func Parse(raw string) (Payload, error) {
 	p.Cliente = strings.TrimSpace(p.Cliente)
 
 	return p, nil
+}
+
+// mediaTypeHint detecta o sintoma mais comum de Media Type do Zabbix
+// desatualizado: desde que godesk passou a esperar só "TICKET_NAME RAWDATA"
+// (2 parâmetros), um Media Type ainda configurado com os 7 antigos (DOMAIN
+// USER PASS TICKET_NAME RAWDATA ZABBIX_URL ZABBIX_KEY) faz o RAWDATA
+// receber, na real, o valor do antigo parâmetro USER — um texto qualquer
+// que nunca começa com "{". Isso não cobre todo erro de JSON malformado
+// (ex: aspas curvas), só esse caso específico e bem comum.
+func mediaTypeHint(raw string) string {
+	if strings.HasPrefix(raw, "{") {
+		return ""
+	}
+	return " — RAWDATA não começa com '{': isso costuma indicar que o Media Type do Zabbix ainda está configurado com os 7 parâmetros antigos (DOMAIN USER PASS TICKET_NAME RAWDATA ZABBIX_URL ZABBIX_KEY) em vez dos 2 atuais (TICKET_NAME RAWDATA) — confira em Administration → Alerts → Media types → Parameters"
 }
 
 func EventKind(p Payload) string {

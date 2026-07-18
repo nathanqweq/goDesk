@@ -59,7 +59,11 @@ func FromValues(svc ServiceConfig, ticketName, rawData string) RuntimeConfig {
 		ZabbixURL:  svc.ZabbixURL,
 		ZabbixKey:  svc.ZabbixKey,
 
-		LogFile:     getenv("TOPDESK_LOG_FILE", "/tmp/goDesk-integration.log"),
+		// mesmo arquivo de log do godesk serve — centraliza tudo num só
+		// lugar em vez do antigo default em /tmp (perdido em reboot,
+		// diferente do systemd, e foi o que causou confusão pra achar o
+		// log de um alerta que rodou no modo one-shot).
+		LogFile:     svc.LogFile,
 		ConfigFile:  getenv("TOPDESK_CONFIG", "/etc/zabbix/godesk/godesk-config.yaml"),
 		MetricsFile: MetricsFileFromEnv(),
 		TimeoutSec:  atoiDefault(getenv("TOPDESK_TIMEOUT_SEC", "15"), 15),
