@@ -65,10 +65,13 @@ if (!is_array($named_clients) || count($named_clients) === 0) {
 	echo '<div class="gd-muted">Nenhum cliente cadastrado (rules usam TopDesk próprio, formato antigo).</div>';
 }
 else {
+	echo '<div class="gd-row"><div class="gd-field"><label>🔎 Buscar cliente</label><input type="text" id="gd-filter-view-named-clients" placeholder="Filtrar por nome do cliente..."></div></div>';
+	echo '<div id="gd-view-named-clients">';
+
 	foreach ($named_clients as $name => $nc) {
 		$td = $nc['topdesk'] ?? [];
 
-		echo '<div class="gd-client-card">';
+		echo '<div class="gd-client-card" data-search="'.h($name).'">';
 		echo '<div class="gd-client-name">🏢 '.h($name).'</div>';
 
 		echo '<div class="gd-tags" style="margin-top:10px;">';
@@ -90,6 +93,8 @@ else {
 
 		echo '</div>';
 	}
+
+	echo '</div>';
 }
 
 echo '</div>';
@@ -101,10 +106,14 @@ if (!is_array($rules) || count($rules) === 0) {
 	echo '<div class="gd-muted">Nenhuma rule cadastrada.</div>';
 }
 else {
+	echo '<div class="gd-row"><div class="gd-field"><label>🔎 Buscar rule/cliente</label><input type="text" id="gd-filter-view-rules" placeholder="Filtrar por rule_name ou cliente..."></div></div>';
+	echo '<div id="gd-view-rules">';
+
 	foreach ($rules as $rule_name => $c) {
 		$td = $c['topdesk'] ?? [];
+		$search_text = $rule_name.' '.(string)($c['client'] ?? '');
 
-		echo '<div class="gd-client-card">';
+		echo '<div class="gd-client-card" data-search="'.h($search_text).'">';
 		echo '<div class="gd-client-head">';
 		echo '<div class="gd-client-name">🧩 Rule: '.h($rule_name).'</div>';
 
@@ -143,6 +152,8 @@ else {
 
 		echo '</div>';
 	}
+
+	echo '</div>';
 }
 
 echo '</div>';

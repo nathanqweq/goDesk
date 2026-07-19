@@ -132,6 +132,8 @@ echo '<button class="gd-btn" type="button" data-gd-add-named-client>＋ Adiciona
 echo '</div>';
 echo '<div class="gd-muted" style="margin-bottom:10px">Cadastre um cliente aqui pra não repetir o mesmo TopDesk em várias rules — cada rule abaixo escolhe um cliente e só precisa preencher o que for diferente (ex: more_info_text do circuito).</div>';
 
+echo '<div class="gd-row"><div class="gd-field"><label>🔎 Buscar cliente</label><input type="text" id="gd-filter-named-clients" placeholder="Filtrar por nome do cliente..."></div></div>';
+
 echo '<div id="gd-named-clients">';
 
 $nidx = 0;
@@ -227,6 +229,8 @@ echo '<div class="gd-client-head">';
 echo '<h2 style="margin:0">👥 Rules</h2>';
 echo '<button class="gd-btn" type="button" data-gd-add>＋ Adicionar rule</button>';
 echo '</div>';
+
+echo '<div class="gd-row"><div class="gd-field"><label>🔎 Buscar rule/cliente</label><input type="text" id="gd-filter-rules" placeholder="Filtrar por rule_name ou cliente..."></div></div>';
 
 echo '<div id="gd-clients">';
 

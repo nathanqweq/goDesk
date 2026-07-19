@@ -1,6 +1,67 @@
 (function () {
   "use strict";
 
+  // Filtro de busca: esconde os cards de um container cujo texto (extraído
+  // por textExtractor) não contém a query digitada. Reaproveitado tanto na
+  // tela de Editar (extrai de <input>/<select> ao vivo) quanto na de
+  // Visualizar (extrai de data-search, já que lá é tudo texto estático).
+  const filters = {};
+
+  function makeFilter(inputId, containerId, cardSelector, textExtractor) {
+    const input = document.getElementById(inputId);
+    const container = document.getElementById(containerId);
+    if (!input || !container) return null;
+
+    function apply() {
+      const q = input.value.trim().toLowerCase();
+      container.querySelectorAll(cardSelector).forEach((card) => {
+        const text = textExtractor(card).toLowerCase();
+        card.style.display = (q === "" || text.includes(q)) ? "" : "none";
+      });
+    }
+
+    input.addEventListener("input", apply);
+    filters[inputId] = apply;
+    return apply;
+  }
+
+  function clearFilter(inputId) {
+    const input = document.getElementById(inputId);
+    if (input) input.value = "";
+    if (filters[inputId]) filters[inputId]();
+  }
+
+  function initFilters() {
+    makeFilter(
+      "gd-filter-named-clients",
+      "gd-named-clients",
+      ".gd-named-client",
+      (card) => card.querySelector(".gd-named-client-name")?.value || ""
+    );
+    makeFilter(
+      "gd-filter-rules",
+      "gd-clients",
+      ".gd-client",
+      (card) => {
+        const ruleInput = card.querySelector('input[name*="[rule_name]"]');
+        const clientSelect = card.querySelector(".gd-client-select");
+        return (ruleInput ? ruleInput.value : "") + " " + (clientSelect ? clientSelect.value : "");
+      }
+    );
+    makeFilter(
+      "gd-filter-view-named-clients",
+      "gd-view-named-clients",
+      "[data-search]",
+      (card) => card.getAttribute("data-search") || ""
+    );
+    makeFilter(
+      "gd-filter-view-rules",
+      "gd-view-rules",
+      "[data-search]",
+      (card) => card.getAttribute("data-search") || ""
+    );
+  }
+
   function closestContainer(el) {
     return el.closest(".gd-card, .gd-client-card");
   }
@@ -243,6 +304,7 @@
     initSendMoreToggles();
     initSendEmailToggles();
     syncClientSelects();
+    clearFilter("gd-filter-named-clients");
   }
 
   function addClient() {
@@ -370,6 +432,7 @@
     initSendMoreToggles();
     initSendEmailToggles();
     syncClientSelects();
+    clearFilter("gd-filter-rules");
   }
 
   // Event delegation (sem precisar onclick inline)
@@ -425,5 +488,6 @@
     initSendMoreToggles();
     initSendEmailToggles();
     syncClientSelects();
+    initFilters();
   });
 })();
