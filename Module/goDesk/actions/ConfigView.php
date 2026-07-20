@@ -33,6 +33,7 @@ class ConfigView extends CController {
 		$td['send_email'] ??= false;
 		$td['email_to'] ??= '';
 		$td['email_cc'] ??= '';
+		$td['once_per_day'] ??= false;
 	}
 
 	private function loadConfig(): array {

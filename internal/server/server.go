@@ -34,6 +34,8 @@ func Run(opts config.ServiceConfig) error {
 	mux.HandleFunc("GET /healthz", handleHealth)
 	mux.HandleFunc("POST /alert", handleAlert(opts))
 	mux.HandleFunc("POST /config", handleConfig(opts.Token, opts.ConfigFile))
+	mux.HandleFunc("POST /validate-client", handleValidateClient(opts))
+	mux.HandleFunc("GET /once-per-day", handleOncePerDayList(opts.Token))
 
 	srv := &http.Server{
 		Addr:         opts.ListenAddr,
@@ -50,6 +52,8 @@ func Run(opts config.ServiceConfig) error {
 	} else {
 		log.Println("[healthcheck] desabilitado (GODESK_HEALTHCHECK_INTERVAL ou GODESK_TOPDESK_DOMAIN não configurados)")
 	}
+
+	go runOncePerDayPurge(ctx)
 
 	errCh := make(chan error, 1)
 	go func() {

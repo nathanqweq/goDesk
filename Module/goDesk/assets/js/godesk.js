@@ -168,6 +168,72 @@
     return max + 1;
   }
 
+  // Chama godesk.config.validate (que por sua vez passa pelo godesk-client
+  // no servidor, o único lugar que tem as credenciais do TopDesk) pra
+  // conferir se o operator/oper_group digitados existem de verdade.
+  function testNamedClient(btn) {
+    const card = btn.closest(".gd-named-client");
+    if (!card) return;
+
+    const result = card.querySelector(".gd-test-result");
+    const operatorInput = card.querySelector('input[name*="[topdesk][operator]"]');
+    const operGroupInput = card.querySelector('input[name*="[topdesk][oper_group]"]');
+    const operator = operatorInput ? operatorInput.value.trim() : "";
+    const operGroup = operGroupInput ? operGroupInput.value.trim() : "";
+
+    if (!operator && !operGroup) {
+      if (result) {
+        result.className = "gd-test-result gd-muted";
+        result.textContent = "Preencha operator e/ou oper_group pra testar.";
+      }
+      return;
+    }
+
+    if (result) {
+      result.className = "gd-test-result gd-muted";
+      result.textContent = "Testando...";
+    }
+    btn.disabled = true;
+
+    fetch("zabbix.php?action=godesk.config.validate", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ operator, oper_group: operGroup })
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!result) return;
+
+        if (data.error) {
+          result.className = "gd-test-result gd-error";
+          result.textContent = "❌ " + data.error;
+          return;
+        }
+
+        const parts = [];
+        if (operator) {
+          const r1 = data.operator;
+          parts.push(r1 && r1.valid ? `✅ operator (${escapeHtml(operator)})` : `❌ operator (${escapeHtml(operator)}): ${escapeHtml((r1 && r1.error) || "inválido")}`);
+        }
+        if (operGroup) {
+          const r2 = data.oper_group;
+          parts.push(r2 && r2.valid ? `✅ oper_group (${escapeHtml(operGroup)})` : `❌ oper_group (${escapeHtml(operGroup)}): ${escapeHtml((r2 && r2.error) || "inválido")}`);
+        }
+
+        const anyInvalid = (operator && !(data.operator && data.operator.valid)) || (operGroup && !(data.oper_group && data.oper_group.valid));
+        result.className = "gd-test-result " + (anyInvalid ? "gd-error" : "gd-ok");
+        result.innerHTML = parts.join("<br>");
+      })
+      .catch((err) => {
+        if (!result) return;
+        result.className = "gd-test-result gd-error";
+        result.textContent = "❌ falha ao testar: " + err;
+      })
+      .finally(() => {
+        btn.disabled = false;
+      });
+  }
+
   function escapeHtml(s) {
     return String(s)
       .replace(/&/g, "&amp;")
@@ -217,7 +283,10 @@
       <div class="gd-client-card gd-named-client" data-idx="${i}">
         <div class="gd-client-head">
           <div class="gd-client-name">🏢 Cliente</div>
-          <button class="gd-btn gd-btn-danger" type="button" data-gd-remove-named-client>Remover</button>
+          <div>
+            <button class="gd-btn" type="button" data-gd-test-client>🔍 Testar</button>
+            <button class="gd-btn gd-btn-danger" type="button" data-gd-remove-named-client>Remover</button>
+          </div>
         </div>
 
         <div class="gd-row">
@@ -226,6 +295,8 @@
             <input type="text" class="gd-named-client-name" name="named_clients[${i}][name]" value="">
           </div>
         </div>
+
+        <div class="gd-test-result gd-muted" style="margin-bottom:8px"></div>
 
         <div class="gd-divider"></div>
         <div class="gd-small-title">🎫 TopDesk (compartilhado por todas as rules deste cliente)</div>
@@ -293,6 +364,13 @@
           <div class="gd-field">
             <label>Email copia</label>
             <input type="text" class="gd-email-cc" name="named_clients[${i}][topdesk][email_cc]" value="" disabled>
+          </div>
+          <div class="gd-field gd-field-tight">
+            <label>Um por dia</label>
+            <div class="gd-check">
+              <input type="checkbox" name="named_clients[${i}][topdesk][once_per_day]" value="1">
+              <span class="gd-muted">no máx. 1 e-mail/dia por alerta+host</span>
+            </div>
           </div>
         </div>
       </div>
@@ -421,6 +499,13 @@
             <label>Email copia</label>
             <input type="text" class="gd-email-cc" name="clients[${i}][topdesk][email_cc]" value="" disabled>
           </div>
+          <div class="gd-field gd-field-tight">
+            <label>Um por dia</label>
+            <div class="gd-check">
+              <input type="checkbox" name="clients[${i}][topdesk][once_per_day]" value="1">
+              <span class="gd-muted">no máx. 1 e-mail/dia por alerta+host</span>
+            </div>
+          </div>
         </div>
       </div>
     `;
@@ -462,6 +547,13 @@
     if (rmNamedBtn) {
       e.preventDefault();
       removeNamedClient(rmNamedBtn);
+      return;
+    }
+
+    const testBtn = e.target.closest("[data-gd-test-client]");
+    if (testBtn) {
+      e.preventDefault();
+      testNamedClient(testBtn);
       return;
     }
   });

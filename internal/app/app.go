@@ -159,9 +159,13 @@ func Run(cfg config.RuntimeConfig) (err error) {
 			to := mailer.ParseRecipients(pol.TopDesk.EmailTo)
 			cc := mailer.ParseRecipients(pol.TopDesk.EmailCc)
 
-			if len(to) == 0 {
+			switch {
+			case len(to) == 0:
 				log.Printf("[email] WARN: send_email ativo sem destinatario TO (rule=%q)\n", p.RuleName)
-			} else {
+			case pol.TopDesk.OncePerDay && oncePerDaySeenToday(p.Trigger, p.HostID):
+				recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.EmailSkippedOncePerDay++ })
+				log.Printf("[email] SKIP (um por dia): trigger=%q host_id=%q já enviado hoje (rule=%q)\n", p.Trigger, p.HostID, p.RuleName)
+			default:
 				subject := fmt.Sprintf("%s - %s", ticketName, created)
 				body := topdesk.OpeningEmailHTML(created, p, contract)
 				err := mailer.SendHTML(
@@ -180,6 +184,8 @@ func Run(cfg config.RuntimeConfig) (err error) {
 				if err != nil {
 					recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.EmailSendErrors++ })
 					log.Printf("[email] WARN: falha ao enviar email ticket=%s: %v\n", created, err)
+				} else if pol.TopDesk.OncePerDay {
+					oncePerDayRecord(p.Cliente, p.Trigger, p.Host, p.HostID)
 				}
 			}
 		}

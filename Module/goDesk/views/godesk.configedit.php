@@ -120,6 +120,13 @@ echo '</div>';
 echo '<div class="gd-row gd-sendemail-box"'.$def_send_email_hidden.'>';
 echo '<div class="gd-field"><label>Email para</label><input type="text" class="gd-email-to" name="default[topdesk][email_to]" value="'.h($def_td['email_to'] ?? '').'"></div>';
 echo '<div class="gd-field"><label>Email copia</label><input type="text" class="gd-email-cc" name="default[topdesk][email_cc]" value="'.h($def_td['email_cc'] ?? '').'"></div>';
+echo '<div class="gd-field gd-field-tight">
+	<label>Um por dia</label>
+	<div class="gd-check">
+		<input type="checkbox" name="default[topdesk][once_per_day]" value="1" '.(!empty($def_td['once_per_day']) ? 'checked' : '').'>
+		<span class="gd-muted">no máx. 1 e-mail/dia por alerta+host</span>
+	</div>
+</div>';
 echo '</div>';
 
 echo '</div>';
@@ -145,12 +152,17 @@ foreach ($named_clients as $nc) {
 
 	echo '<div class="gd-client-head">';
 	echo '<div class="gd-client-name">🏢 Cliente</div>';
+	echo '<div>';
+	echo '<button class="gd-btn" type="button" data-gd-test-client>🔍 Testar</button> ';
 	echo '<button class="gd-btn gd-btn-danger" type="button" data-gd-remove-named-client>Remover</button>';
+	echo '</div>';
 	echo '</div>';
 
 	echo '<div class="gd-row">';
 	echo '<div class="gd-field"><label>Nome do cliente (chave do YAML)</label><input type="text" class="gd-named-client-name" name="named_clients['.$nidx.'][name]" value="'.h($name).'"></div>';
 	echo '</div>';
+
+	echo '<div class="gd-test-result gd-muted" style="margin-bottom:8px"></div>';
 
 	echo '<div class="gd-divider"></div>';
 	echo '<div class="gd-small-title">🎫 TopDesk (compartilhado por todas as rules deste cliente)</div>';
@@ -213,6 +225,13 @@ foreach ($named_clients as $nc) {
 	echo '<div class="gd-row gd-sendemail-box"'.$nc_send_email_hidden.'>';
 	echo '<div class="gd-field"><label>Email para</label><input type="text" class="gd-email-to" name="named_clients['.$nidx.'][topdesk][email_to]" value="'.h($td['email_to'] ?? '').'"></div>';
 	echo '<div class="gd-field"><label>Email copia</label><input type="text" class="gd-email-cc" name="named_clients['.$nidx.'][topdesk][email_cc]" value="'.h($td['email_cc'] ?? '').'"></div>';
+	echo '<div class="gd-field gd-field-tight">
+		<label>Um por dia</label>
+		<div class="gd-check">
+			<input type="checkbox" name="named_clients['.$nidx.'][topdesk][once_per_day]" value="1" '.(!empty($td['once_per_day']) ? 'checked' : '').'>
+			<span class="gd-muted">no máx. 1 e-mail/dia por alerta+host</span>
+		</div>
+	</div>';
 	echo '</div>';
 
 	echo '</div>';
@@ -344,6 +363,13 @@ foreach ($rules as $c) {
 	echo '<div class="gd-row gd-sendemail-box"'.$send_email_hidden.'>';
 	echo '<div class="gd-field"><label>Email para</label><input type="text" class="gd-email-to" name="clients['.$idx.'][topdesk][email_to]" value="'.h($td['email_to'] ?? '').'"></div>';
 	echo '<div class="gd-field"><label>Email copia</label><input type="text" class="gd-email-cc" name="clients['.$idx.'][topdesk][email_cc]" value="'.h($td['email_cc'] ?? '').'"></div>';
+	echo '<div class="gd-field gd-field-tight">
+		<label>Um por dia</label>
+		<div class="gd-check">
+			<input type="checkbox" name="clients['.$idx.'][topdesk][once_per_day]" value="1" '.(!empty($td['once_per_day']) ? 'checked' : '').'>
+			<span class="gd-muted">no máx. 1 e-mail/dia por alerta+host</span>
+		</div>
+	</div>';
 	echo '</div>';
 
 	echo '</div>';

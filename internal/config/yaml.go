@@ -24,6 +24,7 @@ type TopDeskDefaults struct {
 	SendEmail       bool   `yaml:"send_email"`
 	EmailTo         string `yaml:"email_to"`
 	EmailCc         string `yaml:"email_cc"`
+	OncePerDay      bool   `yaml:"once_per_day"`
 }
 
 type Policy struct {
@@ -126,11 +127,11 @@ func ParsePolicies(data []byte) (PoliciesFile, error) {
 
 // flattenRules resolve o formato "clientes + rules" para o
 // map[string]Policy achatado que ResolvePolicy já sabe consumir — cada
-// regra herda o topdesk do cliente referenciado (incluindo os 3 campos
-// booleanos send_more_info/adicional_cresol/send_email) e só pode
-// sobrescrever o que de fato varia por regra: urgency/impact/priority/
+// regra herda o topdesk do cliente referenciado (incluindo os 4 campos
+// booleanos send_more_info/adicional_cresol/send_email/once_per_day) e só
+// pode sobrescrever o que de fato varia por regra: urgency/impact/priority/
 // autoclose e os campos de texto do topdesk. Quando a regra referencia um
-// cliente válido, os 3 booleanos do topdesk vêm sempre do cliente — bool
+// cliente válido, os 4 booleanos do topdesk vêm sempre do cliente — bool
 // não distingue "não informado" de "false", então permitir override por
 // regra apagaria silenciosamente o que o cliente configurou assim que a
 // regra não preenchesse esses campos. Regras sem cliente (referência
@@ -245,21 +246,22 @@ func mergePolicy(def Policy, over Policy) Policy {
 }
 
 // mergeTopDesk aplica over sobre base como uma política completa: campos
-// de texto só sobrescrevem se vierem preenchidos; os 3 booleanos
-// (send_more_info, adicional_cresol, send_email) sempre vêm de over. Use
-// isso quando over representa uma política inteira (cliente do YAML
-// antigo, ou cliente nomeado do YAML novo) — para overrides parciais de
-// regra, veja mergeTopDeskTextOverrides.
+// de texto só sobrescrevem se vierem preenchidos; os 4 booleanos
+// (send_more_info, adicional_cresol, send_email, once_per_day) sempre vêm
+// de over. Use isso quando over representa uma política inteira (cliente
+// do YAML antigo, ou cliente nomeado do YAML novo) — para overrides
+// parciais de regra, veja mergeTopDeskTextOverrides.
 func mergeTopDesk(base, over TopDeskDefaults) TopDeskDefaults {
 	base = mergeTopDeskTextOverrides(base, over)
 	base.SendMoreInfo = over.SendMoreInfo
 	base.AdicionalCresol = over.AdicionalCresol
 	base.SendEmail = over.SendEmail
+	base.OncePerDay = over.OncePerDay
 	return base
 }
 
 // mergeTopDeskTextOverrides aplica só os campos de texto de over sobre
-// base (inclui more_info_text), deliberadamente sem tocar nos 3 booleanos
+// base (inclui more_info_text), deliberadamente sem tocar nos 4 booleanos
 // — usado pelo override de uma regra sobre o que já foi resolvido do
 // cliente/default.
 func mergeTopDeskTextOverrides(base, over TopDeskDefaults) TopDeskDefaults {

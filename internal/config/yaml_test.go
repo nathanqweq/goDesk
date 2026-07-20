@@ -189,3 +189,56 @@ rules:
 		t.Fatalf("esperava override da regra vencer, veio %q", pol.TopDesk.Category)
 	}
 }
+
+func TestParsePoliciesOncePerDayInheritsFromClient(t *testing.T) {
+	yamlText := `
+default: {}
+
+clients:
+  HELPDESK:
+    topdesk:
+      send_email: true
+      once_per_day: true
+
+rules:
+  REGRA-UM-POR-DIA:
+    client: HELPDESK
+`
+	pf, err := ParsePolicies([]byte(yamlText))
+	if err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+
+	pol := ResolvePolicy(pf, "REGRA-UM-POR-DIA")
+	if !pol.TopDesk.OncePerDay {
+		t.Fatal("esperava once_per_day herdado do cliente (true)")
+	}
+}
+
+func TestParsePoliciesRuleWithoutClientControlsOwnOncePerDay(t *testing.T) {
+	yamlText := `
+default:
+  topdesk:
+    once_per_day: false
+
+clients:
+  HELPDESK:
+    topdesk:
+      once_per_day: false
+
+rules:
+  REGRA-STANDALONE:
+    topdesk:
+      contract: "CONTRATO-PROPRIO"
+      once_per_day: true
+`
+	pf, err := ParsePolicies([]byte(yamlText))
+	if err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+
+	pol := ResolvePolicy(pf, "REGRA-STANDALONE")
+	if !pol.TopDesk.OncePerDay {
+		t.Fatal("regra sem cliente deveria controlar seu próprio once_per_day (true)")
+	}
+}

@@ -28,9 +28,10 @@ type Snapshot struct {
 	TicketsCloseErrors   int64 `json:"tickets_close_errors_total"`
 	TicketsAlreadyClosed int64 `json:"tickets_already_closed_total"`
 
-	ZabbixAckErrors    int64 `json:"zabbix_ack_errors_total"`
-	EmailSendErrors    int64 `json:"email_send_errors_total"`
-	SendMoreInfoErrors int64 `json:"send_more_info_errors_total"`
+	ZabbixAckErrors        int64 `json:"zabbix_ack_errors_total"`
+	EmailSendErrors        int64 `json:"email_send_errors_total"`
+	EmailSkippedOncePerDay int64 `json:"email_skipped_once_per_day_total"`
+	SendMoreInfoErrors     int64 `json:"send_more_info_errors_total"`
 
 	TopdeskHealthChecksTotal        int64     `json:"topdesk_healthchecks_total"`
 	TopdeskHealthCheckErrors        int64     `json:"topdesk_healthcheck_errors_total"`

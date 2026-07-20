@@ -7,7 +7,7 @@
  * Schema (formato novo — clientes nomeados + rules referenciando eles):
  * default:
  *   client, urgency, impact, priority, autoclose
- *   topdesk: { contract, operator, oper_group, main_caller, secundary_caller, sla, category, sub_category, call_type, send_more_info, more_info_text, adicional_cresol, send_email, email_to, email_cc }
+ *   topdesk: { contract, operator, oper_group, main_caller, secundary_caller, sla, category, sub_category, call_type, send_more_info, more_info_text, adicional_cresol, send_email, email_to, email_cc, once_per_day }
  *
  * clients:
  *   <NOME_DO_CLIENTE>:
@@ -60,6 +60,7 @@ class ConfigEdit extends CController {
 		$td['send_email'] ??= false;
 		$td['email_to'] ??= '';
 		$td['email_cc'] ??= '';
+		$td['once_per_day'] ??= false;
 	}
 
 	private function loadConfig(): array {
@@ -145,7 +146,8 @@ class ConfigEdit extends CController {
 			'adicional_cresol' => $this->toBool($td['adicional_cresol'] ?? false),
 			'send_email' => $this->toBool($td['send_email'] ?? false),
 			'email_to' => (string)($td['email_to'] ?? ''),
-			'email_cc' => (string)($td['email_cc'] ?? '')
+			'email_cc' => (string)($td['email_cc'] ?? ''),
+			'once_per_day' => $this->toBool($td['once_per_day'] ?? false)
 		];
 	}
 
@@ -212,7 +214,7 @@ class ConfigEdit extends CController {
 			return ['ok' => false, 'error' => 'Config inválida: default.topdesk ausente.'];
 		}
 
-		foreach (['contract','operator','oper_group','main_caller','secundary_caller','sla','category','sub_category','call_type','send_more_info','more_info_text','adicional_cresol','send_email','email_to','email_cc'] as $k) {
+		foreach (['contract','operator','oper_group','main_caller','secundary_caller','sla','category','sub_category','call_type','send_more_info','more_info_text','adicional_cresol','send_email','email_to','email_cc','once_per_day'] as $k) {
 			if (!array_key_exists($k, $cfg['default']['topdesk'])) {
 				return ['ok' => false, 'error' => 'Config inválida: default.topdesk.'.$k.' ausente.'];
 			}

@@ -1,10 +1,15 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
+	"strings"
+	"time"
 
 	"godesk/internal/app"
 	"godesk/internal/config"
@@ -20,6 +25,9 @@ func main() {
 			return
 		case "--monitoring":
 			runMonitoring()
+			return
+		case "--once-per-day":
+			runOncePerDay()
 			return
 		}
 	}
@@ -61,6 +69,46 @@ func runServe() {
 
 	if err := server.Run(opts); err != nil {
 		log.Fatalln(err)
+	}
+}
+
+// runOncePerDay consulta o godesk serve rodando na mesma máquina (é lá que
+// a lista "um por dia" vive, só em memória — ver internal/app/onceperday.go
+// e internal/server/onceperday.go) e imprime as entradas de hoje. Usado
+// pra conferir se a deduplicação de e-mail está funcionando.
+func runOncePerDay() {
+	opts := config.ServiceConfigFromEnv()
+
+	url := "http://" + opts.ListenAddr + "/once-per-day"
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "godesk --once-per-day: "+err.Error())
+		os.Exit(1)
+	}
+	if opts.Token != "" {
+		req.Header.Set("Authorization", "Bearer "+opts.Token)
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "godesk --once-per-day: falha ao consultar "+url+": "+err.Error())
+		os.Exit(1)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		fmt.Fprintf(os.Stderr, "godesk --once-per-day: servidor respondeu %d: %s\n", resp.StatusCode, strings.TrimSpace(string(body)))
+		os.Exit(1)
+	}
+
+	var pretty bytes.Buffer
+	if err := json.Indent(&pretty, body, "", "  "); err == nil {
+		fmt.Println(pretty.String())
+	} else {
+		fmt.Println(string(body))
 	}
 }
 
