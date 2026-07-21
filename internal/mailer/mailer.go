@@ -62,7 +62,7 @@ func SendHTML(cfg Config, to []string, cc []string, subject string, htmlBody str
 
 	var auth smtp.Auth
 	if strings.TrimSpace(cfg.User) != "" {
-		auth = smtp.PlainAuth("", cfg.User, cfg.Pass, strings.TrimSpace(cfg.Host))
+		auth = LoginAuth(cfg.User, cfg.Pass)
 	}
 
 	msg := buildMIME(cfg.From, to, cc, subject, htmlBody)
