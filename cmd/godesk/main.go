@@ -29,6 +29,9 @@ func main() {
 		case "--once-per-day":
 			runOncePerDay()
 			return
+		case "--help", "-h":
+			printUsage()
+			return
 		}
 	}
 
@@ -45,6 +48,36 @@ func main() {
 		log.Printf("[app] ERRO: %v\n", err)
 		fail(err)
 	}
+}
+
+// printUsage lista todas as formas de interagir com o binário godesk —
+// separado do godesk-client (esse é outro binário, instalado no host do
+// frontend Zabbix, com seu próprio --help).
+func printUsage() {
+	fmt.Println(`godesk — cria/atualiza chamados no TopDesk a partir de alertas do Zabbix
+
+Uso:
+  godesk TICKET_NAME RAWDATA   Modo one-shot: processa um alerta e sai
+                                (é assim que o Zabbix Action chama o script;
+                                DOMAIN/USER/PASS vêm de godesk-service.env)
+
+  godesk serve                 Sobe o serviço HTTP persistente (systemd
+                                usa esse modo — ver dist/godesk.service).
+                                Endpoints: POST /alert, POST /config,
+                                POST /validate-client, GET /once-per-day,
+                                GET /healthz
+
+  godesk --monitoring          Mostra o snapshot de métricas acumuladas
+                                (lido do arquivo local, GODESK_METRICS_FILE)
+
+  godesk --once-per-day        Mostra a lista "um por dia" (alerta+host que
+                                já mandaram e-mail hoje) — consulta o
+                                godesk serve rodando nesta máquina via HTTP
+
+  godesk --help, -h            Mostra esta ajuda
+
+Configuração: /etc/zabbix/godesk/godesk-service.env (ou variáveis de
+ambiente com o mesmo nome — ver internal/config/config.go).`)
 }
 
 // fail imprime uma mensagem curta em stderr — sempre visível pro Zabbix no
