@@ -48,7 +48,7 @@ func FromArgs(argv []string) (RuntimeConfig, error) {
 // (uma vez, no início do processo — ver ServiceConfigFromEnv) mais os dois
 // valores que de fato mudam por alerta: ticketName e rawData.
 func FromValues(svc ServiceConfig, ticketName, rawData string) RuntimeConfig {
-	smtpFromFile := LoadEnvFile(smtpConfigEnvPath)
+	smtp := SMTPConfigFromEnv()
 
 	cfg := RuntimeConfig{
 		Domain:     svc.TopdeskDomain,
@@ -67,11 +67,11 @@ func FromValues(svc ServiceConfig, ticketName, rawData string) RuntimeConfig {
 		ConfigFile:  getenv("TOPDESK_CONFIG", "/etc/zabbix/godesk/godesk-config.yaml"),
 		MetricsFile: MetricsFileFromEnv(),
 		TimeoutSec:  atoiDefault(getenv("TOPDESK_TIMEOUT_SEC", "15"), 15),
-		SMTPHost:    getenv("TOPDESK_SMTP_HOST", smtpFromFile["TOPDESK_SMTP_HOST"]),
-		SMTPPort:    getenv("TOPDESK_SMTP_PORT", pickDefault(smtpFromFile["TOPDESK_SMTP_PORT"], "25")),
-		SMTPUser:    getenv("TOPDESK_SMTP_USER", smtpFromFile["TOPDESK_SMTP_USER"]),
-		SMTPPass:    getenv("TOPDESK_SMTP_PASS", smtpFromFile["TOPDESK_SMTP_PASS"]),
-		SMTPFrom:    getenv("TOPDESK_SMTP_FROM", smtpFromFile["TOPDESK_SMTP_FROM"]),
+		SMTPHost:    smtp.Host,
+		SMTPPort:    smtp.Port,
+		SMTPUser:    smtp.User,
+		SMTPPass:    smtp.Pass,
+		SMTPFrom:    smtp.From,
 	}
 
 	// sane
@@ -79,6 +79,31 @@ func FromValues(svc ServiceConfig, ticketName, rawData string) RuntimeConfig {
 	cfg.ZabbixURL = strings.TrimRight(cfg.ZabbixURL, "/")
 
 	return cfg
+}
+
+// SMTPConfig é a configuração de e-mail (godesk-smtp-config.env), separada
+// do RuntimeConfig pra poder ser lida sozinha — usada por `godesk
+// --test-mail`, que só quer testar o SMTP sem processar um alerta.
+type SMTPConfig struct {
+	Host string
+	Port string
+	User string
+	Pass string
+	From string
+}
+
+// SMTPConfigFromEnv segue a mesma prioridade de sempre: variável de
+// ambiente do processo primeiro, depois godesk-smtp-config.env.
+func SMTPConfigFromEnv() SMTPConfig {
+	fromFile := LoadEnvFile(smtpConfigEnvPath)
+
+	return SMTPConfig{
+		Host: getenv("TOPDESK_SMTP_HOST", fromFile["TOPDESK_SMTP_HOST"]),
+		Port: getenv("TOPDESK_SMTP_PORT", pickDefault(fromFile["TOPDESK_SMTP_PORT"], "25")),
+		User: getenv("TOPDESK_SMTP_USER", fromFile["TOPDESK_SMTP_USER"]),
+		Pass: getenv("TOPDESK_SMTP_PASS", fromFile["TOPDESK_SMTP_PASS"]),
+		From: getenv("TOPDESK_SMTP_FROM", fromFile["TOPDESK_SMTP_FROM"]),
+	}
 }
 
 // ServiceConfig é a configuração central do goDesk — carregada uma única

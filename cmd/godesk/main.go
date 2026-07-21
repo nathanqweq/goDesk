@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"log"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 
 	"godesk/internal/app"
 	"godesk/internal/config"
+	"godesk/internal/mailer"
 	"godesk/internal/metrics"
 	"godesk/internal/server"
 )
@@ -31,6 +33,9 @@ func main() {
 			return
 		case "--help", "-h":
 			printUsage()
+			return
+		case "--test-mail":
+			runTestMail(os.Args[2:])
 			return
 		}
 	}
@@ -73,6 +78,11 @@ Uso:
   godesk --once-per-day        Mostra a lista "um por dia" (alerta+host que
                                 já mandaram e-mail hoje) — consulta o
                                 godesk serve rodando nesta máquina via HTTP
+
+  godesk --test-mail DESTINATARIO ["conteudo"]
+                                Manda um e-mail de teste usando a config
+                                SMTP real (godesk-smtp-config.env), sem
+                                precisar de um alerta de verdade
 
   godesk --help, -h            Mostra esta ajuda
 
@@ -143,6 +153,45 @@ func runOncePerDay() {
 	} else {
 		fmt.Println(string(body))
 	}
+}
+
+// runTestMail manda um e-mail de teste usando a config SMTP real
+// (godesk-smtp-config.env) — pra confirmar que host/porta/usuário/senha e
+// o mecanismo de autenticação (ver internal/mailer/loginauth.go) estão
+// certos sem precisar esperar um alerta de verdade cair.
+func runTestMail(args []string) {
+	if len(args) < 1 {
+		fmt.Fprintln(os.Stderr, `uso: godesk --test-mail DESTINATARIO ["conteudo da mensagem"]`)
+		os.Exit(2)
+	}
+
+	to := args[0]
+	body := "Teste de envio de e-mail do godesk."
+	if len(args) >= 2 {
+		body = args[1]
+	}
+
+	smtp := config.SMTPConfigFromEnv()
+
+	err := mailer.SendHTML(
+		mailer.Config{
+			Host: smtp.Host,
+			Port: smtp.Port,
+			User: smtp.User,
+			Pass: smtp.Pass,
+			From: smtp.From,
+		},
+		[]string{to},
+		nil,
+		"[godesk] Teste de e-mail",
+		"<p>"+html.EscapeString(body)+"</p>",
+	)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "godesk --test-mail: falha ao enviar: "+err.Error())
+		os.Exit(1)
+	}
+
+	fmt.Printf("OK: e-mail de teste enviado para %s via %s:%s (from=%s)\n", to, smtp.Host, smtp.Port, smtp.From)
 }
 
 func runMonitoring() {
