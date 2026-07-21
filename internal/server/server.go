@@ -34,6 +34,7 @@ func Run(opts config.ServiceConfig) error {
 	mux.HandleFunc("GET /healthz", handleHealth)
 	mux.HandleFunc("POST /alert", handleAlert(opts))
 	mux.HandleFunc("POST /config", handleConfig(opts.Token, opts.ConfigFile))
+	mux.HandleFunc("POST /config/test", handleConfigTest(opts.Token, opts.ConfigFile))
 	mux.HandleFunc("POST /validate-client", handleValidateClient(opts))
 	mux.HandleFunc("GET /once-per-day", handleOncePerDayList(opts.Token))
 

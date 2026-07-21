@@ -15,12 +15,21 @@ import (
 const clientEnvPath = "/etc/zabbix/godesk/godesk-client.env"
 
 func main() {
-	if len(os.Args) > 1 && os.Args[1] == "validate" {
-		if err := runValidate(os.Args[2:]); err != nil {
-			fmt.Fprintln(os.Stderr, "godesk-client: "+err.Error())
-			os.Exit(1)
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "validate":
+			if err := runValidate(os.Args[2:]); err != nil {
+				fmt.Fprintln(os.Stderr, "godesk-client: "+err.Error())
+				os.Exit(1)
+			}
+			return
+		case "test-config":
+			if err := runTestConfig(); err != nil {
+				fmt.Fprintln(os.Stderr, "godesk-client: "+err.Error())
+				os.Exit(1)
+			}
+			return
 		}
-		return
 	}
 
 	if err := run(); err != nil {
@@ -54,20 +63,67 @@ func run() error {
 		return err
 	}
 
-	configPath := resolve(env, "TOPDESK_CONFIG", "/etc/zabbix/godesk/godesk-config.yaml")
-
-	data, err := os.ReadFile(configPath)
+	data, configPath, err := readLocalConfig(env)
 	if err != nil {
-		return fmt.Errorf("falha ao ler %s: %w", configPath, err)
+		return err
+	}
+
+	if _, err := postYAML(serverURL, token, "/config", data); err != nil {
+		return err
+	}
+
+	fmt.Printf("config enviada com sucesso para %s (lida de %s)\n", serverURL, configPath)
+	return nil
+}
+
+// runTestConfig manda o mesmo arquivo de config real (TOPDESK_CONFIG) pro
+// endpoint de dry run (/config/test, ver internal/server/configtest.go):
+// valida o YAML e confere permissão de escrita no servidor sem nunca
+// sobrescrever o godesk-config.yaml de produção. Serve pra testar o canal
+// client→server (send + save) sem risco de aplicar um payload errado.
+func runTestConfig() error {
+	env, serverURL, token, err := loadClientEnv()
+	if err != nil {
+		return err
+	}
+
+	data, configPath, err := readLocalConfig(env)
+	if err != nil {
+		return err
+	}
+
+	if _, err := postYAML(serverURL, token, "/config/test", data); err != nil {
+		return err
+	}
+
+	fmt.Printf("OK: %s é um YAML válido e o servidor (%s) consegue gravar — nada foi alterado\n", configPath, serverURL)
+	return nil
+}
+
+// readLocalConfig lê e valida o TOPDESK_CONFIG local — reaproveitado por
+// run() e runTestConfig(), que só diferem em pra qual endpoint mandam o
+// mesmo conteúdo.
+func readLocalConfig(env map[string]string) (data []byte, path string, err error) {
+	path = resolve(env, "TOPDESK_CONFIG", "/etc/zabbix/godesk/godesk-config.yaml")
+
+	data, err = os.ReadFile(path)
+	if err != nil {
+		return nil, path, fmt.Errorf("falha ao ler %s: %w", path, err)
 	}
 
 	if _, err := config.ParsePolicies(data); err != nil {
-		return fmt.Errorf("yaml inválido em %s: %w", configPath, err)
+		return nil, path, fmt.Errorf("yaml inválido em %s: %w", path, err)
 	}
 
-	req, err := http.NewRequest(http.MethodPost, serverURL+"/config", bytes.NewReader(data))
+	return data, path, nil
+}
+
+// postYAML manda data (Content-Type: application/x-yaml) pro endpoint
+// informado do servidor e devolve o corpo da resposta em caso de sucesso.
+func postYAML(serverURL, token, path string, data []byte) ([]byte, error) {
+	req, err := http.NewRequest(http.MethodPost, serverURL+path, bytes.NewReader(data))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/x-yaml")
@@ -75,18 +131,17 @@ func run() error {
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("falha ao enviar para %s: %w", serverURL, err)
+		return nil, fmt.Errorf("falha ao enviar para %s%s: %w", serverURL, path, err)
 	}
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("servidor respondeu %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+		return nil, fmt.Errorf("servidor respondeu %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
-	fmt.Printf("config enviada com sucesso para %s\n", serverURL)
-	return nil
+	return body, nil
 }
 
 // runValidate repassa pro servidor um JSON com campos tipo

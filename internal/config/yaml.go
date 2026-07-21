@@ -200,6 +200,21 @@ func SaveFile(path string, data []byte) (string, error) {
 	return backupPath, nil
 }
 
+// TestWritable confere se dá pra gravar em path sem alterar seu conteúdo:
+// cria e remove um arquivo temporário no mesmo diretório (mesma operação
+// que SaveFile precisa pra criar+renomear), nunca tocando no arquivo real.
+// Usado pelo endpoint POST /config/test (godesk-client test-config) pra
+// testar send+save do config sem sobrescrever o arquivo de produção.
+func TestWritable(path string) error {
+	tmp := path + ".writetest." + time.Now().Format("20060102-150405.000000000")
+
+	if err := os.WriteFile(tmp, []byte("godesk write test"), 0644); err != nil {
+		return err
+	}
+
+	return os.Remove(tmp)
+}
+
 // ResolvePolicy agora recebe RULE NAME (key em clients:)
 func ResolvePolicy(pf PoliciesFile, ruleName string) Policy {
 	ruleName = strings.TrimSpace(ruleName)
