@@ -159,15 +159,23 @@ func Run(cfg config.RuntimeConfig) (err error) {
 			to := mailer.ParseRecipients(pol.TopDesk.EmailTo)
 			cc := mailer.ParseRecipients(pol.TopDesk.EmailCc)
 
+			log.Printf("[email] chamado=%q (rule=%q) precisa de envio de e-mail: to=%v cc=%v once_per_day=%v\n",
+				created, p.RuleName, to, cc, pol.TopDesk.OncePerDay)
+
 			switch {
 			case len(to) == 0:
-				log.Printf("[email] WARN: send_email ativo sem destinatario TO (rule=%q)\n", p.RuleName)
+				log.Printf("[email] WARN: send_email ativo sem destinatario TO (chamado=%q rule=%q)\n", created, p.RuleName)
 			case pol.TopDesk.OncePerDay && oncePerDaySeenToday(p.Trigger, p.HostID):
 				recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.EmailSkippedOncePerDay++ })
-				log.Printf("[email] SKIP (um por dia): trigger=%q host_id=%q já enviado hoje (rule=%q)\n", p.Trigger, p.HostID, p.RuleName)
+				log.Printf("[email] SKIP (um por dia): chamado=%q trigger=%q host_id=%q já enviado hoje (rule=%q)\n",
+					created, p.Trigger, p.HostID, p.RuleName)
 			default:
 				subject := fmt.Sprintf("%s - %s", ticketName, created)
 				body := topdesk.OpeningEmailHTML(created, p, contract)
+
+				log.Printf("[email] tentativa de envio: chamado=%q to=%v cc=%v subject=%q via %s:%s (from=%s)\n",
+					created, to, cc, subject, cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPFrom)
+
 				err := mailer.SendHTML(
 					mailer.Config{
 						Host: cfg.SMTPHost,
@@ -183,9 +191,14 @@ func Run(cfg config.RuntimeConfig) (err error) {
 				)
 				if err != nil {
 					recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.EmailSendErrors++ })
-					log.Printf("[email] WARN: falha ao enviar email ticket=%s: %v\n", created, err)
-				} else if pol.TopDesk.OncePerDay {
-					oncePerDayRecord(p.Cliente, p.Trigger, p.Host, p.HostID)
+					log.Printf("[email] FALHA no envio: chamado=%q to=%v cc=%v subject=%q erro=%v\n",
+						created, to, cc, subject, err)
+				} else {
+					log.Printf("[email] OK: e-mail enviado com sucesso chamado=%q to=%v cc=%v subject=%q\n",
+						created, to, cc, subject)
+					if pol.TopDesk.OncePerDay {
+						oncePerDayRecord(p.Cliente, p.Trigger, p.Host, p.HostID)
+					}
 				}
 			}
 		}
