@@ -134,6 +134,13 @@ else {
 		echo '<div class="gd-kv"><span class="gd-k">Priority</span><span class="gd-v">'.h($c['priority'] ?? '').'</span></div>';
 		echo '</div>';
 
+		if (!empty($c['custom_status'])) {
+			echo '<div class="gd-row" style="margin-top:10px;">';
+			echo '<div class="gd-kv"><span class="gd-k">Status abertura (ID)</span><span class="gd-v">'.h($c['status_open'] ?? '').'</span></div>';
+			echo '<div class="gd-kv"><span class="gd-k">Status atualização (ID)</span><span class="gd-v">'.h($c['status_update'] ?? '').'</span></div>';
+			echo '</div>';
+		}
+
 		echo '<div class="gd-small-title" style="margin-top:10px;">🎫 TopDesk</div>';
 		echo '<div class="gd-tags">';
 		foreach (['contract','operator','oper_group','main_caller','secundary_caller','sla','category','sub_category','call_type'] as $k) {

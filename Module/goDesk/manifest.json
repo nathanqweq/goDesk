@@ -2,7 +2,7 @@
   "manifest_version": 2.0,
   "id": "godesk",
   "name": "goDesk",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "namespace": "GoDesk",
   "description": "goDesk module (config viewer/editor).",
   "assets": {

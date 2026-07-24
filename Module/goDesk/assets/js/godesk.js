@@ -109,6 +109,27 @@
     document.querySelectorAll(".gd-sendmore-toggle").forEach(toggleSendMore);
   }
 
+  function toggleCustomStatus(chk) {
+    const container = closestContainer(chk);
+    if (!container) return;
+
+    const box = container.querySelector(".gd-customstatus-box");
+    if (!box) return;
+
+    const inputs = box.querySelectorAll("input");
+    if (chk.checked) {
+      box.style.display = "";
+      inputs.forEach((inp) => { inp.disabled = false; inp.style.opacity = "1"; });
+    } else {
+      box.style.display = "none";
+      inputs.forEach((inp) => { inp.disabled = true; inp.style.opacity = "0.55"; });
+    }
+  }
+
+  function initCustomStatusToggles() {
+    document.querySelectorAll(".gd-customstatus-toggle").forEach(toggleCustomStatus);
+  }
+
   function toggleSendEmail(chk) {
     const container = closestContainer(chk);
     if (!container) return;
@@ -432,6 +453,27 @@
           </div>
         </div>
 
+        <div class="gd-row">
+          <div class="gd-field gd-field-tight">
+            <label>Custom status</label>
+            <div class="gd-check">
+              <input type="checkbox" class="gd-customstatus-toggle" name="clients[${i}][custom_status]" value="1">
+              <span class="gd-muted">sobrescrever o processingStatus padrão de abertura/atualização</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="gd-row gd-customstatus-box" style="display:none">
+          <div class="gd-field">
+            <label>Status abertura (ID no TopDesk)</label>
+            <input type="text" name="clients[${i}][status_open]" value="" disabled>
+          </div>
+          <div class="gd-field">
+            <label>Status atualização (ID no TopDesk)</label>
+            <input type="text" name="clients[${i}][status_update]" value="" disabled>
+          </div>
+        </div>
+
         <div class="gd-divider"></div>
         <div class="gd-small-title">🎫 TopDesk</div>
 
@@ -516,6 +558,7 @@
     initSlaLocks();
     initSendMoreToggles();
     initSendEmailToggles();
+    initCustomStatusToggles();
     syncClientSelects();
     clearFilter("gd-filter-rules");
   }
@@ -573,12 +616,16 @@
 
     const sendEmail = e.target.closest(".gd-sendemail-toggle");
     if (sendEmail) toggleSendEmail(sendEmail);
+
+    const customStatus = e.target.closest(".gd-customstatus-toggle");
+    if (customStatus) toggleCustomStatus(customStatus);
   });
 
   document.addEventListener("DOMContentLoaded", () => {
     initSlaLocks();
     initSendMoreToggles();
     initSendEmailToggles();
+    initCustomStatusToggles();
     syncClientSelects();
     initFilters();
   });

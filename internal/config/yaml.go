@@ -36,6 +36,17 @@ type Policy struct {
 	Impact    string `yaml:"impact"`
 	AutoClose bool   `yaml:"autoclose"`
 
+	// CustomStatus/StatusOpen/StatusUpdate: igual AutoClose, sempre
+	// pertencem à regra (nunca ao cliente referenciado) — ver
+	// flattenRules/mergePolicy. Quando CustomStatus é false, o
+	// processingStatus de abertura/atualização segue o comportamento fixo
+	// de sempre (ver internal/app/app.go); quando true, StatusOpen e
+	// StatusUpdate (IDs de processingStatus no TopDesk) substituem esse
+	// valor fixo, se preenchidos.
+	CustomStatus bool   `yaml:"custom_status"`
+	StatusOpen   string `yaml:"status_open"`
+	StatusUpdate string `yaml:"status_update"`
+
 	TopDesk TopDeskDefaults `yaml:"topdesk"`
 }
 
@@ -56,12 +67,15 @@ type ClientPolicy struct {
 // por regra — urgency/impact/priority/autoclose e overrides de texto do
 // TopDesk (o mais comum sendo more_info_text).
 type RulePolicy struct {
-	Client    string          `yaml:"client"`
-	Priority  string          `yaml:"priority"`
-	Urgency   string          `yaml:"urgency"`
-	Impact    string          `yaml:"impact"`
-	AutoClose bool            `yaml:"autoclose"`
-	TopDesk   TopDeskDefaults `yaml:"topdesk"`
+	Client       string          `yaml:"client"`
+	Priority     string          `yaml:"priority"`
+	Urgency      string          `yaml:"urgency"`
+	Impact       string          `yaml:"impact"`
+	AutoClose    bool            `yaml:"autoclose"`
+	CustomStatus bool            `yaml:"custom_status"`
+	StatusOpen   string          `yaml:"status_open"`
+	StatusUpdate string          `yaml:"status_update"`
+	TopDesk      TopDeskDefaults `yaml:"topdesk"`
 }
 
 // policiesFileV2 é o formato novo do YAML — só usado internamente durante
@@ -165,6 +179,14 @@ func flattenRules(v2 policiesFileV2) PoliciesFile {
 		}
 		p.AutoClose = rule.AutoClose
 
+		p.CustomStatus = rule.CustomStatus
+		if strings.TrimSpace(rule.StatusOpen) != "" {
+			p.StatusOpen = rule.StatusOpen
+		}
+		if strings.TrimSpace(rule.StatusUpdate) != "" {
+			p.StatusUpdate = rule.StatusUpdate
+		}
+
 		out[ruleName] = p
 	}
 
@@ -254,6 +276,14 @@ func mergePolicy(def Policy, over Policy) Policy {
 
 	// autoclose do cliente manda (se existir bloco do cliente)
 	def.AutoClose = over.AutoClose
+
+	def.CustomStatus = over.CustomStatus
+	if strings.TrimSpace(over.StatusOpen) != "" {
+		def.StatusOpen = over.StatusOpen
+	}
+	if strings.TrimSpace(over.StatusUpdate) != "" {
+		def.StatusUpdate = over.StatusUpdate
+	}
 
 	def.TopDesk = mergeTopDesk(def.TopDesk, over.TopDesk)
 

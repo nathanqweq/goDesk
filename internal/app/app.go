@@ -196,7 +196,7 @@ func Run(cfg config.RuntimeConfig) (err error) {
 
 	case exists && eventKind == "ProblemStart":
 		action := "Recebemos novamente o alerta " + p.Trigger + " em nosso Zabbix."
-		if err := td.PatchTicket(ticketID, buildUpdatePayload(action, status)); err != nil {
+		if err := td.PatchTicket(ticketID, buildUpdatePayload(action, status, pol)); err != nil {
 			recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.TicketsUpdateErrors++ })
 			log.Printf("[topdesk] WARN: falha ao atualizar chamado %s: %v\n", ticketID, err)
 		} else {
@@ -236,7 +236,7 @@ func Run(cfg config.RuntimeConfig) (err error) {
 			}
 		} else {
 			action := "Recebemos a normalização do alerta " + p.Trigger + " em nosso Zabbix."
-			if err := td.PatchTicket(ticketID, buildUpdatePayload(action, status)); err != nil {
+			if err := td.PatchTicket(ticketID, buildUpdatePayload(action, status, pol)); err != nil {
 				recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.TicketsUpdateErrors++ })
 				log.Printf("[topdesk] WARN: falha ao atualizar chamado %s: %v\n", ticketID, err)
 			} else {
@@ -289,6 +289,14 @@ func buildCreatePayload(
 		"processingStatus": map[string]any{"name": processingStatusName},
 	}
 
+	// custom_status (por rule): substitui o processingStatus padrão de
+	// abertura por um ID configurado, quando preenchido.
+	if pol.CustomStatus {
+		if v := strings.TrimSpace(pol.StatusOpen); v != "" && !strings.EqualFold(v, "null") {
+			payload["processingStatus"] = map[string]any{"id": v}
+		}
+	}
+
 	// Secondary caller só é enviado quando existir valor válido.
 	if v := strings.TrimSpace(secCaller); v != "" && !strings.EqualFold(v, "null") {
 		payload["optionalFields2"] = map[string]any{"memo2": v}
@@ -325,10 +333,21 @@ func buildCreatePayload(
 	return payload
 }
 
-func buildUpdatePayload(action, currentStatus string) map[string]any {
+// buildUpdatePayload monta o PATCH de update de um chamado já existente.
+// Quando currentStatus não é "Registrado", força o chamado pra um
+// processingStatus fixo (ClosedStatusID) — comportamento inalterado desde
+// sempre. custom_status (por rule) permite substituir esse ID fixo por
+// pol.StatusUpdate, se a rule tiver ligado a flag e preenchido o campo.
+func buildUpdatePayload(action, currentStatus string, pol config.Policy) map[string]any {
 	payload := map[string]any{"action": action}
 	if !strings.EqualFold(currentStatus, "Registrado") {
-		payload["processingStatus"] = map[string]any{"id": ClosedStatusID}
+		statusID := ClosedStatusID
+		if pol.CustomStatus {
+			if v := strings.TrimSpace(pol.StatusUpdate); v != "" && !strings.EqualFold(v, "null") {
+				statusID = v
+			}
+		}
+		payload["processingStatus"] = map[string]any{"id": statusID}
 	}
 	return payload
 }

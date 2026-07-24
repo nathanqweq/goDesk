@@ -259,6 +259,8 @@ foreach ($rules as $c) {
 	$client_name = $c['client'] ?? '';
 	$td = $c['topdesk'] ?? [];
 	$autoclose = !empty($c['autoclose']) ? 'checked' : '';
+	$custom_status = !empty($c['custom_status']) ? 'checked' : '';
+	$custom_status_hidden = !empty($c['custom_status']) ? '' : ' style="display:none"';
 
 	echo '<div class="gd-client-card gd-client" data-idx="'.$idx.'">';
 
@@ -300,6 +302,20 @@ foreach ($rules as $c) {
 			<input type="checkbox" class="gd-autoclose" name="clients['.$idx.'][autoclose]" value="1" '.$autoclose.'>
 		</div>
 	</div>';
+	echo '</div>';
+
+	echo '<div class="gd-row">';
+	echo '<div class="gd-field gd-field-tight">
+		<label>Custom status</label>
+		<div class="gd-check">
+			<input type="checkbox" class="gd-customstatus-toggle" name="clients['.$idx.'][custom_status]" value="1" '.$custom_status.'>
+			<span class="gd-muted">sobrescrever o processingStatus padrão de abertura/atualização</span>
+		</div>
+	</div>';
+	echo '</div>';
+	echo '<div class="gd-row gd-customstatus-box"'.$custom_status_hidden.'>';
+	echo '<div class="gd-field"><label>Status abertura (ID no TopDesk)</label><input type="text" name="clients['.$idx.'][status_open]" value="'.h($c['status_open'] ?? '').'"></div>';
+	echo '<div class="gd-field"><label>Status atualização (ID no TopDesk)</label><input type="text" name="clients['.$idx.'][status_update]" value="'.h($c['status_update'] ?? '').'"></div>';
 	echo '</div>';
 
 	echo '<div class="gd-divider"></div>';

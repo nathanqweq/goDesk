@@ -86,6 +86,9 @@ class ConfigView extends CController {
 			}
 			$rules[$rule]['client'] ??= '';
 			$rules[$rule]['priority'] ??= '';
+			$rules[$rule]['custom_status'] ??= false;
+			$rules[$rule]['status_open'] ??= '';
+			$rules[$rule]['status_update'] ??= '';
 			$rules[$rule]['topdesk'] ??= [];
 			$this->fillTopdeskDefaults($rules[$rule]['topdesk']);
 		}
