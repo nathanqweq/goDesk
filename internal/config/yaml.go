@@ -25,6 +25,14 @@ type TopDeskDefaults struct {
 	EmailTo         string `yaml:"email_to"`
 	EmailCc         string `yaml:"email_cc"`
 	OncePerDay      bool   `yaml:"once_per_day"`
+
+	// SendTeams: depois de criar o chamado (e na normalização de um chamado
+	// existente), posta um card no Workflow do MS Teams em TeamsWebhook.
+	// TeamsZabbixURL é a URL do frontend do Zabbix usada no botão "Event
+	// info" do card (vazio = cai pro GODESK_ZABBIX_URL do serviço).
+	SendTeams      bool   `yaml:"send_teams"`
+	TeamsWebhook   string `yaml:"teams_webhook"`
+	TeamsZabbixURL string `yaml:"teams_zabbix_url"`
 }
 
 type Policy struct {
@@ -142,7 +150,7 @@ func ParsePolicies(data []byte) (PoliciesFile, error) {
 // flattenRules resolve o formato "clientes + rules" para o
 // map[string]Policy achatado que ResolvePolicy já sabe consumir — cada
 // regra herda o topdesk do cliente referenciado (incluindo os 4 campos
-// booleanos send_more_info/adicional_cresol/send_email/once_per_day) e só
+// booleanos send_more_info/adicional_cresol/send_email/once_per_day/send_teams) e só
 // pode sobrescrever o que de fato varia por regra: urgency/impact/priority/
 // autoclose e os campos de texto do topdesk. Quando a regra referencia um
 // cliente válido, os 4 booleanos do topdesk vêm sempre do cliente — bool
@@ -293,7 +301,7 @@ func mergePolicy(def Policy, over Policy) Policy {
 // mergeTopDesk aplica over sobre base como uma política completa: campos
 // de texto só sobrescrevem se vierem preenchidos; os 4 booleanos
 // (send_more_info, adicional_cresol, send_email, once_per_day) sempre vêm
-// de over. Use isso quando over representa uma política inteira (cliente
+// de over (mais send_teams). Use isso quando over representa uma política inteira (cliente
 // do YAML antigo, ou cliente nomeado do YAML novo) — para overrides
 // parciais de regra, veja mergeTopDeskTextOverrides.
 func mergeTopDesk(base, over TopDeskDefaults) TopDeskDefaults {
@@ -302,6 +310,7 @@ func mergeTopDesk(base, over TopDeskDefaults) TopDeskDefaults {
 	base.AdicionalCresol = over.AdicionalCresol
 	base.SendEmail = over.SendEmail
 	base.OncePerDay = over.OncePerDay
+	base.SendTeams = over.SendTeams
 	return base
 }
 
@@ -345,6 +354,12 @@ func mergeTopDeskTextOverrides(base, over TopDeskDefaults) TopDeskDefaults {
 	}
 	if over.EmailCc != "" {
 		base.EmailCc = over.EmailCc
+	}
+	if strings.TrimSpace(over.TeamsWebhook) != "" {
+		base.TeamsWebhook = over.TeamsWebhook
+	}
+	if strings.TrimSpace(over.TeamsZabbixURL) != "" {
+		base.TeamsZabbixURL = over.TeamsZabbixURL
 	}
 	return base
 }

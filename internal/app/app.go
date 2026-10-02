@@ -202,6 +202,7 @@ func Run(cfg config.RuntimeConfig) (err error) {
 				}
 			}
 		}
+		notifyTeams(cfg, httpClient, pol, p, created, false)
 		if err := zx.Acknowledge(p.EventID, "Chamado criado: "+created); err != nil {
 			recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.ZabbixAckErrors++ })
 			log.Printf("[zabbix] ACK ERROR: %v\n", err)
@@ -232,17 +233,19 @@ func Run(cfg config.RuntimeConfig) (err error) {
 
 		if pol.AutoClose {
 			closeMsg := topdesk.CloseHTML(ticketID, p)
-			if err := td.PatchTicket(ticketID, map[string]any{
+			closeErr := td.PatchTicket(ticketID, map[string]any{
 				"action": closeMsg,
 				"processingStatus": map[string]any{
 					"name": "Fechado",
 				},
-			}); err != nil {
+			})
+			if closeErr != nil {
 				recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.TicketsCloseErrors++ })
-				log.Printf("[topdesk] WARN: falha ao encerrar chamado %s: %v\n", ticketID, err)
+				log.Printf("[topdesk] WARN: falha ao encerrar chamado %s: %v\n", ticketID, closeErr)
 			} else {
 				recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.TicketsClosed++ })
 			}
+			notifyTeams(cfg, httpClient, pol, p, ticketID, closeErr == nil)
 			if err := zx.Acknowledge(p.EventID, "Chamado encerrado: "+ticketID); err != nil {
 				recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.ZabbixAckErrors++ })
 				log.Printf("[zabbix] ACK ERROR: %v\n", err)
@@ -255,6 +258,7 @@ func Run(cfg config.RuntimeConfig) (err error) {
 			} else {
 				recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.TicketsUpdated++ })
 			}
+			notifyTeams(cfg, httpClient, pol, p, ticketID, false)
 			if err := zx.Acknowledge(p.EventID, "Normalização recebida (sem autoclose): "+ticketID); err != nil {
 				recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.ZabbixAckErrors++ })
 				log.Printf("[zabbix] ACK ERROR: %v\n", err)

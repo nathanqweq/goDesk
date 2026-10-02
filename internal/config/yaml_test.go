@@ -242,3 +242,42 @@ rules:
 		t.Fatal("regra sem cliente deveria controlar seu próprio once_per_day (true)")
 	}
 }
+
+func TestParsePoliciesTeamsInheritsFromClientWithRuleWebhookOverride(t *testing.T) {
+	yamlText := `
+default: {}
+
+clients:
+  HELPDESK:
+    topdesk:
+      send_teams: true
+      teams_webhook: "https://webhook.cliente"
+      teams_zabbix_url: "https://zabbix.cliente"
+
+rules:
+  REGRA-HERDA:
+    client: HELPDESK
+  REGRA-OUTRO-CANAL:
+    client: HELPDESK
+    topdesk:
+      send_teams: false
+      teams_webhook: "https://webhook.outro-canal"
+`
+	pf, err := ParsePolicies([]byte(yamlText))
+	if err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+
+	pol := ResolvePolicy(pf, "REGRA-HERDA")
+	if !pol.TopDesk.SendTeams || pol.TopDesk.TeamsWebhook != "https://webhook.cliente" || pol.TopDesk.TeamsZabbixURL != "https://zabbix.cliente" {
+		t.Fatalf("esperava teams herdado do cliente, veio %+v", pol.TopDesk)
+	}
+
+	pol = ResolvePolicy(pf, "REGRA-OUTRO-CANAL")
+	if !pol.TopDesk.SendTeams {
+		t.Fatal("send_teams deveria vir do cliente mesmo com a rule em false (igual send_email)")
+	}
+	if pol.TopDesk.TeamsWebhook != "https://webhook.outro-canal" {
+		t.Fatalf("rule deveria sobrescrever o webhook, veio %q", pol.TopDesk.TeamsWebhook)
+	}
+}

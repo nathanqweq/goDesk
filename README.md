@@ -65,6 +65,15 @@ Em **Alerts → Media types**, configure um Media Type do tipo Script apontando 
 
 Com `GODESK_TOPDESK_DOMAIN/USER/PASS` e `GODESK_HEALTHCHECK_INTERVAL` configurados em `godesk-service.env`, o `godesk serve` testa `GET /tas/api/incidents?pageSize=1` nesse intervalo, em background (não interfere no processamento de alertas), registrando sucesso/erro e latência nos logs e em `godesk --monitoring`.
 
+### 7. (Opcional) Notificação no MS Teams
+
+Marque **Enviar Teams** no default, no cliente ou na rule (pela UI do módulo) e preencha:
+
+- **Webhook do Teams (Workflow)**: URL de um Workflow do Teams criado a partir do template *"Post a message in a channel when a webhook request is received"*.
+- **URL do Zabbix (frontend)**: usada no botão *Event info* do card. Se ficar vazia, usa `GODESK_ZABBIX_URL`.
+
+Com isso, o goDesk posta um card no canal (mesmo formato do media type *MS Teams Workflow* do Zabbix, já com o número do chamado do TopDesk) quando cria o chamado e quando recebe a normalização de um chamado existente. Uma falha no envio só gera log (`[teams]`) e a métrica `teams_send_errors_total`. O chamado não é afetado.
+
 ## Instalação manual (sem apt)
 
 Use [install.sh](install.sh) — compila/copia os arquivos na mão, com as mesmas opções (módulo, binário, configs, serviço systemd). Útil se o host não tem acesso ao repositório APT.

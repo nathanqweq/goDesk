@@ -158,6 +158,27 @@
     document.querySelectorAll(".gd-sendemail-toggle").forEach(toggleSendEmail);
   }
 
+  function toggleSendTeams(chk) {
+    const container = closestContainer(chk);
+    if (!container) return;
+
+    const box = container.querySelector(".gd-sendteams-box");
+    if (!box) return;
+
+    const inputs = box.querySelectorAll("input");
+    if (chk.checked) {
+      box.style.display = "";
+      inputs.forEach((inp) => { inp.disabled = false; inp.style.opacity = "1"; });
+    } else {
+      box.style.display = "none";
+      inputs.forEach((inp) => { inp.disabled = true; inp.style.opacity = "0.55"; });
+    }
+  }
+
+  function initSendTeamsToggles() {
+    document.querySelectorAll(".gd-sendteams-toggle").forEach(toggleSendTeams);
+  }
+
   function removeClient(btn) {
     const card = btn.closest(".gd-client");
     if (card) card.remove();
@@ -394,6 +415,27 @@
             </div>
           </div>
         </div>
+
+        <div class="gd-row">
+          <div class="gd-field gd-field-tight">
+            <label>Enviar Teams</label>
+            <div class="gd-check">
+              <input type="checkbox" class="gd-sendteams-toggle" name="named_clients[${i}][topdesk][send_teams]" value="1">
+              <span class="gd-muted">postar no MS Teams apos criar o chamado</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="gd-row gd-sendteams-box" style="display:none">
+          <div class="gd-field">
+            <label>Webhook do Teams (Workflow)</label>
+            <input type="text" class="gd-teams-webhook" name="named_clients[${i}][topdesk][teams_webhook]" value="" placeholder="https://...logic.azure.com/workflows/..." disabled>
+          </div>
+          <div class="gd-field">
+            <label>URL do Zabbix (frontend)</label>
+            <input type="text" class="gd-teams-zabbix-url" name="named_clients[${i}][topdesk][teams_zabbix_url]" value="" placeholder="https://zabbix.empresa.com (vazio = GODESK_ZABBIX_URL)" disabled>
+          </div>
+        </div>
       </div>
     `;
 
@@ -402,6 +444,7 @@
     initSlaLocks();
     initSendMoreToggles();
     initSendEmailToggles();
+    initSendTeamsToggles();
     syncClientSelects();
     clearFilter("gd-filter-named-clients");
   }
@@ -549,6 +592,27 @@
             </div>
           </div>
         </div>
+
+        <div class="gd-row">
+          <div class="gd-field gd-field-tight">
+            <label>Enviar Teams</label>
+            <div class="gd-check">
+              <input type="checkbox" class="gd-sendteams-toggle" name="clients[${i}][topdesk][send_teams]" value="1">
+              <span class="gd-muted">postar no MS Teams apos criar o chamado (só se não tiver cliente escolhido)</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="gd-row gd-sendteams-box" style="display:none">
+          <div class="gd-field">
+            <label>Webhook do Teams (Workflow)</label>
+            <input type="text" class="gd-teams-webhook" name="clients[${i}][topdesk][teams_webhook]" value="" placeholder="https://...logic.azure.com/workflows/..." disabled>
+          </div>
+          <div class="gd-field">
+            <label>URL do Zabbix (frontend)</label>
+            <input type="text" class="gd-teams-zabbix-url" name="clients[${i}][topdesk][teams_zabbix_url]" value="" placeholder="https://zabbix.empresa.com (vazio = GODESK_ZABBIX_URL)" disabled>
+          </div>
+        </div>
       </div>
     `;
 
@@ -558,6 +622,7 @@
     initSlaLocks();
     initSendMoreToggles();
     initSendEmailToggles();
+    initSendTeamsToggles();
     initCustomStatusToggles();
     syncClientSelects();
     clearFilter("gd-filter-rules");
@@ -617,6 +682,9 @@
     const sendEmail = e.target.closest(".gd-sendemail-toggle");
     if (sendEmail) toggleSendEmail(sendEmail);
 
+    const sendTeams = e.target.closest(".gd-sendteams-toggle");
+    if (sendTeams) toggleSendTeams(sendTeams);
+
     const customStatus = e.target.closest(".gd-customstatus-toggle");
     if (customStatus) toggleCustomStatus(customStatus);
   });
@@ -625,6 +693,7 @@
     initSlaLocks();
     initSendMoreToggles();
     initSendEmailToggles();
+    initSendTeamsToggles();
     initCustomStatusToggles();
     syncClientSelects();
     initFilters();

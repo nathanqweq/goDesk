@@ -20,6 +20,9 @@ default:
     send_email: false
     email_to: ""
     email_cc: ""
+    send_teams: false
+    teams_webhook: "" # URL do Workflow do Teams ("Post a message in a channel when a webhook request is received")
+    teams_zabbix_url: "" # frontend do Zabbix pro botao "Event info" (vazio = GODESK_ZABBIX_URL)
     call_type: "Resolucao de incidente"
 
 # Clientes nomeados: cadastre um cliente uma vez e todas as rules que o
@@ -42,6 +45,9 @@ clients:
       send_email: false
       email_to: ""
       email_cc: ""
+      send_teams: false
+      teams_webhook: ""
+      teams_zabbix_url: ""
       call_type: "Resolucao de incidente"
 
 # Rules: a chave precisa bater com RAWDATA.rule_name (EVENT.TAGS.RuleName
@@ -49,7 +55,7 @@ clients:
 # só é preciso preencher aqui o que de fato varia por regra (urgency,
 # impact, priority, autoclose, e overrides pontuais de topdesk como
 # more_info_text). Campos de topdesk vazios herdam do cliente; os 3
-# booleanos (send_more_info/adicional_cresol/send_email) sempre vem do
+# booleanos (send_more_info/adicional_cresol/send_email/send_teams) sempre vem do
 # cliente quando "client" está preenchido.
 rules:
   CRESOL-AP-SW:

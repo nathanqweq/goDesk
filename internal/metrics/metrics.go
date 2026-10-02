@@ -32,6 +32,7 @@ type Snapshot struct {
 	EmailSendErrors        int64 `json:"email_send_errors_total"`
 	EmailSkippedOncePerDay int64 `json:"email_skipped_once_per_day_total"`
 	SendMoreInfoErrors     int64 `json:"send_more_info_errors_total"`
+	TeamsSendErrors        int64 `json:"teams_send_errors_total"`
 
 	TopdeskHealthChecksTotal        int64     `json:"topdesk_healthchecks_total"`
 	TopdeskHealthCheckErrors        int64     `json:"topdesk_healthcheck_errors_total"`

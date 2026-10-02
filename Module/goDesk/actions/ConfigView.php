@@ -34,6 +34,9 @@ class ConfigView extends CController {
 		$td['email_to'] ??= '';
 		$td['email_cc'] ??= '';
 		$td['once_per_day'] ??= false;
+		$td['send_teams'] ??= false;
+		$td['teams_webhook'] ??= '';
+		$td['teams_zabbix_url'] ??= '';
 	}
 
 	private function loadConfig(): array {
