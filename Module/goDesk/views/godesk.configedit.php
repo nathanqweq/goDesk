@@ -250,22 +250,6 @@ foreach ($named_clients as $nc) {
 	</div>';
 	echo '</div>';
 
-	$nc_send_teams = !empty($td['send_teams']) ? 'checked' : '';
-	$nc_send_teams_hidden = !empty($td['send_teams']) ? '' : ' style="display:none"';
-	echo '<div class="gd-row">';
-	echo '<div class="gd-field gd-field-tight">
-		<label>Enviar Teams</label>
-		<div class="gd-check">
-			<input type="checkbox" class="gd-sendteams-toggle" name="named_clients['.$nidx.'][topdesk][send_teams]" value="1" '.$nc_send_teams.'>
-			<span class="gd-muted">postar no MS Teams apos criar o chamado</span>
-		</div>
-	</div>';
-	echo '</div>';
-	echo '<div class="gd-row gd-sendteams-box"'.$nc_send_teams_hidden.'>';
-	echo '<div class="gd-field"><label>Webhook do Teams (Workflow)</label><input type="text" class="gd-teams-webhook" name="named_clients['.$nidx.'][topdesk][teams_webhook]" value="'.h($td['teams_webhook'] ?? '').'" placeholder="https://...logic.azure.com/workflows/..."></div>';
-	echo '<div class="gd-field"><label>URL do Zabbix (frontend)</label><input type="text" class="gd-teams-zabbix-url" name="named_clients['.$nidx.'][topdesk][teams_zabbix_url]" value="'.h($td['teams_zabbix_url'] ?? '').'" placeholder="https://zabbix.empresa.com (vazio = GODESK_ZABBIX_URL)"></div>';
-	echo '</div>';
-
 	echo '</div>';
 
 	$nidx++;
@@ -427,7 +411,7 @@ foreach ($rules as $c) {
 		<label>Enviar Teams</label>
 		<div class="gd-check">
 			<input type="checkbox" class="gd-sendteams-toggle" name="clients['.$idx.'][topdesk][send_teams]" value="1" '.$send_teams.'>
-			<span class="gd-muted">postar no MS Teams apos criar o chamado (só se não tiver cliente escolhido)</span>
+			<span class="gd-muted">postar no MS Teams apos criar o chamado (vale com ou sem cliente escolhido)</span>
 		</div>
 	</div>';
 	echo '</div>';

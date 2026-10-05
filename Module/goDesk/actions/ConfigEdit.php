@@ -22,7 +22,8 @@
  *                                  # na abertura do chamado quando custom_status=true
  *     status_update: ""           # id do processingStatus no TopDesk, usado
  *                                  # ao atualizar o chamado quando custom_status=true
- *     topdesk: { ... só overrides de texto (ex: more_info_text) ... }
+ *     topdesk: { ... só overrides de texto (ex: more_info_text) ...,
+ *                send_teams, teams_webhook, teams_zabbix_url }  # Teams é sempre da rule
  *
  * Formato antigo (clients: {RULE_NAME: {...topdesk completo...}}, sem
  * "rules") continua sendo lido normalmente — ver loadConfig(). A partir do
@@ -122,6 +123,7 @@ class ConfigEdit extends CController {
 				$rules[$rule] = [];
 			}
 			$rules[$rule]['client'] ??= '';
+			$this->migrateClientTeams($rules[$rule], $named_clients);
 			$rules[$rule]['priority'] ??= '';
 			$rules[$rule]['custom_status'] ??= false;
 			$rules[$rule]['status_open'] ??= '';
@@ -131,6 +133,31 @@ class ConfigEdit extends CController {
 		}
 
 		return ['default' => $parsed['default'], 'rules' => $rules, 'named_clients' => $named_clients];
+	}
+
+	/**
+	 * Até a v1.7.0 o Teams também podia ser ligado no cliente. Agora ele é
+	 * sempre da rule: ao abrir a tela, uma rule cujo cliente tinha Teams
+	 * ligado já aparece com Teams ligado (e o webhook do cliente, se a rule
+	 * não tiver um), pra que o primeiro save pela UI não desligue nada.
+	 */
+	private function migrateClientTeams(array &$rule, array $named_clients): void {
+		$client_td = $named_clients[$rule['client']]['topdesk'] ?? [];
+		if (empty($client_td['send_teams'])) {
+			return;
+		}
+
+		$rule['topdesk'] ??= [];
+		if (!empty($rule['topdesk']['send_teams'])) {
+			return;
+		}
+
+		$rule['topdesk']['send_teams'] = true;
+		foreach (['teams_webhook', 'teams_zabbix_url'] as $k) {
+			if (trim((string)($rule['topdesk'][$k] ?? '')) === '' && trim((string)($client_td[$k] ?? '')) !== '') {
+				$rule['topdesk'][$k] = $client_td[$k];
+			}
+		}
 	}
 
 	private function toBool($v): bool {
@@ -193,9 +220,11 @@ class ConfigEdit extends CController {
 				continue;
 			}
 
-			$td = (array)($row['topdesk'] ?? []);
+			$td = $this->normalizeTopdeskFromPost((array)($row['topdesk'] ?? []));
+			// Teams é sempre da rule (com ou sem cliente) — não grava no cliente
+			unset($td['send_teams'], $td['teams_webhook'], $td['teams_zabbix_url']);
 			$config['clients'][$name] = [
-				'topdesk' => $this->normalizeTopdeskFromPost($td)
+				'topdesk' => $td
 			];
 		}
 

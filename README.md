@@ -67,7 +67,7 @@ Com `GODESK_TOPDESK_DOMAIN/USER/PASS` e `GODESK_HEALTHCHECK_INTERVAL` configurad
 
 ### 7. (Opcional) Notificação no MS Teams
 
-Marque **Enviar Teams** no default, no cliente ou na rule (pela UI do módulo) e preencha:
+Marque **Enviar Teams** na rule (pela UI do módulo) e preencha os campos abaixo. O Teams é sempre configurado **por rule**, com ou sem cliente escolhido: cada rule liga, desliga e escolhe o próprio canal. O que estiver no **default** vale para alertas cuja rule não está cadastrada, e o webhook/URL do default servem de padrão para rules que deixarem esses campos vazios.
 
 - **Webhook do Teams (Workflow)**: URL de um Workflow do Teams criado a partir do template *"Post a message in a channel when a webhook request is received"*.
 - **URL do Zabbix (frontend)**: usada no botão *Event info* do card. Se ficar vazia, usa `GODESK_ZABBIX_URL`.

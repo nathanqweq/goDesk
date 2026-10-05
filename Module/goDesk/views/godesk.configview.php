@@ -91,11 +91,6 @@ else {
 		echo '<span class="gd-tag">email_to: '.h($td['email_to'] ?? '').'</span>';
 		echo '<span class="gd-tag">email_cc: '.h($td['email_cc'] ?? '').'</span>';
 		echo '<span class="gd-tag">once_per_day: '.(!empty($td['once_per_day']) ? 'true' : 'false').'</span>';
-		echo '<span class="gd-tag">send_teams: '.(!empty($td['send_teams']) ? 'true' : 'false').'</span>';
-		if (!empty($td['send_teams'])) {
-			echo '<span class="gd-tag">teams_webhook: '.(trim($td['teams_webhook'] ?? '') !== '' ? 'configurado' : 'vazio').'</span>';
-			echo '<span class="gd-tag">teams_zabbix_url: '.h($td['teams_zabbix_url'] ?? '').'</span>';
-		}
 		echo '</div>';
 		if (!empty($td['more_info_text'])) {
 			echo '<div class="gd-row" style="margin-top:10px;">';

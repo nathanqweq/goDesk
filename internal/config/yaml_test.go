@@ -243,41 +243,55 @@ rules:
 	}
 }
 
-func TestParsePoliciesTeamsInheritsFromClientWithRuleWebhookOverride(t *testing.T) {
+func TestParsePoliciesTeamsBelongsToRuleEvenWithClient(t *testing.T) {
 	yamlText := `
-default: {}
+default:
+  topdesk:
+    teams_webhook: "https://webhook.default"
 
 clients:
   HELPDESK:
     topdesk:
+      contract: "CONTRATO-HELPDESK"
+      send_email: true
       send_teams: true
-      teams_webhook: "https://webhook.cliente"
-      teams_zabbix_url: "https://zabbix.cliente"
 
 rules:
-  REGRA-HERDA:
+  REGRA-COM-TEAMS:
     client: HELPDESK
+    topdesk:
+      send_teams: true
   REGRA-OUTRO-CANAL:
     client: HELPDESK
     topdesk:
-      send_teams: false
+      send_teams: true
       teams_webhook: "https://webhook.outro-canal"
+  REGRA-SEM-TEAMS:
+    client: HELPDESK
 `
 	pf, err := ParsePolicies([]byte(yamlText))
 	if err != nil {
 		t.Fatalf("erro inesperado: %v", err)
 	}
 
-	pol := ResolvePolicy(pf, "REGRA-HERDA")
-	if !pol.TopDesk.SendTeams || pol.TopDesk.TeamsWebhook != "https://webhook.cliente" || pol.TopDesk.TeamsZabbixURL != "https://zabbix.cliente" {
-		t.Fatalf("esperava teams herdado do cliente, veio %+v", pol.TopDesk)
+	pol := ResolvePolicy(pf, "REGRA-COM-TEAMS")
+	if !pol.TopDesk.SendTeams {
+		t.Fatal("send_teams da regra deveria valer mesmo com cliente escolhido")
+	}
+	if pol.TopDesk.TeamsWebhook != "https://webhook.default" {
+		t.Fatalf("regra sem webhook deveria cair pro default, veio %q", pol.TopDesk.TeamsWebhook)
+	}
+	if pol.TopDesk.Contract != "CONTRATO-HELPDESK" || !pol.TopDesk.SendEmail {
+		t.Fatalf("o resto do topdesk continua vindo do cliente, veio %+v", pol.TopDesk)
 	}
 
 	pol = ResolvePolicy(pf, "REGRA-OUTRO-CANAL")
-	if !pol.TopDesk.SendTeams {
-		t.Fatal("send_teams deveria vir do cliente mesmo com a rule em false (igual send_email)")
-	}
 	if pol.TopDesk.TeamsWebhook != "https://webhook.outro-canal" {
-		t.Fatalf("rule deveria sobrescrever o webhook, veio %q", pol.TopDesk.TeamsWebhook)
+		t.Fatalf("regra deveria usar o próprio webhook, veio %q", pol.TopDesk.TeamsWebhook)
+	}
+
+	pol = ResolvePolicy(pf, "REGRA-SEM-TEAMS")
+	if pol.TopDesk.SendTeams {
+		t.Fatal("send_teams do cliente não deveria valer: a regra é que decide (e está desligado)")
 	}
 }

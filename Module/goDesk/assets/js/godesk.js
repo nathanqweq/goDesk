@@ -415,27 +415,6 @@
             </div>
           </div>
         </div>
-
-        <div class="gd-row">
-          <div class="gd-field gd-field-tight">
-            <label>Enviar Teams</label>
-            <div class="gd-check">
-              <input type="checkbox" class="gd-sendteams-toggle" name="named_clients[${i}][topdesk][send_teams]" value="1">
-              <span class="gd-muted">postar no MS Teams apos criar o chamado</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="gd-row gd-sendteams-box" style="display:none">
-          <div class="gd-field">
-            <label>Webhook do Teams (Workflow)</label>
-            <input type="text" class="gd-teams-webhook" name="named_clients[${i}][topdesk][teams_webhook]" value="" placeholder="https://...logic.azure.com/workflows/..." disabled>
-          </div>
-          <div class="gd-field">
-            <label>URL do Zabbix (frontend)</label>
-            <input type="text" class="gd-teams-zabbix-url" name="named_clients[${i}][topdesk][teams_zabbix_url]" value="" placeholder="https://zabbix.empresa.com (vazio = GODESK_ZABBIX_URL)" disabled>
-          </div>
-        </div>
       </div>
     `;
 
@@ -598,7 +577,7 @@
             <label>Enviar Teams</label>
             <div class="gd-check">
               <input type="checkbox" class="gd-sendteams-toggle" name="clients[${i}][topdesk][send_teams]" value="1">
-              <span class="gd-muted">postar no MS Teams apos criar o chamado (só se não tiver cliente escolhido)</span>
+              <span class="gd-muted">postar no MS Teams apos criar o chamado (vale com ou sem cliente escolhido)</span>
             </div>
           </div>
         </div>

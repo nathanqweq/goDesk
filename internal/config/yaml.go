@@ -30,6 +30,8 @@ type TopDeskDefaults struct {
 	// existente), posta um card no Workflow do MS Teams em TeamsWebhook.
 	// TeamsZabbixURL é a URL do frontend do Zabbix usada no botão "Event
 	// info" do card (vazio = cai pro GODESK_ZABBIX_URL do serviço).
+	// Diferente dos outros booleanos daqui, SendTeams sempre pertence à
+	// regra, mesmo quando ela referencia um cliente — ver flattenRules.
 	SendTeams      bool   `yaml:"send_teams"`
 	TeamsWebhook   string `yaml:"teams_webhook"`
 	TeamsZabbixURL string `yaml:"teams_zabbix_url"`
@@ -150,15 +152,20 @@ func ParsePolicies(data []byte) (PoliciesFile, error) {
 // flattenRules resolve o formato "clientes + rules" para o
 // map[string]Policy achatado que ResolvePolicy já sabe consumir — cada
 // regra herda o topdesk do cliente referenciado (incluindo os 4 campos
-// booleanos send_more_info/adicional_cresol/send_email/once_per_day/send_teams) e só
+// booleanos send_more_info/adicional_cresol/send_email/once_per_day) e só
 // pode sobrescrever o que de fato varia por regra: urgency/impact/priority/
-// autoclose e os campos de texto do topdesk. Quando a regra referencia um
-// cliente válido, os 4 booleanos do topdesk vêm sempre do cliente — bool
+// autoclose/send_teams e os campos de texto do topdesk. Quando a regra
+// referencia um cliente válido, os 4 booleanos do topdesk vêm sempre do
+// cliente — bool
 // não distingue "não informado" de "false", então permitir override por
 // regra apagaria silenciosamente o que o cliente configurou assim que a
 // regra não preenchesse esses campos. Regras sem cliente (referência
 // vazia ou inexistente) continuam funcionando como o formato antigo: o
 // topdesk da própria regra é aplicado por completo, booleanos inclusos.
+//
+// send_teams é a exceção: igual autoclose/custom_status, vem sempre da
+// própria regra, com ou sem cliente — o Teams é ligado/desligado por regra
+// (teams_webhook/teams_zabbix_url vazios na regra caem pro default).
 func flattenRules(v2 policiesFileV2) PoliciesFile {
 	out := make(map[string]Policy, len(v2.Rules))
 
@@ -172,6 +179,7 @@ func flattenRules(v2 policiesFileV2) PoliciesFile {
 			p.TopDesk = mergeTopDesk(p.TopDesk, cp.TopDesk)
 			p.Client = rule.Client
 			p.TopDesk = mergeTopDeskTextOverrides(p.TopDesk, rule.TopDesk)
+			p.TopDesk.SendTeams = rule.TopDesk.SendTeams
 		} else {
 			p.TopDesk = mergeTopDesk(p.TopDesk, rule.TopDesk)
 		}

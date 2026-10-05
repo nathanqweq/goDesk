@@ -45,9 +45,6 @@ clients:
       send_email: false
       email_to: ""
       email_cc: ""
-      send_teams: false
-      teams_webhook: ""
-      teams_zabbix_url: ""
       call_type: "Resolucao de incidente"
 
 # Rules: a chave precisa bater com RAWDATA.rule_name (EVENT.TAGS.RuleName
@@ -55,8 +52,10 @@ clients:
 # só é preciso preencher aqui o que de fato varia por regra (urgency,
 # impact, priority, autoclose, e overrides pontuais de topdesk como
 # more_info_text). Campos de topdesk vazios herdam do cliente; os 3
-# booleanos (send_more_info/adicional_cresol/send_email/send_teams) sempre vem do
-# cliente quando "client" está preenchido.
+# booleanos (send_more_info/adicional_cresol/send_email) sempre vem do
+# cliente quando "client" está preenchido. O Teams (send_teams,
+# teams_webhook, teams_zabbix_url) é a exceção: é sempre da própria rule,
+# com ou sem cliente (webhook vazio = usa o do default).
 rules:
   CRESOL-AP-SW:
     client: "CRESOL"
@@ -66,3 +65,5 @@ rules:
     autoclose: false
     topdesk:
       more_info_text: ""
+      send_teams: false
+      teams_webhook: ""
