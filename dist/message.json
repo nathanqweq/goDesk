@@ -1,6 +1,7 @@
 {
  "rule_name":"{EVENT.TAGS.RuleName}",
  "cliente":"{EVENT.TAGS.Cliente}",
+ "equipe":"{EVENT.TAGS.Equipe}",
  "status":"{TRIGGER.STATUS}",
  "host":"{HOST.NAME}",
  "trigger":"{EVENT.NAME}",

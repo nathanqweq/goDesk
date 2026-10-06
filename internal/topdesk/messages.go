@@ -18,10 +18,17 @@ func FormatDateBR(date string) string {
 }
 
 func CreateHTML(p rawdata.Payload, contractResolved string) string {
+	// Equipe só aparece quando a tag veio preenchida no evento
+	equipe := ""
+	if v := strings.TrimSpace(p.Equipe); v != "" {
+		equipe = "<strong>Equipe:</strong><br>" + htmlEscape(v) + "<br>"
+	}
+
 	return fmt.Sprintf(
 		"<strong>TELTEC SOLUTIONS</strong><br><strong>Zabbix %s</strong><br>"+
 			"<strong>Status:</strong><br>%s<br>"+
 			"<strong>Host:</strong><br>%s<br>"+
+			"%s"+
 			"<strong>Trigger:</strong><br>%s<br>"+
 			"<strong>Valor do evento:</strong><br>%s<br>"+
 			"<strong>Severidade:</strong><br>%s<br>"+
@@ -32,6 +39,7 @@ func CreateHTML(p rawdata.Payload, contractResolved string) string {
 		empty(contractResolved, "-"),
 		empty(p.Status, "-"),
 		empty(p.Host, "-"),
+		equipe,
 		empty(p.Trigger, "-"),
 		empty(prefer(p.EventValue, p.ValueItem), "-"),
 		empty(p.Severity, "-"),

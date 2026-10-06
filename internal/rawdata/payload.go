@@ -23,6 +23,11 @@ type Payload struct {
 	// ===== DISPLAY APENAS (não decide policy) =====
 	Cliente string `json:"cliente"`
 
+	// Equipe (tag opcional do evento, ex: {EVENT.TAGS.Equipe}): quando vem
+	// preenchida, entra como linha "Equipe" no texto de abertura do
+	// chamado; vazia/*UNKNOWN*/macro não resolvida = linha omitida.
+	Equipe string `json:"equipe"`
+
 	// ===== TAGS / TOPDESK =====
 	Contract        string `json:"contract"`
 	OperGroup       string `json:"oper_group"`

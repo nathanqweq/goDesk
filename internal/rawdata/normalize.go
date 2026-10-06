@@ -19,6 +19,7 @@ func Normalize(p *Payload) {
 	// novo
 	p.RuleName = clean(p.RuleName)
 	p.Cliente = clean(p.Cliente)
+	p.Equipe = optionalTag(p.Equipe)
 
 	// topdesk
 	p.Contract = clean(p.Contract)
@@ -63,4 +64,22 @@ func clean(s string) string {
 	s = strings.TrimPrefix(s, `"`)
 	s = strings.TrimSuffix(s, `"`)
 	return strings.TrimSpace(s)
+}
+
+// optionalTag limpa o valor de uma tag que pode não existir no evento: o
+// Zabbix manda "*UNKNOWN*" quando a tag não existe, e um Media Type
+// configurado errado pode mandar a própria macro sem resolver
+// ("{EVENT.TAGS.Equipe}") — nos dois casos o valor vira vazio.
+func optionalTag(s string) string {
+	s = clean(s)
+	bare := strings.Trim(s, "*<>")
+	switch {
+	case s == "":
+		return ""
+	case strings.EqualFold(bare, "UNKNOWN"), strings.EqualFold(s, "null"):
+		return ""
+	case strings.HasPrefix(s, "{") && strings.HasSuffix(s, "}"):
+		return ""
+	}
+	return s
 }
