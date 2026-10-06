@@ -28,23 +28,23 @@ func CreateHTML(p rawdata.Payload, contractResolved string) string {
 		"<strong>TELTEC SOLUTIONS</strong><br><strong>Zabbix %s</strong><br>"+
 			"<strong>Status:</strong><br>%s<br>"+
 			"<strong>Host:</strong><br>%s<br>"+
-			"%s"+
 			"<strong>Trigger:</strong><br>%s<br>"+
 			"<strong>Valor do evento:</strong><br>%s<br>"+
 			"<strong>Severidade:</strong><br>%s<br>"+
 			"<strong>Data:</strong><br>%s<br>"+
 			"<strong>Hora:</strong><br>%s<br>"+
+			"%s"+
 			"<strong>Event ID:</strong><br>%s<br>"+
 			"<strong>Trigger ID:</strong><br>%s<br>",
 		empty(contractResolved, "-"),
 		empty(p.Status, "-"),
 		empty(p.Host, "-"),
-		equipe,
 		empty(p.Trigger, "-"),
 		empty(prefer(p.EventValue, p.ValueItem), "-"),
 		empty(p.Severity, "-"),
 		empty(FormatDateBR(p.Date), p.Date),
 		empty(p.Hour, "-"),
+		equipe,
 		empty(p.EventID, "-"),
 		empty(p.TriggerID, "-"),
 	)
