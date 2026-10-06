@@ -362,7 +362,7 @@ foreach ($rules as $c) {
 		<label>Sendmore info</label>
 		<div class="gd-check">
 			<input type="checkbox" class="gd-sendmore-toggle" name="clients['.$idx.'][topdesk][send_more_info]" value="1" '.$send_more.'>
-			<span class="gd-muted">comentar após criar o chamado (só se não tiver cliente escolhido — em rule com cliente, quem manda é o cliente)</span>
+			<span class="gd-muted">comentar após criar o chamado (com cliente escolhido: envia se o cliente OU esta rule estiver marcado)</span>
 		</div>
 	</div>';
 	echo '</div>';

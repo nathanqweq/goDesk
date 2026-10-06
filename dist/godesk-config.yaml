@@ -51,11 +51,12 @@ clients:
 # no Zabbix). "client" referencia um nome cadastrado em "clients:" acima —
 # só é preciso preencher aqui o que de fato varia por regra (urgency,
 # impact, priority, autoclose, e overrides pontuais de topdesk como
-# more_info_text). Campos de topdesk vazios herdam do cliente; os 3
-# booleanos (send_more_info/adicional_cresol/send_email) sempre vem do
-# cliente quando "client" está preenchido. O Teams (send_teams,
-# teams_webhook, teams_zabbix_url) é a exceção: é sempre da própria rule,
-# com ou sem cliente (webhook vazio = usa o do default).
+# more_info_text). Campos de topdesk vazios herdam do cliente; os
+# booleanos adicional_cresol/send_email sempre vem do cliente quando
+# "client" está preenchido. Exceções: o Teams (send_teams, teams_webhook,
+# teams_zabbix_url) é sempre da própria rule, com ou sem cliente (webhook
+# vazio = usa o do default); e o send_more_info liga se o cliente OU a
+# rule estiver marcado (texto: rule > cliente > default).
 rules:
   CRESOL-AP-SW:
     client: "CRESOL"

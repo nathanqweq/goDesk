@@ -522,7 +522,7 @@
             <label>Sendmore info</label>
             <div class="gd-check">
               <input type="checkbox" class="gd-sendmore-toggle" name="clients[${i}][topdesk][send_more_info]" value="1">
-              <span class="gd-muted">comentar após criar o chamado</span>
+              <span class="gd-muted">comentar após criar o chamado (com cliente escolhido: envia se o cliente OU esta rule estiver marcado)</span>
             </div>
           </div>
         </div>

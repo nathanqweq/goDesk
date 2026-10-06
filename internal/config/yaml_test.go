@@ -295,3 +295,60 @@ rules:
 		t.Fatal("send_teams do cliente não deveria valer: a regra é que decide (e está desligado)")
 	}
 }
+
+func TestParsePoliciesSendMoreInfoClientOrRule(t *testing.T) {
+	yamlText := `
+default:
+  topdesk:
+    more_info_text: "texto default"
+
+clients:
+  SEM-SENDMORE:
+    topdesk:
+      send_more_info: false
+      more_info_text: "texto do cliente"
+  COM-SENDMORE:
+    topdesk:
+      send_more_info: true
+      more_info_text: "texto do cliente"
+
+rules:
+  REGRA-LIGA-SO-ELA:
+    client: SEM-SENDMORE
+    topdesk:
+      send_more_info: true
+      more_info_text: "texto da regra"
+  REGRA-LIGA-SEM-TEXTO:
+    client: SEM-SENDMORE
+    topdesk:
+      send_more_info: true
+  REGRA-HERDA-DO-CLIENTE:
+    client: COM-SENDMORE
+  REGRA-NENHUM:
+    client: SEM-SENDMORE
+`
+	pf, err := ParsePolicies([]byte(yamlText))
+	if err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+
+	pol := ResolvePolicy(pf, "REGRA-LIGA-SO-ELA")
+	if !pol.TopDesk.SendMoreInfo || pol.TopDesk.MoreInfoText != "texto da regra" {
+		t.Fatalf("regra com cliente deveria conseguir ligar o sendmore com o próprio texto, veio %+v", pol.TopDesk)
+	}
+
+	pol = ResolvePolicy(pf, "REGRA-LIGA-SEM-TEXTO")
+	if !pol.TopDesk.SendMoreInfo || pol.TopDesk.MoreInfoText != "texto do cliente" {
+		t.Fatalf("regra ligada sem texto deveria usar o texto do cliente, veio %+v", pol.TopDesk)
+	}
+
+	pol = ResolvePolicy(pf, "REGRA-HERDA-DO-CLIENTE")
+	if !pol.TopDesk.SendMoreInfo {
+		t.Fatal("cliente com sendmore ligado continua valendo pras regras dele")
+	}
+
+	pol = ResolvePolicy(pf, "REGRA-NENHUM")
+	if pol.TopDesk.SendMoreInfo {
+		t.Fatal("nem cliente nem regra ligaram: não deveria enviar")
+	}
+}

@@ -163,9 +163,13 @@ func ParsePolicies(data []byte) (PoliciesFile, error) {
 // vazia ou inexistente) continuam funcionando como o formato antigo: o
 // topdesk da própria regra é aplicado por completo, booleanos inclusos.
 //
-// send_teams é a exceção: igual autoclose/custom_status, vem sempre da
-// própria regra, com ou sem cliente — o Teams é ligado/desligado por regra
-// (teams_webhook/teams_zabbix_url vazios na regra caem pro default).
+// Duas exceções:
+//   - send_teams: igual autoclose/custom_status, vem sempre da própria
+//     regra, com ou sem cliente (teams_webhook/teams_zabbix_url vazios na
+//     regra caem pro default);
+//   - send_more_info: liga se o cliente OU a regra estiver ligado. Não é
+//     "só a regra" porque o uso comum é o cliente ligar o comentário e cada
+//     regra só trazer o próprio more_info_text.
 func flattenRules(v2 policiesFileV2) PoliciesFile {
 	out := make(map[string]Policy, len(v2.Rules))
 
@@ -180,6 +184,10 @@ func flattenRules(v2 policiesFileV2) PoliciesFile {
 			p.Client = rule.Client
 			p.TopDesk = mergeTopDeskTextOverrides(p.TopDesk, rule.TopDesk)
 			p.TopDesk.SendTeams = rule.TopDesk.SendTeams
+			// send_more_info: cliente OU regra — a regra consegue ligar o
+			// comentário só pra ela, sem desligar o que o cliente já liga
+			// pra todas as suas regras (texto: regra > cliente > default)
+			p.TopDesk.SendMoreInfo = p.TopDesk.SendMoreInfo || rule.TopDesk.SendMoreInfo
 		} else {
 			p.TopDesk = mergeTopDesk(p.TopDesk, rule.TopDesk)
 		}
