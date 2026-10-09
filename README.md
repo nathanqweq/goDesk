@@ -38,6 +38,7 @@ Instala o módulo do Zabbix (`/usr/share/zabbix/ui/modules/goDesk`) e o binário
 ### 3. Configurar
 
 Arquivos em `/etc/zabbix/godesk/` (criados com valores de exemplo na instalação — edite antes de usar):
+**IMPORTANTE** Caso seu Zabbix Server e Zabbix Front estejam na mesma máquina, o arquivo **godesk-service.env** não é necessário configurar, pois o servidor vai conseguir interpretar os dados localmente.
 
 | Arquivo | Onde | Para quê |
 |---|---|---|
