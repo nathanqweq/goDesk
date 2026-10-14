@@ -21,7 +21,8 @@ class Module extends CModule {
 				(new CMenuItem(_('goDesk')))->setSubMenu(
 					new CMenu([
 						(new CMenuItem(_('Config (visualizar)')))->setAction('godesk.config.view'),
-						(new CMenuItem(_('Config (editar)')))->setAction('godesk.config.edit')
+						(new CMenuItem(_('Config (editar)')))->setAction('godesk.config.edit'),
+						(new CMenuItem(_('Dependências')))->setAction('godesk.dependencies.edit')
 					])
 				)
 			);

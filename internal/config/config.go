@@ -17,10 +17,11 @@ type RuntimeConfig struct {
 	ZabbixURL  string
 	ZabbixKey  string
 
-	LogFile     string
-	ConfigFile  string
-	MetricsFile string
-	TimeoutSec  int
+	LogFile          string
+	ConfigFile       string
+	DependenciesFile string
+	MetricsFile      string
+	TimeoutSec       int
 
 	SMTPHost string
 	SMTPPort string
@@ -31,6 +32,10 @@ type RuntimeConfig struct {
 
 const smtpConfigEnvPath = "/etc/zabbix/godesk/godesk-smtp-config.env"
 const serviceConfigEnvPath = "/etc/zabbix/godesk/godesk-service.env"
+
+// DefaultDependenciesFile é o caminho padrão do godesk-dependencies.yaml,
+// tanto no servidor quanto no host do frontend (godesk-client).
+const DefaultDependenciesFile = "/etc/zabbix/godesk/godesk-dependencies.yaml"
 
 func FromArgs(argv []string) (RuntimeConfig, error) {
 	// TICKET_NAME RAWDATA — DOMAIN/USER/PASS/ZABBIX_URL/ZABBIX_KEY não são
@@ -64,8 +69,9 @@ func FromValues(svc ServiceConfig, ticketName, rawData string) RuntimeConfig {
 		// diferente do systemd, e foi o que causou confusão pra achar o
 		// log de um alerta que rodou no modo one-shot).
 		LogFile:     svc.LogFile,
-		ConfigFile:  getenv("TOPDESK_CONFIG", "/etc/zabbix/godesk/godesk-config.yaml"),
-		MetricsFile: MetricsFileFromEnv(),
+		ConfigFile:       getenv("TOPDESK_CONFIG", "/etc/zabbix/godesk/godesk-config.yaml"),
+		DependenciesFile: svc.DependenciesFile,
+		MetricsFile:      MetricsFileFromEnv(),
 		TimeoutSec:  atoiDefault(getenv("TOPDESK_TIMEOUT_SEC", "15"), 15),
 		SMTPHost:    smtp.Host,
 		SMTPPort:    smtp.Port,
@@ -115,6 +121,10 @@ type ServiceConfig struct {
 	LogFile    string
 	ConfigFile string
 
+	// DependenciesFile é o godesk-dependencies.yaml (ver dependencies.go),
+	// separado do ConfigFile pra ter página e sync próprios no módulo.
+	DependenciesFile string
+
 	// TopDesk padrão do serviço — não vem mais de alerta nenhum, é sempre
 	// daqui (usado tanto pra criar/atualizar chamados quanto pelo
 	// healthcheck em background).
@@ -144,6 +154,8 @@ func ServiceConfigFromEnv() ServiceConfig {
 		Token:      get("GODESK_SERVICE_TOKEN", ""),
 		LogFile:    get("TOPDESK_LOG_FILE", "/var/log/godesk/godesk-service.log"),
 		ConfigFile: get("TOPDESK_CONFIG", "/etc/zabbix/godesk/godesk-config.yaml"),
+
+		DependenciesFile: get("GODESK_DEPENDENCIES_FILE", DefaultDependenciesFile),
 
 		TopdeskDomain: get("GODESK_TOPDESK_DOMAIN", ""),
 		TopdeskUser:   get("GODESK_TOPDESK_USER", ""),

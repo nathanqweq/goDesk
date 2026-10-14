@@ -152,3 +152,36 @@ func TestHandleHealth(t *testing.T) {
 		t.Fatalf("esperado 200, got %d", w.Code)
 	}
 }
+
+func TestHandleDependenciesRejectsCycle(t *testing.T) {
+	target := filepath.Join(t.TempDir(), "godesk-dependencies.yaml")
+	body := "dependencies:\n  - host: A\n    parents: [{host: B}]\n  - host: B\n    parents: [{host: A}]\n"
+	req := httptest.NewRequest("POST", "/dependencies", bytes.NewBufferString(body))
+	w := httptest.NewRecorder()
+
+	handleDependencies("", target)(w, req)
+
+	if w.Code != 400 {
+		t.Fatalf("esperado 400, got %d: %s", w.Code, w.Body.String())
+	}
+	if _, err := os.Stat(target); !os.IsNotExist(err) {
+		t.Fatalf("arquivo não deveria ter sido criado para dependência circular")
+	}
+}
+
+func TestHandleDependenciesWritesValidYAML(t *testing.T) {
+	target := filepath.Join(t.TempDir(), "godesk-dependencies.yaml")
+	body := "dependencies:\n  - host: SRV-01\n    parents: [{host: SW-01}]\n"
+	req := httptest.NewRequest("POST", "/dependencies", bytes.NewBufferString(body))
+	w := httptest.NewRecorder()
+
+	handleDependencies("", target)(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("esperado 200, got %d: %s", w.Code, w.Body.String())
+	}
+	got, err := os.ReadFile(target)
+	if err != nil || string(got) != body {
+		t.Fatalf("conteúdo gravado difere do enviado: %q err=%v", got, err)
+	}
+}

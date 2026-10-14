@@ -49,6 +49,14 @@
       }
     );
     makeFilter(
+      "gd-filter-deps",
+      "gd-deps",
+      ".gd-dep",
+      (card) => Array.from(card.querySelectorAll(".gd-dep-host, .gd-dep-parent-host"))
+        .map((i) => i.value)
+        .join(" ")
+    );
+    makeFilter(
       "gd-filter-view-named-clients",
       "gd-view-named-clients",
       "[data-search]",
@@ -483,6 +491,13 @@
               <span class="gd-muted">sobrescrever o processingStatus padrão de abertura/atualização</span>
             </div>
           </div>
+          <div class="gd-field gd-field-tight">
+            <label>Dependência</label>
+            <div class="gd-check">
+              <input type="checkbox" name="clients[${i}][dependency]" value="1">
+              <span class="gd-muted">não abrir chamado se um host pai estiver em alerta (<a href="zabbix.php?action=godesk.dependencies.edit">Dependências</a>)</span>
+            </div>
+          </div>
         </div>
 
         <div class="gd-row gd-customstatus-box" style="display:none">
@@ -607,8 +622,187 @@
     clearFilter("gd-filter-rules");
   }
 
+  // ===== Dependências (godesk.dependencies.edit) =====
+
+  function escapeAttr(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  function parentRowHtml(i, j) {
+    const ev = `gd-ev-${i}-${j}`;
+    return `
+      <div class="gd-row gd-dep-parent">
+        <div class="gd-field">
+          <label>Host pai</label>
+          <input type="text" class="gd-dep-parent-host" list="gd-hosts-list" autocomplete="off" name="deps[${i}][parents][${j}][host]" value="">
+        </div>
+        <div class="gd-field">
+          <label>Evento a observar <span class="gd-muted">(vazio = qualquer)</span></label>
+          <input type="text" class="gd-dep-parent-event" list="${ev}" autocomplete="off" name="deps[${i}][parents][${j}][event]" value="" placeholder="ex: Unavailable by ICMP ping, *Interface*down*">
+          <datalist id="${ev}"></datalist>
+        </div>
+        <div class="gd-field gd-field-tight" style="min-width:auto;">
+          <button class="gd-btn gd-btn-danger" type="button" data-gd-dep-parent-remove>✕</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function addDependency() {
+    const host = document.getElementById("gd-deps");
+    if (!host) return;
+
+    const i = parseInt(host.dataset.nextIdx || "0", 10);
+    host.dataset.nextIdx = String(i + 1);
+
+    host.insertAdjacentHTML("beforeend", `
+      <div class="gd-client-card gd-dep" data-idx="${i}" data-next-parent="1">
+        <div class="gd-client-head">
+          <div class="gd-client-name">🖥️ Host dependente</div>
+          <button class="gd-btn gd-btn-danger" type="button" data-gd-dep-remove>Remover</button>
+        </div>
+        <div class="gd-row">
+          <div class="gd-field">
+            <label>Host (nome técnico)</label>
+            <input type="text" class="gd-dep-host" list="gd-hosts-list" autocomplete="off" name="deps[${i}][host]" value="">
+          </div>
+          <div class="gd-field gd-field-tight">
+            <label>Modo</label>
+            <select name="deps[${i}][mode]">
+              <option value="any" selected>Qualquer pai em alerta</option>
+              <option value="all">Todos os pais em alerta</option>
+            </select>
+          </div>
+        </div>
+        <div class="gd-small-title" style="margin-top:12px;">Depende de</div>
+        <div class="gd-dep-parents">${parentRowHtml(i, 0)}</div>
+        <div class="gd-actions"><button class="gd-btn" type="button" data-gd-dep-parent-add>+ Adicionar pai</button></div>
+      </div>
+    `);
+
+    clearFilter("gd-filter-deps");
+    host.lastElementChild.querySelector(".gd-dep-host")?.focus();
+  }
+
+  function addParent(btn) {
+    const card = btn.closest(".gd-dep");
+    if (!card) return;
+
+    const i = card.dataset.idx;
+    const j = parseInt(card.dataset.nextParent || "0", 10);
+    card.dataset.nextParent = String(j + 1);
+
+    card.querySelector(".gd-dep-parents").insertAdjacentHTML("beforeend", parentRowHtml(i, j));
+  }
+
+  // Sugere os nomes de trigger do host pai no campo "Evento a observar"
+  // (busca na primeira vez que o campo recebe foco, e de novo se o host
+  // pai mudar).
+  function loadParentEvents(eventInput) {
+    const row = eventInput.closest(".gd-dep-parent");
+    const hostInput = row?.querySelector(".gd-dep-parent-host");
+    const list = row?.querySelector("datalist");
+    if (!hostInput || !list) return;
+
+    const hostName = hostInput.value.trim();
+    if (hostName === "" || list.dataset.host === hostName) return;
+    list.dataset.host = hostName;
+
+    fetch("zabbix.php?action=godesk.dependencies.triggers", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ host: hostName })
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        list.innerHTML = (data.triggers || [])
+          .map((t) => `<option value="${escapeAttr(t)}"></option>`)
+          .join("");
+      })
+      .catch(() => { list.dataset.host = ""; });
+  }
+
+  function exportDependencies() {
+    const src = document.getElementById("gd-deps-export-yaml");
+    const text = src ? src.value : "";
+    if (text.trim() === "") {
+      alert("Nenhuma dependência salva para exportar.");
+      return;
+    }
+
+    const blob = new Blob([text], { type: "text/yaml" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "godesk-dependencies.yaml";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function importDependencies(fileInput) {
+    const file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      fileInput.value = "";
+      if (!confirm(`Importar "${file.name}"? Isso SUBSTITUI todas as dependências atuais (um backup do arquivo atual é mantido no servidor).`)) {
+        return;
+      }
+      const form = document.getElementById("gd-deps-import-form");
+      form.querySelector('textarea[name="import_yaml"]').value = String(reader.result || "");
+      form.submit();
+    };
+    reader.readAsText(file);
+  }
+
   // Event delegation (sem precisar onclick inline)
   document.addEventListener("click", (e) => {
+    const depAdd = e.target.closest("[data-gd-dep-add]");
+    if (depAdd) {
+      e.preventDefault();
+      addDependency();
+      return;
+    }
+
+    const depRemove = e.target.closest("[data-gd-dep-remove]");
+    if (depRemove) {
+      e.preventDefault();
+      if (confirm("Remover este host dependente?")) depRemove.closest(".gd-dep")?.remove();
+      return;
+    }
+
+    const parentAdd = e.target.closest("[data-gd-dep-parent-add]");
+    if (parentAdd) {
+      e.preventDefault();
+      addParent(parentAdd);
+      return;
+    }
+
+    const parentRemove = e.target.closest("[data-gd-dep-parent-remove]");
+    if (parentRemove) {
+      e.preventDefault();
+      parentRemove.closest(".gd-dep-parent")?.remove();
+      return;
+    }
+
+    if (e.target.closest("[data-gd-deps-export]")) {
+      e.preventDefault();
+      exportDependencies();
+      return;
+    }
+
+    if (e.target.closest("[data-gd-deps-import]")) {
+      e.preventDefault();
+      document.getElementById("gd-deps-import-file")?.click();
+      return;
+    }
+
     const addBtn = e.target.closest("[data-gd-add]");
     if (addBtn) {
       e.preventDefault();
@@ -651,7 +845,17 @@
     }
   });
 
+  document.addEventListener("focusin", (e) => {
+    const ev = e.target.closest(".gd-dep-parent-event");
+    if (ev) loadParentEvents(ev);
+  });
+
   document.addEventListener("change", (e) => {
+    if (e.target.id === "gd-deps-import-file") {
+      importDependencies(e.target);
+      return;
+    }
+
     const chk = e.target.closest(".gd-autoclose");
     if (chk) toggleSlaFromCheckbox(chk);
 

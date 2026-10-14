@@ -160,6 +160,21 @@
   color: #a30000;
 }
 
+.godesk-module .gd-warn {
+  background: #fff8e1;
+  border: 1px solid #ffe08a;
+  color: #8a6100;
+}
+
+.godesk-module .gd-dep-missing {
+  color: #b26a00;
+  font-size: 12px;
+}
+
+.godesk-module .gd-dep-parent + .gd-dep-parent {
+  margin-top: 8px;
+}
+
 .godesk-module .gd-muted {
   color: #666;
   font-size: 13px;

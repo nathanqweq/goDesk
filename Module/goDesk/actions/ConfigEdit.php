@@ -18,6 +18,7 @@
  *     client: "NOME_DO_CLIENTE"   # referencia clients.<NOME_DO_CLIENTE>
  *     urgency, impact, priority, autoclose
  *     custom_status: bool         # sempre da própria rule, nunca do cliente
+ *     dependency: bool            # sempre da rule: consulta godesk-dependencies.yaml antes de abrir chamado
  *     status_open: ""             # id do processingStatus no TopDesk, usado
  *                                  # na abertura do chamado quando custom_status=true
  *     status_update: ""           # id do processingStatus no TopDesk, usado
@@ -126,6 +127,7 @@ class ConfigEdit extends CController {
 			$this->migrateClientTeams($rules[$rule], $named_clients);
 			$rules[$rule]['priority'] ??= '';
 			$rules[$rule]['custom_status'] ??= false;
+			$rules[$rule]['dependency'] ??= false;
 			$rules[$rule]['status_open'] ??= '';
 			$rules[$rule]['status_update'] ??= '';
 			$rules[$rule]['topdesk'] ??= [];
@@ -242,6 +244,7 @@ class ConfigEdit extends CController {
 				'impact' => (string)($row['impact'] ?? ''),
 				'priority' => (string)($row['priority'] ?? ''),
 				'custom_status' => $this->toBool($row['custom_status'] ?? false),
+				'dependency' => $this->toBool($row['dependency'] ?? false),
 				'status_open' => (string)($row['status_open'] ?? ''),
 				'status_update' => (string)($row['status_update'] ?? ''),
 				'topdesk' => $this->normalizeTopdeskFromPost($td)
@@ -405,6 +408,7 @@ class ConfigEdit extends CController {
 					'impact' => (string)($r['impact'] ?? ''),
 					'priority' => (string)($r['priority'] ?? ''),
 					'custom_status' => (bool)($r['custom_status'] ?? false),
+					'dependency' => (bool)($r['dependency'] ?? false),
 					'status_open' => (string)($r['status_open'] ?? ''),
 					'status_update' => (string)($r['status_update'] ?? ''),
 					'topdesk' => (array)($r['topdesk'] ?? [])

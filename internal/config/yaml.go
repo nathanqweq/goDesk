@@ -57,6 +57,11 @@ type Policy struct {
 	StatusOpen   string `yaml:"status_open"`
 	StatusUpdate string `yaml:"status_update"`
 
+	// Dependency: igual AutoClose, sempre pertence à regra. Quando true, o
+	// host do alerta é procurado em godesk-dependencies.yaml antes de abrir
+	// chamado (ver internal/app/dependency.go).
+	Dependency bool `yaml:"dependency"`
+
 	TopDesk TopDeskDefaults `yaml:"topdesk"`
 }
 
@@ -85,6 +90,7 @@ type RulePolicy struct {
 	CustomStatus bool            `yaml:"custom_status"`
 	StatusOpen   string          `yaml:"status_open"`
 	StatusUpdate string          `yaml:"status_update"`
+	Dependency   bool            `yaml:"dependency"`
 	TopDesk      TopDeskDefaults `yaml:"topdesk"`
 }
 
@@ -202,6 +208,7 @@ func flattenRules(v2 policiesFileV2) PoliciesFile {
 			p.Priority = rule.Priority
 		}
 		p.AutoClose = rule.AutoClose
+		p.Dependency = rule.Dependency
 
 		p.CustomStatus = rule.CustomStatus
 		if strings.TrimSpace(rule.StatusOpen) != "" {
@@ -300,6 +307,7 @@ func mergePolicy(def Policy, over Policy) Policy {
 
 	// autoclose do cliente manda (se existir bloco do cliente)
 	def.AutoClose = over.AutoClose
+	def.Dependency = over.Dependency
 
 	def.CustomStatus = over.CustomStatus
 	if strings.TrimSpace(over.StatusOpen) != "" {

@@ -29,6 +29,12 @@ func main() {
 				os.Exit(1)
 			}
 			return
+		case "dependencies":
+			if err := runDependencies(); err != nil {
+				fmt.Fprintln(os.Stderr, "godesk-client: "+err.Error())
+				os.Exit(1)
+			}
+			return
 		}
 	}
 
@@ -97,6 +103,33 @@ func runTestConfig() error {
 	}
 
 	fmt.Printf("OK: %s é um YAML válido e o servidor (%s) consegue gravar — nada foi alterado\n", configPath, serverURL)
+	return nil
+}
+
+// runDependencies manda o godesk-dependencies.yaml local (gravado pela
+// página "Dependências" do módulo) pro POST /dependencies do servidor —
+// mesmo fluxo de run(), outro arquivo.
+func runDependencies() error {
+	env, serverURL, token, err := loadClientEnv()
+	if err != nil {
+		return err
+	}
+
+	path := resolve(env, "GODESK_DEPENDENCIES_FILE", config.DefaultDependenciesFile)
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("falha ao ler %s: %w", path, err)
+	}
+	if _, err := config.ParseDependencies(data); err != nil {
+		return fmt.Errorf("yaml inválido em %s: %w", path, err)
+	}
+
+	if _, err := postYAML(serverURL, token, "/dependencies", data); err != nil {
+		return err
+	}
+
+	fmt.Printf("dependências enviadas com sucesso para %s (lidas de %s)\n", serverURL, path)
 	return nil
 }
 

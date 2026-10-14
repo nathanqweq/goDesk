@@ -125,6 +125,9 @@ else {
 		echo '<div class="gd-client-name">🧩 Rule: '.h($rule_name).'</div>';
 
 		$c_auto = !empty($c['autoclose']) ? '<span class="gd-pill gd-true">autoclose</span>' : '<span class="gd-pill gd-false">manual</span>';
+		if (!empty($c['dependency'])) {
+			$c_auto .= ' <span class="gd-pill gd-true">dependência</span>';
+		}
 		echo '<div>'.$c_auto.'</div>';
 		echo '</div>';
 

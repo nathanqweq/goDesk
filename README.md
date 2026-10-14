@@ -75,6 +75,24 @@ Marque **Enviar Teams** na rule (pela UI do módulo) e preencha os campos abaixo
 
 Com isso, o goDesk posta um card no canal (mesmo formato do media type *MS Teams Workflow* do Zabbix, já com o número do chamado do TopDesk) quando cria o chamado e quando recebe a normalização de um chamado existente. Uma falha no envio só gera log (`[teams]`) e a métrica `teams_send_errors_total`. O chamado não é afetado.
 
+### 8. (Opcional) Dependência entre hosts
+
+Evita abrir um chamado por servidor quando o problema real é o switch ou firewall de que eles dependem. Não usa a dependência nativa de triggers do Zabbix e não exige trigger nova nem mudança no Media Type.
+
+1. Em **Alerts → goDesk → Dependências**, cadastre cada host dependente e os hosts pai dele:
+   - **Modo**: *qualquer* não abre chamado se pelo menos um pai estiver em alerta. *Todos* só segura o chamado se todos os pais estiverem em alerta (para links e switches redundantes).
+   - **Evento a observar** (por pai): nome do problema no pai. Aceita `*` como curinga, por exemplo `*Interface*down*`. Se ficar vazio, qualquer problema ativo do pai conta. Ao focar o campo, ele sugere as triggers do host pai.
+   - **Exportar/Importar**: baixa ou carrega o `godesk-dependencies.yaml`. Importar **substitui** tudo, e um backup do arquivo anterior fica salvo. Na importação, o hostid é recalculado pelo nome do host, então o arquivo funciona entre ambientes diferentes.
+2. Marque **Dependência** nas rules que devem respeitar isso.
+
+As dependências ficam em `/etc/zabbix/godesk/godesk-dependencies.yaml` (caminho alterável com `GODESK_DEPENDENCIES_FILE`), um arquivo separado do `godesk-config.yaml`. Ao salvar pela UI, ele é sincronizado com o servidor pelo mesmo caminho da config (`godesk-client dependencies` → `POST /dependencies`).
+
+Quando um alerta de uma rule com dependência chega para um host cadastrado e não existe chamado aberto, o goDesk consulta os problemas ativos dos pais na API do Zabbix (`problem.get`). Se o pai estiver em alerta, o chamado **não é aberto**. Em vez disso, o goDesk comenta no evento do Zabbix (*"host X depende de host(s) com alerta ativo: ..."*) e incrementa a métrica `alerts_held_by_dependency_total`.
+
+- O comentário **não reconhece** o evento. Configure um **passo de escalonamento** na Action do Zabbix (por exemplo, reenviar após 15 min, com a condição *Problem is not acknowledged*). Assim, se o pai normalizar e o host continuar com problema, o reenvio abre o chamado normalmente.
+- Se der erro na consulta (Zabbix fora do ar, sem permissão, host pai inexistente), o chamado é aberto normalmente.
+- O token em `GODESK_ZABBIX_KEY` precisa de permissão de leitura nos hosts pai.
+
 ## Instalação manual (sem apt)
 
 Use [install.sh](install.sh) — compila/copia os arquivos na mão, com as mesmas opções (módulo, binário, configs, serviço systemd). Útil se o host não tem acesso ao repositório APT.

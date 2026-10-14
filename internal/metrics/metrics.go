@@ -18,6 +18,10 @@ type Snapshot struct {
 	AlertsProcessed int64 `json:"alerts_processed_total"`
 	AlertsFailed    int64 `json:"alerts_failed_total"`
 
+	// AlertsHeldByDependency: alertas que não abriram chamado porque um
+	// host pai estava em alerta (godesk-dependencies.yaml).
+	AlertsHeldByDependency int64 `json:"alerts_held_by_dependency_total"`
+
 	TicketsCreated      int64 `json:"tickets_created_total"`
 	TicketsCreateErrors int64 `json:"tickets_create_errors_total"`
 

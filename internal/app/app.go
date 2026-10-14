@@ -113,6 +113,20 @@ func Run(cfg config.RuntimeConfig) (err error) {
 
 	switch {
 	case !exists && eventKind == "ProblemStart":
+		if pol.Dependency {
+			if msg, hold := checkDependency(cfg, zx, p); hold {
+				recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.AlertsHeldByDependency++ })
+				// só comentário, sem ack: o evento segue "não reconhecido" e um
+				// escalonamento da Action reenvia o alerta — se o pai já tiver
+				// normalizado até lá, o chamado é aberto normalmente.
+				if err := zx.AddMessage(p.EventID, msg); err != nil {
+					recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.ZabbixAckErrors++ })
+					log.Printf("[zabbix] ACK ERROR: %v\n", err)
+				}
+				return nil
+			}
+		}
+
 		msgHTML := topdesk.CreateHTML(p, contract)
 
 		payload := buildCreatePayload(

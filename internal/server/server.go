@@ -35,6 +35,7 @@ func Run(opts config.ServiceConfig) error {
 	mux.HandleFunc("POST /alert", handleAlert(opts))
 	mux.HandleFunc("POST /config", handleConfig(opts.Token, opts.ConfigFile))
 	mux.HandleFunc("POST /config/test", handleConfigTest(opts.Token, opts.ConfigFile))
+	mux.HandleFunc("POST /dependencies", handleDependencies(opts.Token, opts.DependenciesFile))
 	mux.HandleFunc("POST /validate-client", handleValidateClient(opts))
 	mux.HandleFunc("GET /once-per-day", handleOncePerDayList(opts.Token))
 
@@ -108,6 +109,24 @@ func handleAlert(opts config.ServiceConfig) http.HandlerFunc {
 }
 
 func handleConfig(token, configFile string) http.HandlerFunc {
+	return handleYAMLFile(token, configFile, "config", func(b []byte) error {
+		_, err := config.ParsePolicies(b)
+		return err
+	})
+}
+
+// handleDependencies recebe o godesk-dependencies.yaml (godesk-client
+// dependencies) — mesmo fluxo do /config, outro arquivo.
+func handleDependencies(token, depsFile string) http.HandlerFunc {
+	return handleYAMLFile(token, depsFile, "dependências", func(b []byte) error {
+		_, err := config.ParseDependencies(b)
+		return err
+	})
+}
+
+// handleYAMLFile valida o YAML recebido com parse e grava em path
+// (atômico, com backup do anterior).
+func handleYAMLFile(token, path, label string, parse func([]byte) error) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !authorized(r, token) {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
@@ -120,19 +139,19 @@ func handleConfig(token, configFile string) http.HandlerFunc {
 			return
 		}
 
-		if _, err := config.ParsePolicies(body); err != nil {
+		if err := parse(body); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "yaml inválido: " + err.Error()})
 			return
 		}
 
-		backup, err := config.SaveFile(configFile, body)
+		backup, err := config.SaveFile(path, body)
 		if err != nil {
-			log.Printf("[server] ERRO ao gravar config (%s): %v\n", configFile, err)
+			log.Printf("[server] ERRO ao gravar %s (%s): %v\n", label, path, err)
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
 
-		log.Printf("[server] config atualizada (%s, backup=%q)\n", configFile, backup)
+		log.Printf("[server] %s atualizada (%s, backup=%q)\n", label, path, backup)
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "backup": backup})
 	}
 }
