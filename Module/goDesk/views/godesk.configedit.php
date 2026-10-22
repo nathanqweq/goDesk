@@ -24,6 +24,9 @@ if (!empty($data['status'])) {
 		echo '<div class="gd-subtitle"><b>Backup:</b> '.h($data['backup']).'</div>';
 	}
 }
+if (!empty($data['warning'])) {
+	echo '<div class="gd-banner gd-warn"><b>Atenção:</b> '.h($data['warning']).'</div>';
+}
 if (!empty($data['error'])) {
 	echo '<div class="gd-banner gd-err"><b>Erro:</b> '.h($data['error']).'</div>';
 }
@@ -33,6 +36,14 @@ if (!empty($data['sync_status'])) {
 if (!empty($data['sync_error'])) {
 	echo '<div class="gd-banner gd-err"><b>Sincronização:</b> '.h($data['sync_error']).'</div>';
 }
+
+// rules + clientes salvos atuais (o que o Exportar baixa — não inclui edições não salvas)
+echo '<textarea id="gd-rules-export-yaml" style="display:none">'.h($data['rules_export'] ?? '').'</textarea>';
+
+echo '<form id="gd-rules-import-form" method="post" action="zabbix.php?action=godesk.config.edit" style="display:none">';
+echo '<input type="hidden" name="import" value="1">';
+echo '<textarea name="import_yaml"></textarea>';
+echo '</form>';
 
 echo '<form method="post" action="zabbix.php?action=godesk.config.edit">';
 echo '<input type="hidden" name="save" value="1">';
@@ -262,8 +273,14 @@ echo '</div>';
 echo '<div class="gd-card">';
 echo '<div class="gd-client-head">';
 echo '<h2 style="margin:0">👥 Rules</h2>';
+echo '<div>';
+echo '<button class="gd-btn" type="button" data-gd-rules-export>⬇ Exportar</button> ';
+echo '<button class="gd-btn" type="button" data-gd-rules-import>⬆ Importar</button> ';
 echo '<button class="gd-btn" type="button" data-gd-add>＋ Adicionar rule</button>';
 echo '</div>';
+echo '<input type="file" id="gd-rules-import-file" accept=".yaml,.yml,text/yaml" style="display:none">';
+echo '</div>';
+echo '<div class="gd-muted" style="margin-bottom:10px">Exportar baixa as rules salvas junto com os clientes cadastrados (as rules referenciam eles pelo nome). Importar <b>substitui</b> todas as rules (e os clientes, se o arquivo trouxer) — o Default não é alterado.</div>';
 
 echo '<div class="gd-row"><div class="gd-field"><label>🔎 Buscar rule/cliente</label><input type="text" id="gd-filter-rules" placeholder="Filtrar por rule_name ou cliente..."></div></div>';
 

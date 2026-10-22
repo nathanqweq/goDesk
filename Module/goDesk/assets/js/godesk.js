@@ -726,35 +726,38 @@
       .catch(() => { list.dataset.host = ""; });
   }
 
-  function exportDependencies() {
-    const src = document.getElementById("gd-deps-export-yaml");
+  // Exportar/Importar (Dependências e Rules): o Exportar baixa o YAML salvo
+  // que a view deixa num textarea oculto; o Importar lê o arquivo escolhido
+  // e manda o texto num form oculto (o servidor valida e faz backup).
+  function exportYaml(srcId, filename, emptyMsg) {
+    const src = document.getElementById(srcId);
     const text = src ? src.value : "";
     if (text.trim() === "") {
-      alert("Nenhuma dependência salva para exportar.");
+      alert(emptyMsg);
       return;
     }
 
     const blob = new Blob([text], { type: "text/yaml" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "godesk-dependencies.yaml";
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     a.remove();
     URL.revokeObjectURL(a.href);
   }
 
-  function importDependencies(fileInput) {
+  function importYaml(fileInput, formId, confirmMsg) {
     const file = fileInput.files && fileInput.files[0];
     if (!file) return;
 
     const reader = new FileReader();
     reader.onload = () => {
       fileInput.value = "";
-      if (!confirm(`Importar "${file.name}"? Isso SUBSTITUI todas as dependências atuais (um backup do arquivo atual é mantido no servidor).`)) {
+      if (!confirm(confirmMsg(file.name))) {
         return;
       }
-      const form = document.getElementById("gd-deps-import-form");
+      const form = document.getElementById(formId);
       form.querySelector('textarea[name="import_yaml"]').value = String(reader.result || "");
       form.submit();
     };
@@ -793,13 +796,25 @@
 
     if (e.target.closest("[data-gd-deps-export]")) {
       e.preventDefault();
-      exportDependencies();
+      exportYaml("gd-deps-export-yaml", "godesk-dependencies.yaml", "Nenhuma dependência salva para exportar.");
       return;
     }
 
     if (e.target.closest("[data-gd-deps-import]")) {
       e.preventDefault();
       document.getElementById("gd-deps-import-file")?.click();
+      return;
+    }
+
+    if (e.target.closest("[data-gd-rules-export]")) {
+      e.preventDefault();
+      exportYaml("gd-rules-export-yaml", "godesk-rules.yaml", "Nenhuma rule salva para exportar.");
+      return;
+    }
+
+    if (e.target.closest("[data-gd-rules-import]")) {
+      e.preventDefault();
+      document.getElementById("gd-rules-import-file")?.click();
       return;
     }
 
@@ -852,7 +867,14 @@
 
   document.addEventListener("change", (e) => {
     if (e.target.id === "gd-deps-import-file") {
-      importDependencies(e.target);
+      importYaml(e.target, "gd-deps-import-form", (name) =>
+        `Importar "${name}"? Isso SUBSTITUI todas as dependências atuais (um backup do arquivo atual é mantido no servidor).`);
+      return;
+    }
+
+    if (e.target.id === "gd-rules-import-file") {
+      importYaml(e.target, "gd-rules-import-form", (name) =>
+        `Importar "${name}"? Isso SUBSTITUI todas as rules atuais (e os clientes, se o arquivo trouxer). Edições não salvas nesta tela serão perdidas. O Default não é alterado e um backup do arquivo atual é mantido no servidor.`);
       return;
     }
 

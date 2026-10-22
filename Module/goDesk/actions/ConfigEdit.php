@@ -30,6 +30,10 @@
  * "rules") continua sendo lido normalmente — ver loadConfig(). A partir do
  * primeiro save por este módulo, o arquivo sempre é regravado no formato
  * novo.
+ *
+ * Exportar/Importar (card Rules): o YAML exportado tem só clients + rules;
+ * importar substitui as rules (e os clientes, se o arquivo tiver a chave
+ * "clients") e mantém o default deste ambiente.
  */
 
 namespace Modules\GoDesk\Actions;
@@ -48,9 +52,11 @@ class ConfigEdit extends CController {
 	protected function checkInput(): bool {
 		$fields = [
 			'save' => 'in 0,1',
+			'import' => 'in 0,1',
 			'default' => 'array',
 			'clients' => 'array',
-			'named_clients' => 'array'
+			'named_clients' => 'array',
+			'import_yaml' => 'string'
 		];
 
 		return $this->validateInput($fields);
@@ -254,6 +260,83 @@ class ConfigEdit extends CController {
 		return $config;
 	}
 
+	/**
+	 * Mesmo resultado do normalizeConfigFromPost, mas a partir de um config
+	 * já em formato de arquivo (mapas por nome, como o loadConfig devolve
+	 * ou como vem de um YAML importado).
+	 */
+	private function normalizeConfigFromFile(array $default, array $named_clients, array $rules): array {
+		$post_named_clients = [];
+		foreach ($named_clients as $name => $c) {
+			$post_named_clients[] = ['name' => (string)$name, 'topdesk' => (array)($c['topdesk'] ?? [])];
+		}
+
+		$post_rules = [];
+		foreach ($rules as $rule_name => $r) {
+			$post_rules[] = ['rule_name' => (string)$rule_name] + (is_array($r) ? $r : []);
+		}
+
+		return $this->normalizeConfigFromPost($default, $post_named_clients, $post_rules);
+	}
+
+	/**
+	 * YAML do botão Exportar: só clients + rules do arquivo salvo (não inclui
+	 * edições não salvas nem o default, que é de cada ambiente). Os clientes
+	 * vão junto porque as rules referenciam eles pelo nome.
+	 */
+	private function buildRulesExport(): string {
+		if (!function_exists('yaml_emit')) {
+			return '';
+		}
+
+		$cfg = $this->loadConfig();
+		if (isset($cfg['_error']) || !$cfg['rules']) {
+			return '';
+		}
+
+		$norm = $this->normalizeConfigFromFile([], $cfg['named_clients'], $cfg['rules']);
+
+		return yaml_emit(['clients' => $norm['clients'], 'rules' => $norm['rules']], YAML_UTF8_ENCODING, YAML_LN_BREAK);
+	}
+
+	/**
+	 * Importa rules (e clientes, se o arquivo trouxer) de um YAML exportado
+	 * — ou de um godesk-config.yaml inteiro, cujo default é ignorado. SUBSTITUI
+	 * todas as rules; os clientes só são substituídos se o arquivo tiver a
+	 * chave "clients", senão os atuais são mantidos. O default atual nunca
+	 * é alterado.
+	 */
+	private function buildConfigFromImport(string $text, array $current, ?string &$error, ?string &$warning): ?array {
+		$parsed = (trim($text) === '') ? null : @yaml_parse($text);
+		if (!is_array($parsed) || !is_array($parsed['rules'] ?? null) || !$parsed['rules']) {
+			$error = 'Arquivo importado não é um YAML de rules válido (esperado a chave "rules").';
+			return null;
+		}
+
+		$named_clients = $current['named_clients'];
+		if (array_key_exists('clients', $parsed)) {
+			if (!is_array($parsed['clients'] ?? [])) {
+				$error = 'Arquivo importado: a chave "clients" não é uma lista de clientes.';
+				return null;
+			}
+			$named_clients = (array)($parsed['clients'] ?? []);
+		}
+
+		$cfg = $this->normalizeConfigFromFile($current['default'], $named_clients, $parsed['rules']);
+
+		$missing = [];
+		foreach ($cfg['rules'] as $r) {
+			if ($r['client'] !== '' && !isset($cfg['clients'][$r['client']])) {
+				$missing[$r['client']] = true;
+			}
+		}
+		if ($missing) {
+			$warning = 'Rules referenciando clientes não cadastrados: '.implode(', ', array_keys($missing));
+		}
+
+		return $cfg;
+	}
+
 	private function validateConfig(array $cfg): array {
 		if (!isset($cfg['default']) || !isset($cfg['clients']) || !isset($cfg['rules'])) {
 			return ['ok' => false, 'error' => 'Config inválida: faltam as chaves default/clients/rules.'];
@@ -343,26 +426,42 @@ class ConfigEdit extends CController {
 
 	protected function doAction(): void {
 		$save = ($this->getInput('save', '0') === '1');
+		$import = ($this->getInput('import', '0') === '1');
 
 		$status = null;
 		$error = null;
+		$warning = null;
 		$backup = null;
 		$sync_status = null;
 		$sync_error = null;
 
-		if ($save) {
-			if (!function_exists('yaml_emit')) {
+		if ($save || $import) {
+			if (!function_exists('yaml_emit') || !function_exists('yaml_parse')) {
 				$error = 'Extensão PHP yaml não instalada (yaml_emit). Instale php-yaml.';
 				$cfg = $this->loadConfig();
 			}
 			else {
-				$post_default = $this->getInput('default', []);
-				$post_named_clients = $this->getInput('named_clients', []);
-				$post_rules = $this->getInput('clients', []);
+				if ($import) {
+					$cfg = $this->loadConfig();
+					if (isset($cfg['_error'])) {
+						$error = 'Importação cancelada, não foi possível ler a config atual: '.$cfg['_error'];
+					}
+					else {
+						$imported = $this->buildConfigFromImport((string)$this->getInput('import_yaml', ''), $cfg, $error, $warning);
+						if ($imported !== null) {
+							$cfg = $imported;
+						}
+					}
+				}
+				else {
+					$post_default = $this->getInput('default', []);
+					$post_named_clients = $this->getInput('named_clients', []);
+					$post_rules = $this->getInput('clients', []);
 
-				$cfg = $this->normalizeConfigFromPost($post_default, $post_named_clients, $post_rules);
+					$cfg = $this->normalizeConfigFromPost($post_default, $post_named_clients, $post_rules);
+				}
 
-				$val = $this->validateConfig($cfg);
+				$val = ($error === null) ? $this->validateConfig($cfg) : ['ok' => false, 'error' => $error];
 				if (!$val['ok']) {
 					$error = $val['error'];
 				}
@@ -374,7 +473,9 @@ class ConfigEdit extends CController {
 						$error = $wr['error'];
 					}
 					else {
-						$status = 'Config salva com sucesso.';
+						$status = $import
+							? 'Rules importadas e salvas ('.count($cfg['rules']).' rules, '.count($cfg['clients']).' clientes).'
+							: 'Config salva com sucesso.';
 						$backup = $wr['backup'] ?? null;
 
 						$sync = $this->pushToServer();
@@ -416,9 +517,13 @@ class ConfigEdit extends CController {
 			}
 		}
 
+		// loadConfig devolve os clientes em "named_clients"; o config montado
+		// no save/import (formato de arquivo) devolve em "clients"
+		$named_clients_map = $cfg['named_clients'] ?? $cfg['clients'] ?? [];
+
 		$named_clients_list = [];
-		if (isset($cfg['named_clients']) && is_array($cfg['named_clients'])) {
-			foreach ($cfg['named_clients'] as $name => $c) {
+		if (is_array($named_clients_map)) {
+			foreach ($named_clients_map as $name => $c) {
 				$named_clients_list[] = [
 					'name' => $name,
 					'topdesk' => (array)($c['topdesk'] ?? [])
@@ -431,12 +536,14 @@ class ConfigEdit extends CController {
 			'path' => $this->config_path,
 			'status' => $status,
 			'error' => $error,
+			'warning' => $warning,
 			'backup' => $backup,
 			'sync_status' => $sync_status,
 			'sync_error' => $sync_error,
 			'default' => (array)($cfg['default'] ?? []),
 			'named_clients' => $named_clients_list,
-			'rules' => $rules_list
+			'rules' => $rules_list,
+			'rules_export' => $this->buildRulesExport()
 		]));
 	}
 }
