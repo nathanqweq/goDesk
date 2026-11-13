@@ -351,6 +351,11 @@
   align-self: flex-end;
 }
 
+.godesk-module .gd-topo-ro-info {
+  padding: 6px 0;
+  line-height: 1.5;
+}
+
 .godesk-module .gd-topo-simbar {
   display: flex;
   flex-wrap: wrap;

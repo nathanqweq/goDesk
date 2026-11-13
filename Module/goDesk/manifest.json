@@ -36,6 +36,10 @@
       "class": "DependenciesV2Edit",
       "view": "godesk.topology"
     },
+    "godesk.topology.view": {
+      "class": "TopologyView",
+      "view": "godesk.topology.view"
+    },
     "godesk.topology.data": {
       "class": "DependenciesV2Data",
       "view": "godesk.topology.data",

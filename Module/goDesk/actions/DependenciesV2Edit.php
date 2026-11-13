@@ -32,7 +32,7 @@ use CControllerResponseData;
 
 class DependenciesV2Edit extends CController {
 
-	private string $path = '/etc/zabbix/godesk/godesk-dependencies-v2.yaml';
+	protected string $path = '/etc/zabbix/godesk/godesk-dependencies-v2.yaml';
 
 	private const DEFAULT_ROOT = 'ZABBIX';
 	private const DEFAULT_DOWN_EVENT = '*Unavailable by ICMP ping*';
@@ -54,7 +54,7 @@ class DependenciesV2Edit extends CController {
 		return (isset(\CWebUser::$data['type']) && \CWebUser::$data['type'] == USER_TYPE_SUPER_ADMIN);
 	}
 
-	private function loadFile(): array {
+	protected function loadFile(): array {
 		if (!file_exists($this->path)) {
 			return ['sites' => [], 'raw' => '', 'error' => null];
 		}
@@ -71,7 +71,7 @@ class DependenciesV2Edit extends CController {
 	}
 
 	/** null = inválido; vazio/sem "sites" = lista vazia. */
-	private function parseYaml(string $text): ?array {
+	protected function parseYaml(string $text): ?array {
 		if (trim($text) === '') {
 			return [];
 		}
@@ -88,7 +88,7 @@ class DependenciesV2Edit extends CController {
 	 * inteiros, descarta nó sem host e link incompleto, junta links
 	 * repetidos (A-B e B-A são o mesmo cabo).
 	 */
-	private function normalizeSites(array $rows): array {
+	protected function normalizeSites(array $rows): array {
 		$out = [];
 
 		foreach ($rows as $s) {

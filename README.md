@@ -113,6 +113,8 @@ Como a v2 decide, na hora do alerta:
 - Depois a **topologia**: o host só abre chamado se ainda existir caminho do root até um vizinho dele passando apenas por hosts UP. Por isso a redundância é respeitada (um FW com perna nos dois membros do core só é segurado se os dois caírem), e o comentário no evento informa quem cortou o caminho e o rack.
 - Host sem links, host não encontrado no Zabbix ou erro de consulta: abre chamado (mesma regra de segurança da v1).
 
+**Visualização para o atendimento:** **Alerts → goDesk → Arquitetura (visualizar)** (`godesk.topology.view`) mostra as arquiteturas em modo somente leitura: carrega o estado atual do Zabbix ao abrir e permite simular quedas clicando nos hosts, sem poder editar ou salvar. Funciona para qualquer usuário logado cujo role tenha o módulo goDesk liberado (**Users → User roles → Access to modules**). As telas de edição continuam restritas ao Super admin e nem aparecem no menu dos demais. O estado atual respeita as permissões do usuário: um host que ele não enxerga no Zabbix aparece como UP.
+
 As localidades ficam em `/etc/zabbix/godesk/godesk-dependencies-v2.yaml` (caminho alterável com `GODESK_DEPENDENCIES_V2_FILE`), sincronizado pelo `godesk-client dependencies-v2` → `POST /dependencies-v2`. Exportar/Importar funcionam como na v1. O estado da localidade é lido com 3 chamadas à API do Zabbix por alerta (`host.get`, `problem.get`, `trigger.get`), independente do número de hosts.
 
 ## Instalação manual (sem apt)

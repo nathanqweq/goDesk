@@ -30,8 +30,14 @@ class DependenciesV2Data extends CController {
 		]);
 	}
 
+	// op=state também é usado pela visualização somente leitura
+	// (godesk.topology.view): qualquer usuário logado, com as permissões de
+	// host dele no Zabbix. op=group só serve ao editor → Super admin.
 	protected function checkPermissions(): bool {
-		return (isset(\CWebUser::$data['type']) && \CWebUser::$data['type'] == USER_TYPE_SUPER_ADMIN);
+		if ($this->getInput('op', '') === 'group') {
+			return ($this->getUserType() == USER_TYPE_SUPER_ADMIN);
+		}
+		return ($this->getUserType() >= USER_TYPE_ZABBIX_USER);
 	}
 
 	protected function doAction(): void {

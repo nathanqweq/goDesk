@@ -9,6 +9,10 @@
      - Simular: clique nos hosts pra marcar DOWN e ver quem abriria chamado
                 (mesma decisão do internal/app/dependency_v2.go)
    Salvar manda tudo num campo só (topology_json); o PHP valida e grava.
+
+   Readonly (data.readonly, página godesk.topology.view — atendimento): só
+   o modo Simular, sem arrastar/editar/salvar; carrega o estado atual do
+   Zabbix ao abrir e ao trocar de localidade.
 ========================================================= */
 (function () {
   "use strict";
@@ -77,7 +81,7 @@
     const ka = lc(a), kb = lc(b);
     return s.links.findIndex((l) => (lc(l[0]) === ka && lc(l[1]) === kb) || (lc(l[0]) === kb && lc(l[1]) === ka));
   }
-  function dirty() { S.dirty = true; }
+  function dirty() { if (!S.readonly) S.dirty = true; }
 
   function siteOfHost(host) {
     const k = lc(host);
@@ -282,6 +286,13 @@
 
   function renderSiteProps() {
     const s = site();
+    const info = document.getElementById("gd-topo-ro-info");
+    if (info) {
+      info.innerHTML = !s ? "" :
+        `<b>Root:</b> ${escapeHtml(s.root)} · <b>Status:</b> ${escapeHtml(s.status.host || "—")}` +
+        (s.status.host ? ` (${escapeHtml(s.status.event || "qualquer problema")})` : "") +
+        ` · <b>DOWN =</b> ${escapeHtml(s.down_event)} · ${s.nodes.length - 1} hosts`;
+    }
     document.querySelectorAll("[data-gd-site-field]").forEach((inp) => {
       const f = inp.dataset.gdSiteField;
       inp.disabled = !s;
@@ -295,7 +306,7 @@
       b.classList.toggle("gd-btn-primary", b.dataset.gdTopoMode === S.mode);
     });
     const bar = document.querySelector(".gd-topo-simbar");
-    bar.style.display = S.mode === "sim" ? "" : "none";
+    if (bar) bar.style.display = S.mode === "sim" ? "" : "none";
     const s = site();
     const chk = document.getElementById("gd-topo-sim-sitedown");
     chk.checked = S.sim.siteDown;
@@ -313,7 +324,7 @@
       svg.setAttribute("width", Math.max(600, wrap.clientWidth - 2));
       svg.setAttribute("height", 200);
       const t = el("text", { x: 20, y: 40, class: "gd-topo-empty" }, svg);
-      t.textContent = "Nenhuma localidade cadastrada — clique em “+ Nova localidade”.";
+      t.textContent = S.readonly ? "Nenhuma arquitetura cadastrada ainda." : "Nenhuma localidade cadastrada — clique em “+ Nova localidade”.";
       renderLegend(null, {});
       return;
     }
@@ -415,6 +426,7 @@
         (sim.open.length ? `<ul class="gd-topo-res gd-topo-res-open">${sim.open.map(li).join("")}</ul>` : '<div class="gd-muted">Nenhum.</div>') +
         `<div class="gd-small-title" style="margin-top:12px;">Segurados (${sim.held.length})</div>` +
         (sim.held.length ? `<ul class="gd-topo-res gd-topo-res-held">${sim.held.map(li).join("")}</ul>` : '<div class="gd-muted">Nenhum.</div>') +
+        (S.liveAt ? `<div class="gd-muted" style="margin-top:12px;">Estado do Zabbix carregado às ${escapeHtml(S.liveAt)}${S.simEdited ? " — alterado na simulação" : ""}.</div>` : "") +
         '<div class="gd-muted" style="margin-top:12px;">A simulação não altera nada. Na hora do alerta o goDesk faz a mesma conta com o estado real do Zabbix.</div>';
       return;
     }
@@ -484,6 +496,7 @@
         if (isRoot(s, host)) return;
         const k = lc(host);
         if (S.sim.down.has(k)) S.sim.down.delete(k); else S.sim.down.add(k);
+        S.simEdited = true;
         renderCanvas(); renderSide();
         return;
       }
@@ -505,6 +518,8 @@
       e.preventDefault();
       return;
     }
+
+    if (S.readonly) return;
 
     if (hit && S.mode === "edit") {
       S.sel = { type: "link", idx: +hit.getAttribute("data-link") };
@@ -543,6 +558,7 @@
   }
 
   function deleteSelection() {
+    if (S.readonly) return;
     const s = site();
     if (!s || !S.sel || S.mode !== "edit") return;
     if (S.sel.type === "node") {
@@ -686,7 +702,7 @@
       .catch((err) => alert("Falha ao consultar o grupo: " + err));
   }
 
-  function loadLiveState() {
+  function loadLiveState(quiet) {
     const s = site();
     if (!s) return;
     const hosts = s.nodes.filter((n) => !isRoot(s, n.host)).map((n) => n.host);
@@ -709,9 +725,11 @@
           if ((problems[lc(n.host)] || []).some((p) => matchEvent(s.down_event, p))) S.sim.down.add(lc(n.host));
         });
         S.sim.siteDown = !!s.status.host && (problems[lc(s.status.host)] || []).some((p) => matchEvent(s.status.event, p));
+        S.liveAt = new Date().toLocaleTimeString();
+        S.simEdited = false;
         renderAll();
       })
-      .catch((err) => alert("Falha ao consultar o Zabbix: " + err));
+      .catch((err) => { if (quiet) console.warn("goDesk: estado atual", err); else alert("Falha ao consultar o Zabbix: " + err); });
   }
 
   function setSiteField(field, value) {
@@ -791,8 +809,12 @@
       linkFrom: null,
       drag: null,
       dirty: false,
+      readonly: !!data.readonly,
+      liveAt: null,
+      simEdited: false,
       sim: { down: new Set(), siteDown: false },
     };
+    if (S.readonly) S.mode = "sim";
     S.sites = (data.sites || []).map(prepSite);
 
     const last = storageGet("gd-topo-site");
@@ -815,12 +837,12 @@
         else if (a === "group-import") importGroup();
         else if (a === "layout") { const s = site(); if (s) { autoLayout(s, true); dirty(); renderCanvas(); } }
         else if (a === "node-remove") deleteSelection();
-        else if (a === "sim-clear") { S.sim.down.clear(); S.sim.siteDown = false; renderAll(); }
-        else if (a === "sim-live") loadLiveState();
+        else if (a === "sim-clear") { S.sim.down.clear(); S.sim.siteDown = false; S.simEdited = !!S.liveAt; renderAll(); }
+        else if (a === "sim-live") loadLiveState(false);
         return;
       }
       const mode = e.target.closest("[data-gd-topo-mode]");
-      if (mode) {
+      if (mode && !S.readonly) {
         S.mode = mode.dataset.gdTopoMode;
         S.linkFrom = null;
         if (S.mode !== "edit") S.sel = null;
@@ -828,7 +850,7 @@
         return;
       }
       const unlink = e.target.closest("[data-gd-topo-unlink]");
-      if (unlink) {
+      if (unlink && !S.readonly) {
         const s = site();
         s.links.splice(+unlink.dataset.gdTopoUnlink, 1);
         if (S.sel && S.sel.type === "link") S.sel = null;
@@ -838,6 +860,7 @@
     });
 
     box.addEventListener("input", (e) => {
+      if (S.readonly) return;
       const f = e.target.dataset && e.target.dataset.gdSiteField;
       if (f && f !== "root") setSiteField(f, e.target.value);
       if (e.target.id === "gd-topo-sel-rack") {
@@ -850,10 +873,13 @@
       if (e.target.id === "gd-topo-site") {
         S.cur = +e.target.value || 0;
         S.sel = null; S.linkFrom = null; S.sim.down.clear(); S.sim.siteDown = false;
+        S.liveAt = null; S.simEdited = false;
         storageSet("gd-topo-site", (site() || {}).name || "");
         renderAll();
+        if (S.readonly) loadLiveState(true);
         return;
       }
+      if (S.readonly) return;
       if (e.target.dataset && e.target.dataset.gdSiteField === "root") {
         setSiteField("root", e.target.value);
         renderSiteProps();
@@ -861,6 +887,7 @@
       }
       if (e.target.id === "gd-topo-sim-sitedown") {
         S.sim.siteDown = e.target.checked;
+        S.simEdited = !!S.liveAt;
         renderCanvas(); renderSide();
         return;
       }
@@ -878,7 +905,9 @@
       }
     });
 
-    document.getElementById("gd-topo-newhost").addEventListener("keydown", (e) => {
+    const on = (sel, ev, fn) => { const x = document.querySelector(sel); if (x) x.addEventListener(ev, fn); };
+
+    on("#gd-topo-newhost", "keydown", (e) => {
       if (e.key === "Enter") { e.preventDefault(); addNode(); }
     });
 
@@ -889,11 +918,11 @@
       if (S.sel) { e.preventDefault(); deleteSelection(); }
     });
 
-    document.querySelector("[data-gd-topo-export]").addEventListener("click", exportYaml);
-    document.querySelector("[data-gd-topo-import]").addEventListener("click", () => document.getElementById("gd-topo-import-file").click());
-    document.getElementById("gd-topo-import-file").addEventListener("change", (e) => importYaml(e.target));
+    on("[data-gd-topo-export]", "click", exportYaml);
+    on("[data-gd-topo-import]", "click", () => document.getElementById("gd-topo-import-file").click());
+    on("#gd-topo-import-file", "change", (e) => importYaml(e.target));
 
-    document.getElementById("gd-topo-form").addEventListener("submit", () => {
+    on("#gd-topo-form", "submit", () => {
       document.getElementById("gd-topo-json").value = JSON.stringify({ sites: cleanSites() });
       storageSet("gd-topo-site", (site() || {}).name || "");
       S.dirty = false;
@@ -905,6 +934,7 @@
     window.addEventListener("resize", () => renderCanvas());
 
     renderAll();
+    if (S.readonly) loadLiveState(true);
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
