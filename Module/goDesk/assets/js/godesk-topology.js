@@ -1,6 +1,6 @@
 /* =========================================================
    goDesk — editor visual da dependência v2 (arquitetura)
-   Página: godesk.dependencies.v2.edit (só roda se #gd-topo existir)
+   Página: godesk.topology.edit (só roda se #gd-topo existir)
 
    Estado em JSON (mesmo schema do godesk-dependencies-v2.yaml), desenhado
    em SVG. Modos:
@@ -605,7 +605,7 @@
     const group = document.getElementById("gd-topo-group").value.trim();
     if (!group) return;
 
-    fetch("zabbix.php?action=godesk.dependencies.v2.data", {
+    fetch("zabbix.php?action=godesk.topology.data", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ op: "group", group }),
@@ -679,7 +679,7 @@
     const body = new URLSearchParams({ op: "state" });
     hosts.forEach((h) => body.append("hosts[]", h));
 
-    fetch("zabbix.php?action=godesk.dependencies.v2.data", {
+    fetch("zabbix.php?action=godesk.topology.data", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body,

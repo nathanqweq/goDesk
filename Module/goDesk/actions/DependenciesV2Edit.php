@@ -1,6 +1,6 @@
 <?php
 /**
- * Action: godesk.dependencies.v2.edit
+ * Action: godesk.topology.edit
  *
  * Editor visual do godesk-dependencies-v2.yaml (dependência v2: arquitetura
  * por localidade). Roda em paralelo à v1 (godesk.dependencies.edit); qual

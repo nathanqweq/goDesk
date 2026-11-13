@@ -1,6 +1,6 @@
 <?php
 /**
- * View: godesk.dependencies.v2.data
+ * View: godesk.topology.data
  *
  * Só serializa o resultado — consumida via fetch() pelo godesk-topology.js.
  */

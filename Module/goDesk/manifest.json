@@ -30,13 +30,13 @@
       "class": "DependenciesTriggers",
       "view": "godesk.dependencies.triggers"
     },
-    "godesk.dependencies.v2.edit": {
+    "godesk.topology.edit": {
       "class": "DependenciesV2Edit",
-      "view": "godesk.dependencies.v2"
+      "view": "godesk.topology"
     },
-    "godesk.dependencies.v2.data": {
+    "godesk.topology.data": {
       "class": "DependenciesV2Data",
-      "view": "godesk.dependencies.v2.data"
+      "view": "godesk.topology.data"
     }
   }
 }

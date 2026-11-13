@@ -52,7 +52,7 @@ echo '</div>';
 
 echo '<textarea id="gd-topo-export-yaml" style="display:none">'.h($data['raw'] ?? '').'</textarea>';
 
-echo '<form id="gd-topo-import-form" method="post" action="zabbix.php?action=godesk.dependencies.v2.edit" style="display:none">';
+echo '<form id="gd-topo-import-form" method="post" action="zabbix.php?action=godesk.topology.edit" style="display:none">';
 echo '<input type="hidden" name="import" value="1">';
 echo '<textarea name="import_yaml"></textarea>';
 echo '</form>';
@@ -122,12 +122,12 @@ echo '<script type="application/json" id="gd-topo-data">'.json_encode([
 	'defaults' => $data['defaults'] ?? []
 ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT).'</script>';
 
-echo '<form method="post" id="gd-topo-form" action="zabbix.php?action=godesk.dependencies.v2.edit">';
+echo '<form method="post" id="gd-topo-form" action="zabbix.php?action=godesk.topology.edit">';
 echo '<input type="hidden" name="save" value="1">';
 echo '<textarea name="topology_json" id="gd-topo-json" style="display:none"></textarea>';
 echo '<div class="gd-actions">';
 echo '<button class="gd-btn gd-btn-primary" type="submit">💾 Salvar</button>';
-echo '<a class="gd-btn" href="zabbix.php?action=godesk.dependencies.v2.edit">↩ Recarregar</a>';
+echo '<a class="gd-btn" href="zabbix.php?action=godesk.topology.edit">↩ Recarregar</a>';
 echo '<a class="gd-btn" href="zabbix.php?action=godesk.dependencies.edit">🔗 Dependências v1</a>';
 echo '<a class="gd-btn" href="zabbix.php?action=godesk.config.edit">⚙️ Config</a>';
 echo '</div>';

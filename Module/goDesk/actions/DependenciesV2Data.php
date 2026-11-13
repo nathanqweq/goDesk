@@ -1,6 +1,6 @@
 <?php
 /**
- * Action: godesk.dependencies.v2.data
+ * Action: godesk.topology.data
  *
  * JSON pro editor visual da dependência v2 (godesk-topology.js):
  *
