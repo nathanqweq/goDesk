@@ -22,6 +22,15 @@ type Snapshot struct {
 	// host pai estava em alerta (godesk-dependencies.yaml).
 	AlertsHeldByDependency int64 `json:"alerts_held_by_dependency_total"`
 
+	// Dependência v2 (godesk-dependencies-v2.yaml): avaliações feitas por
+	// rules com dependency_version v2 e quantas seguraram o chamado.
+	DependencyV2Evaluated int64 `json:"dependency_v2_evaluated_total"`
+	DependencyV2Held      int64 `json:"dependency_v2_held_total"`
+	// Shadow: a v1 decide e a v2 só é comparada — Diverged conta as vezes
+	// em que as duas discordaram (detalhe no log: [dependency-shadow]).
+	DependencyShadowEvaluated int64 `json:"dependency_shadow_evaluated_total"`
+	DependencyShadowDiverged  int64 `json:"dependency_shadow_diverged_total"`
+
 	TicketsCreated      int64 `json:"tickets_created_total"`
 	TicketsCreateErrors int64 `json:"tickets_create_errors_total"`
 

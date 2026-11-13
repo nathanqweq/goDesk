@@ -36,6 +36,7 @@ func Run(opts config.ServiceConfig) error {
 	mux.HandleFunc("POST /config", handleConfig(opts.Token, opts.ConfigFile))
 	mux.HandleFunc("POST /config/test", handleConfigTest(opts.Token, opts.ConfigFile))
 	mux.HandleFunc("POST /dependencies", handleDependencies(opts.Token, opts.DependenciesFile))
+	mux.HandleFunc("POST /dependencies-v2", handleDependenciesV2(opts.Token, opts.DependenciesV2File))
 	mux.HandleFunc("POST /validate-client", handleValidateClient(opts))
 	mux.HandleFunc("GET /once-per-day", handleOncePerDayList(opts.Token))
 
@@ -120,6 +121,15 @@ func handleConfig(token, configFile string) http.HandlerFunc {
 func handleDependencies(token, depsFile string) http.HandlerFunc {
 	return handleYAMLFile(token, depsFile, "dependências", func(b []byte) error {
 		_, err := config.ParseDependencies(b)
+		return err
+	})
+}
+
+// handleDependenciesV2 recebe o godesk-dependencies-v2.yaml (godesk-client
+// dependencies-v2) — arquitetura por localidade da dependência v2.
+func handleDependenciesV2(token, path string) http.HandlerFunc {
+	return handleYAMLFile(token, path, "dependências v2", func(b []byte) error {
+		_, err := config.ParseDependenciesV2(b)
 		return err
 	})
 }

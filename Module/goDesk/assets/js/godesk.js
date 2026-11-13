@@ -495,8 +495,16 @@
             <label>Dependência</label>
             <div class="gd-check">
               <input type="checkbox" name="clients[${i}][dependency]" value="1">
-              <span class="gd-muted">não abrir chamado se um host pai estiver em alerta (<a href="zabbix.php?action=godesk.dependencies.edit">Dependências</a>)</span>
+              <span class="gd-muted">não abrir chamado se um host pai estiver em alerta (<a href="zabbix.php?action=godesk.dependencies.edit">v1</a> / <a href="zabbix.php?action=godesk.dependencies.v2.edit">v2</a>)</span>
             </div>
+          </div>
+          <div class="gd-field gd-field-tight">
+            <label>Versão da dependência</label>
+            <select name="clients[${i}][dependency_version]">
+              <option value="v1" selected>v1 (cadastro por host)</option>
+              <option value="v2">v2 (arquitetura)</option>
+              <option value="shadow">shadow (v1 decide, v2 só loga)</option>
+            </select>
           </div>
         </div>
 

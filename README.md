@@ -93,6 +93,28 @@ Quando um alerta de uma rule com dependência chega para um host cadastrado e n�
 - Se der erro na consulta (Zabbix fora do ar, sem permissão, host pai inexistente), o chamado é aberto normalmente.
 - O token em `GODESK_ZABBIX_KEY` precisa de permissão de leitura nos hosts pai.
 
+### 9. (Opcional) Dependência v2: arquitetura por localidade
+
+Roda **em paralelo** à dependência do item 8 (v1), sem alterá-la. Em vez de cadastrar pai por host, você desenha a arquitetura de cada localidade, e o goDesk decide quem é causa raiz.
+
+1. Em **Alerts → goDesk → Dependências v2 (arquitetura)**, crie uma localidade e preencha:
+   - **Host de status** e **Evento de status** (ex: `UHCC - Core Status` / `Powerplant Down`). Com esse evento ativo, **nenhum host da localidade abre chamado**, só o próprio host de status.
+   - **Root** (padrão `ZABBIX`): o ponto de entrada do monitoramento. Ligue-o aos equipamentos de entrada (os SDs).
+   - **Evento de DOWN** (padrão `*Unavailable by ICMP ping*`): o problema que marca um host como caído.
+   - **Hosts e links**: use **Importar hosts de um grupo** (o grupo raiz da usina) e desenhe os cabos no modo **🔗 Ligar**. Marque o rack de cada host.
+2. Use **🧪 Simular** para marcar hosts como DOWN (ou carregar o estado atual do Zabbix) e ver quem abriria chamado antes de ligar a v2.
+3. Em **Config (editar)**, escolha a **Versão da dependência** da rule (precisa estar com **Dependência** marcada):
+   - **v1**: comportamento de sempre.
+   - **shadow**: a v1 continua decidindo, e a v2 só registra no log o que teria feito (`[dependency-shadow] IGUAL|DIVERGE ...`) e conta divergências em `dependency_shadow_diverged_total`. Use para validar em produção sem risco.
+   - **v2**: a v2 decide. Host fora de qualquer localidade da v2 cai na v1.
+
+Como a v2 decide, na hora do alerta:
+- Primeiro checa o **status da localidade**: se o evento de status estiver ativo, segura (exceto o host de status).
+- Depois a **topologia**: o host só abre chamado se ainda existir caminho do root até um vizinho dele passando apenas por hosts UP. Por isso a redundância é respeitada (um FW com perna nos dois membros do core só é segurado se os dois caírem), e o comentário no evento informa quem cortou o caminho e o rack.
+- Host sem links, host não encontrado no Zabbix ou erro de consulta: abre chamado (mesma regra de segurança da v1).
+
+As localidades ficam em `/etc/zabbix/godesk/godesk-dependencies-v2.yaml` (caminho alterável com `GODESK_DEPENDENCIES_V2_FILE`), sincronizado pelo `godesk-client dependencies-v2` → `POST /dependencies-v2`. Exportar/Importar funcionam como na v1. O estado da localidade é lido com 3 chamadas à API do Zabbix por alerta (`host.get`, `problem.get`, `trigger.get`), independente do número de hosts.
+
 ## Instalação manual (sem apt)
 
 Use [install.sh](install.sh) — compila/copia os arquivos na mão, com as mesmas opções (módulo, binário, configs, serviço systemd). Útil se o host não tem acesso ao repositório APT.

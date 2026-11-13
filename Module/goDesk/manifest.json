@@ -7,7 +7,7 @@
   "description": "goDesk module (config viewer/editor).",
   "assets": {
     "css": ["godesk.css"],
-    "js": ["godesk.js"]
+    "js": ["godesk.js", "godesk-topology.js"]
   },
   "actions": {
     "godesk.config.view": {
@@ -29,6 +29,14 @@
     "godesk.dependencies.triggers": {
       "class": "DependenciesTriggers",
       "view": "godesk.dependencies.triggers"
+    },
+    "godesk.dependencies.v2.edit": {
+      "class": "DependenciesV2Edit",
+      "view": "godesk.dependencies.v2"
+    },
+    "godesk.dependencies.v2.data": {
+      "class": "DependenciesV2Data",
+      "view": "godesk.dependencies.v2.data"
     }
   }
 }

@@ -91,6 +91,7 @@ class ConfigView extends CController {
 			$rules[$rule]['priority'] ??= '';
 			$rules[$rule]['custom_status'] ??= false;
 			$rules[$rule]['dependency'] ??= false;
+			$rules[$rule]['dependency_version'] ??= 'v1';
 			$rules[$rule]['status_open'] ??= '';
 			$rules[$rule]['status_update'] ??= '';
 			$rules[$rule]['topdesk'] ??= [];

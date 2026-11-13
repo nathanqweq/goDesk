@@ -20,8 +20,12 @@ type RuntimeConfig struct {
 	LogFile          string
 	ConfigFile       string
 	DependenciesFile string
-	MetricsFile      string
-	TimeoutSec       int
+	// DependenciesV2File é o godesk-dependencies-v2.yaml (arquitetura por
+	// localidade, ver dependencies_v2.go) — usado pelas rules com
+	// dependency_version v2 ou shadow.
+	DependenciesV2File string
+	MetricsFile        string
+	TimeoutSec         int
 
 	SMTPHost string
 	SMTPPort string
@@ -68,16 +72,17 @@ func FromValues(svc ServiceConfig, ticketName, rawData string) RuntimeConfig {
 		// lugar em vez do antigo default em /tmp (perdido em reboot,
 		// diferente do systemd, e foi o que causou confusão pra achar o
 		// log de um alerta que rodou no modo one-shot).
-		LogFile:     svc.LogFile,
-		ConfigFile:       getenv("TOPDESK_CONFIG", "/etc/zabbix/godesk/godesk-config.yaml"),
-		DependenciesFile: svc.DependenciesFile,
-		MetricsFile:      MetricsFileFromEnv(),
-		TimeoutSec:  atoiDefault(getenv("TOPDESK_TIMEOUT_SEC", "15"), 15),
-		SMTPHost:    smtp.Host,
-		SMTPPort:    smtp.Port,
-		SMTPUser:    smtp.User,
-		SMTPPass:    smtp.Pass,
-		SMTPFrom:    smtp.From,
+		LogFile:            svc.LogFile,
+		ConfigFile:         getenv("TOPDESK_CONFIG", "/etc/zabbix/godesk/godesk-config.yaml"),
+		DependenciesFile:   svc.DependenciesFile,
+		DependenciesV2File: svc.DependenciesV2File,
+		MetricsFile:        MetricsFileFromEnv(),
+		TimeoutSec:         atoiDefault(getenv("TOPDESK_TIMEOUT_SEC", "15"), 15),
+		SMTPHost:           smtp.Host,
+		SMTPPort:           smtp.Port,
+		SMTPUser:           smtp.User,
+		SMTPPass:           smtp.Pass,
+		SMTPFrom:           smtp.From,
 	}
 
 	// sane
@@ -125,6 +130,10 @@ type ServiceConfig struct {
 	// separado do ConfigFile pra ter página e sync próprios no módulo.
 	DependenciesFile string
 
+	// DependenciesV2File é o godesk-dependencies-v2.yaml (dependência v2,
+	// em paralelo à v1 — ver dependencies_v2.go).
+	DependenciesV2File string
+
 	// TopDesk padrão do serviço — não vem mais de alerta nenhum, é sempre
 	// daqui (usado tanto pra criar/atualizar chamados quanto pelo
 	// healthcheck em background).
@@ -155,7 +164,8 @@ func ServiceConfigFromEnv() ServiceConfig {
 		LogFile:    get("TOPDESK_LOG_FILE", "/var/log/godesk/godesk-service.log"),
 		ConfigFile: get("TOPDESK_CONFIG", "/etc/zabbix/godesk/godesk-config.yaml"),
 
-		DependenciesFile: get("GODESK_DEPENDENCIES_FILE", DefaultDependenciesFile),
+		DependenciesFile:   get("GODESK_DEPENDENCIES_FILE", DefaultDependenciesFile),
+		DependenciesV2File: get("GODESK_DEPENDENCIES_V2_FILE", DefaultDependenciesV2File),
 
 		TopdeskDomain: get("GODESK_TOPDESK_DOMAIN", ""),
 		TopdeskUser:   get("GODESK_TOPDESK_USER", ""),

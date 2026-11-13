@@ -114,7 +114,7 @@ func Run(cfg config.RuntimeConfig) (err error) {
 	switch {
 	case !exists && eventKind == "ProblemStart":
 		if pol.Dependency {
-			if msg, hold := checkDependency(cfg, zx, p); hold {
+			if msg, hold := runDependency(cfg, zx, p, pol.DependencyVersion); hold {
 				recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.AlertsHeldByDependency++ })
 				// só comentário, sem ack: o evento segue "não reconhecido" e um
 				// escalonamento da Action reenvia o alerta — se o pai já tiver

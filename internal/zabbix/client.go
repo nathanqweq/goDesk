@@ -170,6 +170,89 @@ func (c Client) ActiveProblems(hostID string) ([]Problem, error) {
 	return problems, nil
 }
 
+// ActiveProblemsByHost devolve os problemas ativos de vários hosts de uma
+// vez (usado pela dependência v2, que precisa do estado da localidade
+// inteira): problem.get não diz de qual host é cada problema, então um
+// trigger.get pelos objectid faz o mapa trigger → host. Duas chamadas no
+// total, independente da quantidade de hosts.
+func (c Client) ActiveProblemsByHost(hostIDs []string) (map[string][]Problem, error) {
+	out := map[string][]Problem{}
+	if len(hostIDs) == 0 {
+		return out, nil
+	}
+
+	raw, err := c.call("problem.get", map[string]any{
+		"output":    []string{"eventid", "name", "severity", "clock", "objectid"},
+		"hostids":   hostIDs,
+		"source":    0,
+		"object":    0,
+		"sortfield": []string{"eventid"},
+		"sortorder": "DESC",
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var problems []struct {
+		Problem
+		ObjectID string `json:"objectid"`
+	}
+	if err := json.Unmarshal(raw, &problems); err != nil {
+		return nil, fmt.Errorf("problem.get: %w", err)
+	}
+	if len(problems) == 0 {
+		return out, nil
+	}
+
+	triggerIDs := make([]string, 0, len(problems))
+	seen := map[string]bool{}
+	for _, p := range problems {
+		if !seen[p.ObjectID] {
+			seen[p.ObjectID] = true
+			triggerIDs = append(triggerIDs, p.ObjectID)
+		}
+	}
+
+	raw, err = c.call("trigger.get", map[string]any{
+		"output":      []string{"triggerid"},
+		"triggerids":  triggerIDs,
+		"selectHosts": []string{"hostid"},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var triggers []struct {
+		TriggerID string `json:"triggerid"`
+		Hosts     []struct {
+			HostID string `json:"hostid"`
+		} `json:"hosts"`
+	}
+	if err := json.Unmarshal(raw, &triggers); err != nil {
+		return nil, fmt.Errorf("trigger.get: %w", err)
+	}
+
+	hostsOf := map[string][]string{}
+	for _, t := range triggers {
+		for _, h := range t.Hosts {
+			hostsOf[t.TriggerID] = append(hostsOf[t.TriggerID], h.HostID)
+		}
+	}
+
+	wanted := map[string]bool{}
+	for _, id := range hostIDs {
+		wanted[id] = true
+	}
+	for _, p := range problems {
+		for _, hid := range hostsOf[p.ObjectID] {
+			if wanted[hid] {
+				out[hid] = append(out[hid], p.Problem)
+			}
+		}
+	}
+	return out, nil
+}
+
 func (c Client) configured() bool {
 	return strings.TrimSpace(c.BaseURL) != "" && strings.TrimSpace(c.Token) != ""
 }

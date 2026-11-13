@@ -22,7 +22,8 @@ class Module extends CModule {
 					new CMenu([
 						(new CMenuItem(_('Config (visualizar)')))->setAction('godesk.config.view'),
 						(new CMenuItem(_('Config (editar)')))->setAction('godesk.config.edit'),
-						(new CMenuItem(_('Dependências')))->setAction('godesk.dependencies.edit')
+						(new CMenuItem(_('Dependências')))->setAction('godesk.dependencies.edit'),
+						(new CMenuItem(_('Dependências v2 (arquitetura)')))->setAction('godesk.dependencies.v2.edit')
 					])
 				)
 			);

@@ -62,6 +62,12 @@ type Policy struct {
 	// chamado (ver internal/app/dependency.go).
 	Dependency bool `yaml:"dependency"`
 
+	// DependencyVersion: qual dependência roda quando Dependency é true —
+	// v1 (vazio = v1, godesk-dependencies.yaml), v2 (arquitetura por
+	// localidade, godesk-dependencies-v2.yaml) ou shadow (a v1 decide e a
+	// v2 só registra no log o que teria feito). Também sempre da regra.
+	DependencyVersion string `yaml:"dependency_version"`
+
 	TopDesk TopDeskDefaults `yaml:"topdesk"`
 }
 
@@ -82,16 +88,18 @@ type ClientPolicy struct {
 // por regra — urgency/impact/priority/autoclose e overrides de texto do
 // TopDesk (o mais comum sendo more_info_text).
 type RulePolicy struct {
-	Client       string          `yaml:"client"`
-	Priority     string          `yaml:"priority"`
-	Urgency      string          `yaml:"urgency"`
-	Impact       string          `yaml:"impact"`
-	AutoClose    bool            `yaml:"autoclose"`
-	CustomStatus bool            `yaml:"custom_status"`
-	StatusOpen   string          `yaml:"status_open"`
-	StatusUpdate string          `yaml:"status_update"`
-	Dependency   bool            `yaml:"dependency"`
-	TopDesk      TopDeskDefaults `yaml:"topdesk"`
+	Client       string `yaml:"client"`
+	Priority     string `yaml:"priority"`
+	Urgency      string `yaml:"urgency"`
+	Impact       string `yaml:"impact"`
+	AutoClose    bool   `yaml:"autoclose"`
+	CustomStatus bool   `yaml:"custom_status"`
+	StatusOpen   string `yaml:"status_open"`
+	StatusUpdate string `yaml:"status_update"`
+	Dependency   bool   `yaml:"dependency"`
+	// DependencyVersion: v1 | v2 | shadow (ver Policy.DependencyVersion)
+	DependencyVersion string          `yaml:"dependency_version"`
+	TopDesk           TopDeskDefaults `yaml:"topdesk"`
 }
 
 // policiesFileV2 é o formato novo do YAML — só usado internamente durante
@@ -209,6 +217,7 @@ func flattenRules(v2 policiesFileV2) PoliciesFile {
 		}
 		p.AutoClose = rule.AutoClose
 		p.Dependency = rule.Dependency
+		p.DependencyVersion = rule.DependencyVersion
 
 		p.CustomStatus = rule.CustomStatus
 		if strings.TrimSpace(rule.StatusOpen) != "" {
@@ -308,6 +317,7 @@ func mergePolicy(def Policy, over Policy) Policy {
 	// autoclose do cliente manda (se existir bloco do cliente)
 	def.AutoClose = over.AutoClose
 	def.Dependency = over.Dependency
+	def.DependencyVersion = over.DependencyVersion
 
 	def.CustomStatus = over.CustomStatus
 	if strings.TrimSpace(over.StatusOpen) != "" {

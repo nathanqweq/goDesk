@@ -126,7 +126,7 @@ else {
 
 		$c_auto = !empty($c['autoclose']) ? '<span class="gd-pill gd-true">autoclose</span>' : '<span class="gd-pill gd-false">manual</span>';
 		if (!empty($c['dependency'])) {
-			$c_auto .= ' <span class="gd-pill gd-true">dependência</span>';
+			$c_auto .= ' <span class="gd-pill gd-true">dependência '.h($c['dependency_version'] ?? 'v1').'</span>';
 		}
 		echo '<div>'.$c_auto.'</div>';
 		echo '</div>';

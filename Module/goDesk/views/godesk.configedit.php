@@ -294,6 +294,11 @@ foreach ($rules as $c) {
 	$autoclose = !empty($c['autoclose']) ? 'checked' : '';
 	$custom_status = !empty($c['custom_status']) ? 'checked' : '';
 	$dependency = !empty($c['dependency']) ? 'checked' : '';
+	$dep_version = (string)($c['dependency_version'] ?? 'v1');
+	$dep_opts = '';
+	foreach (['v1' => 'v1 (cadastro por host)', 'v2' => 'v2 (arquitetura)', 'shadow' => 'shadow (v1 decide, v2 só loga)'] as $dv => $dl) {
+		$dep_opts .= '<option value="'.$dv.'"'.($dep_version === $dv ? ' selected' : '').'>'.$dl.'</option>';
+	}
 	$custom_status_hidden = !empty($c['custom_status']) ? '' : ' style="display:none"';
 
 	echo '<div class="gd-client-card gd-client" data-idx="'.$idx.'">';
@@ -350,8 +355,12 @@ foreach ($rules as $c) {
 		<label>Dependência</label>
 		<div class="gd-check">
 			<input type="checkbox" name="clients['.$idx.'][dependency]" value="1" '.$dependency.'>
-			<span class="gd-muted">não abrir chamado se um host pai estiver em alerta (<a href="zabbix.php?action=godesk.dependencies.edit">Dependências</a>)</span>
+			<span class="gd-muted">não abrir chamado se um host pai estiver em alerta (<a href="zabbix.php?action=godesk.dependencies.edit">v1</a> / <a href="zabbix.php?action=godesk.dependencies.v2.edit">v2</a>)</span>
 		</div>
+	</div>';
+	echo '<div class="gd-field gd-field-tight">
+		<label>Versão da dependência</label>
+		<select name="clients['.$idx.'][dependency_version]">'.$dep_opts.'</select>
 	</div>';
 	echo '</div>';
 	echo '<div class="gd-row gd-customstatus-box"'.$custom_status_hidden.'>';

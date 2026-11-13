@@ -336,3 +336,200 @@
   background: #17171a;
   border: 1px solid #333;
 }
+
+/* =========================================================
+   Dependências v2 — editor visual (godesk-topology.js)
+========================================================= */
+
+.godesk-module .gd-wrap-wide {
+  max-width: 1500px;
+}
+
+.godesk-module .gd-topo-modes {
+  display: flex;
+  gap: 6px;
+  align-self: flex-end;
+}
+
+.godesk-module .gd-topo-simbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #f3f6fb;
+  border: 1px dashed #b9c6da;
+}
+
+.godesk-module .gd-topo-main {
+  display: flex;
+  gap: 14px;
+  margin-top: 14px;
+  align-items: stretch;
+}
+
+.godesk-module .gd-topo-canvas-wrap {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  max-height: 72vh;
+  border: 1px solid #dcdcdc;
+  border-radius: 8px;
+  background-color: #fafbfc;
+  background-image: radial-gradient(circle, #d9dde3 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.godesk-module .gd-topo-svg {
+  display: block;
+  user-select: none;
+  touch-action: none;
+}
+
+.godesk-module .gd-topo-side {
+  width: 300px;
+  flex: 0 0 300px;
+  max-height: 72vh;
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid #dcdcdc;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.godesk-module .gd-topo-side .gd-field {
+  min-width: 0;
+}
+
+.godesk-module .gd-topo-side .gd-banner {
+  margin: 8px 0 0 0;
+  font-size: 12px;
+}
+
+.godesk-module .gd-topo-linklist,
+.godesk-module .gd-topo-res {
+  list-style: none;
+  margin: 6px 0 0 0;
+  padding: 0;
+}
+
+.godesk-module .gd-topo-linklist li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(0,0,0,.06);
+}
+
+.godesk-module .gd-topo-res li {
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  border-radius: 6px;
+  border-left: 4px solid;
+}
+
+.godesk-module .gd-topo-res-open li { border-left-color: #d64545; background: rgba(214,69,69,.08); }
+.godesk-module .gd-topo-res-held li { border-left-color: #e0a030; background: rgba(224,160,48,.10); }
+
+.godesk-module .gd-btn-xs {
+  padding: 2px 7px;
+  font-size: 11px;
+}
+
+.godesk-module .gd-topo-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 10px;
+  font-size: 12px;
+}
+
+.godesk-module .gd-topo-legend-item i {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  margin-right: 5px;
+  vertical-align: -2px;
+  border: 1px solid rgba(0,0,0,.2);
+}
+
+.godesk-module .gd-topo-legend-item i.sim-open { background: #d64545; }
+.godesk-module .gd-topo-legend-item i.sim-held { background: #e0a030; }
+.godesk-module .gd-topo-legend-item i.sim-cut { background: #c9ccd1; border-style: dashed; }
+.godesk-module .gd-topo-legend-item i.is-isolated { background: #fff; border-style: dashed; }
+
+/* SVG */
+.godesk-module .gd-topo-link {
+  stroke: #8a96a8;
+  stroke-width: 2;
+}
+.godesk-module .gd-topo-link.is-selected { stroke: #2f6fdf; stroke-width: 4; }
+.godesk-module .gd-topo-link.is-cut { stroke: #d64545; stroke-dasharray: 6 4; opacity: .7; }
+
+.godesk-module .gd-topo-link-hit {
+  stroke: transparent;
+  stroke-width: 12;
+  cursor: pointer;
+}
+
+.godesk-module .gd-topo-node { cursor: grab; }
+.godesk-module .gd-topo-linking .gd-topo-node { cursor: crosshair; }
+
+.godesk-module .gd-topo-node .gd-topo-box {
+  fill: #ffffff;
+  stroke: #5b6b82;
+  stroke-width: 1.5;
+}
+
+.godesk-module .gd-topo-node text {
+  font-size: 12px;
+  font-weight: 600;
+  fill: #1f2733;
+  pointer-events: none;
+}
+
+.godesk-module .gd-topo-node.is-root .gd-topo-box { fill: #2b3a4f; stroke: #2b3a4f; }
+.godesk-module .gd-topo-node.is-root text { fill: #fff; }
+.godesk-module .gd-topo-node.is-isolated .gd-topo-box { stroke-dasharray: 5 3; }
+.godesk-module .gd-topo-node.is-selected .gd-topo-box { stroke: #2f6fdf; stroke-width: 3; }
+.godesk-module .gd-topo-node.is-linkfrom .gd-topo-box { stroke: #2e9e5b; stroke-width: 3; stroke-dasharray: 4 2; }
+
+.godesk-module .gd-topo-node.sim-open .gd-topo-box { fill: #d64545; stroke: #a52f2f; }
+.godesk-module .gd-topo-node.sim-open text { fill: #fff; }
+.godesk-module .gd-topo-node.sim-held .gd-topo-box { fill: #f3c063; stroke: #b9821c; }
+.godesk-module .gd-topo-node.sim-cut .gd-topo-box { fill: #e4e6ea; stroke-dasharray: 5 3; }
+.godesk-module .gd-topo-node.sim-cut text { fill: #6b7280; }
+
+.godesk-module .gd-topo-status rect { fill: #eef2f8; stroke: #8a96a8; }
+.godesk-module .gd-topo-status text { font-size: 12px; fill: #1f2733; }
+.godesk-module .gd-topo-status.is-down rect { fill: #d64545; stroke: #a52f2f; }
+.godesk-module .gd-topo-status.is-down text { fill: #fff; font-weight: 700; }
+
+.godesk-module .gd-topo-empty { font-size: 14px; fill: #6b7280; }
+
+@media (max-width: 900px) {
+  .godesk-module .gd-topo-main { flex-direction: column; }
+  .godesk-module .gd-topo-side { width: auto; flex: 1 1 auto; }
+}
+
+[theme='dark-theme'] .godesk-module .gd-topo-canvas-wrap {
+  background-color: #17171a;
+  background-image: radial-gradient(circle, #2c2c33 1px, transparent 1px);
+  border-color: #333;
+}
+[theme='dark-theme'] .godesk-module .gd-topo-side { border-color: #333; }
+[theme='dark-theme'] .godesk-module .gd-topo-simbar { background: #1c2430; border-color: #35506f; }
+[theme='dark-theme'] .godesk-module .gd-topo-node .gd-topo-box { fill: #2b2f36; stroke: #7d8899; }
+[theme='dark-theme'] .godesk-module .gd-topo-node text { fill: #e8e8e8; }
+[theme='dark-theme'] .godesk-module .gd-topo-node.is-root .gd-topo-box { fill: #4a6487; stroke: #4a6487; }
+[theme='dark-theme'] .godesk-module .gd-topo-node.sim-held .gd-topo-box { fill: #8a6516; stroke: #e0a030; }
+[theme='dark-theme'] .godesk-module .gd-topo-node.sim-cut .gd-topo-box { fill: #24262b; }
+[theme='dark-theme'] .godesk-module .gd-topo-node.sim-cut text { fill: #8b8f97; }
+[theme='dark-theme'] .godesk-module .gd-topo-link { stroke: #6b7686; }
+[theme='dark-theme'] .godesk-module .gd-topo-status rect { fill: #24262b; stroke: #555; }
+[theme='dark-theme'] .godesk-module .gd-topo-status text { fill: #e8e8e8; }
+[theme='dark-theme'] .godesk-module .gd-topo-linklist li { border-bottom-color: rgba(255,255,255,.08); }
+[theme='dark-theme'] .godesk-module .gd-topo-legend-item i.is-isolated { background: #2b2f36; }

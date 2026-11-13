@@ -29,6 +29,12 @@ func main() {
 				os.Exit(1)
 			}
 			return
+		case "dependencies-v2":
+			if err := runDependenciesV2(); err != nil {
+				fmt.Fprintln(os.Stderr, "godesk-client: "+err.Error())
+				os.Exit(1)
+			}
+			return
 		case "dependencies":
 			if err := runDependencies(); err != nil {
 				fmt.Fprintln(os.Stderr, "godesk-client: "+err.Error())
@@ -130,6 +136,32 @@ func runDependencies() error {
 	}
 
 	fmt.Printf("dependências enviadas com sucesso para %s (lidas de %s)\n", serverURL, path)
+	return nil
+}
+
+// runDependenciesV2 manda o godesk-dependencies-v2.yaml local (gravado pela
+// página "Dependências v2" do módulo) pro POST /dependencies-v2.
+func runDependenciesV2() error {
+	env, serverURL, token, err := loadClientEnv()
+	if err != nil {
+		return err
+	}
+
+	path := resolve(env, "GODESK_DEPENDENCIES_V2_FILE", config.DefaultDependenciesV2File)
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("falha ao ler %s: %w", path, err)
+	}
+	if _, err := config.ParseDependenciesV2(data); err != nil {
+		return fmt.Errorf("yaml inválido em %s: %w", path, err)
+	}
+
+	if _, err := postYAML(serverURL, token, "/dependencies-v2", data); err != nil {
+		return err
+	}
+
+	fmt.Printf("dependências v2 enviadas com sucesso para %s (lidas de %s)\n", serverURL, path)
 	return nil
 }
 

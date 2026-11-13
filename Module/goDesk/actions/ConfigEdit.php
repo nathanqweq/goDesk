@@ -19,6 +19,7 @@
  *     urgency, impact, priority, autoclose
  *     custom_status: bool         # sempre da própria rule, nunca do cliente
  *     dependency: bool            # sempre da rule: consulta godesk-dependencies.yaml antes de abrir chamado
+ *     dependency_version: v1      # v1 | v2 (godesk-dependencies-v2.yaml) | shadow (v1 decide, v2 só loga)
  *     status_open: ""             # id do processingStatus no TopDesk, usado
  *                                  # na abertura do chamado quando custom_status=true
  *     status_update: ""           # id do processingStatus no TopDesk, usado
@@ -134,6 +135,7 @@ class ConfigEdit extends CController {
 			$rules[$rule]['priority'] ??= '';
 			$rules[$rule]['custom_status'] ??= false;
 			$rules[$rule]['dependency'] ??= false;
+			$rules[$rule]['dependency_version'] = $this->depVersion($rules[$rule]['dependency_version'] ?? '');
 			$rules[$rule]['status_open'] ??= '';
 			$rules[$rule]['status_update'] ??= '';
 			$rules[$rule]['topdesk'] ??= [];
@@ -170,6 +172,12 @@ class ConfigEdit extends CController {
 
 	private function toBool($v): bool {
 		return ($v === 1 || $v === '1' || $v === true || $v === 'true' || $v === 'on');
+	}
+
+	/** Mesma regra do config.NormalizeDependencyVersion no Go: vazio/desconhecido = v1. */
+	private function depVersion($v): string {
+		$v = strtolower(trim((string)$v));
+		return in_array($v, ['v2', 'shadow'], true) ? $v : 'v1';
 	}
 
 	private function normalizeNullString($v): string {
@@ -251,6 +259,7 @@ class ConfigEdit extends CController {
 				'priority' => (string)($row['priority'] ?? ''),
 				'custom_status' => $this->toBool($row['custom_status'] ?? false),
 				'dependency' => $this->toBool($row['dependency'] ?? false),
+				'dependency_version' => $this->depVersion($row['dependency_version'] ?? ''),
 				'status_open' => (string)($row['status_open'] ?? ''),
 				'status_update' => (string)($row['status_update'] ?? ''),
 				'topdesk' => $this->normalizeTopdeskFromPost($td)
@@ -510,6 +519,7 @@ class ConfigEdit extends CController {
 					'priority' => (string)($r['priority'] ?? ''),
 					'custom_status' => (bool)($r['custom_status'] ?? false),
 					'dependency' => (bool)($r['dependency'] ?? false),
+					'dependency_version' => $this->depVersion($r['dependency_version'] ?? ''),
 					'status_open' => (string)($r['status_open'] ?? ''),
 					'status_update' => (string)($r['status_update'] ?? ''),
 					'topdesk' => (array)($r['topdesk'] ?? [])
