@@ -27,7 +27,7 @@ jobs:
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
       - name: Install packaging tools
-        run: sudo apt-get update && sudo apt-get install -y dpkg-dev gnupg
+        run: sudo apt-get update && sudo apt-get install -y dpkg-dev gnupg apt-utils
 
       - name: Build .deb (godesk)
         run: bash packaging/build-deb.sh "${{ steps.version.outputs.version }}"
