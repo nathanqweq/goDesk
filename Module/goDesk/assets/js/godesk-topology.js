@@ -599,6 +599,21 @@
     renderAll();
   }
 
+  // Lê a resposta das actions JSON do módulo. Se vier HTML (sessão expirada,
+  // erro do Zabbix, módulo desatualizado), mostra o começo do texto em vez
+  // do "Unexpected token '<'" do JSON.parse.
+  function readJson(r) {
+    return r.text().then((text) => {
+      try {
+        return JSON.parse(text);
+      }
+      catch (e) {
+        const plain = text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 200);
+        throw new Error(`resposta não é JSON (HTTP ${r.status}). Recarregue a página; se persistir, reabra Administration → Modules. Início da resposta: ${plain}`);
+      }
+    });
+  }
+
   function importGroup() {
     const s = site();
     if (!s) { alert("Crie ou escolha uma localidade antes."); return; }
@@ -610,7 +625,7 @@
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ op: "group", group }),
     })
-      .then((r) => r.json())
+      .then(readJson)
       .then((data) => {
         if (data.error) { alert(data.error); return; }
         const fresh = s.nodes.length <= 1;
@@ -684,7 +699,7 @@
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body,
     })
-      .then((r) => r.json())
+      .then(readJson)
       .then((data) => {
         if (data.error) { alert(data.error); return; }
         const problems = {};

@@ -20,7 +20,8 @@
     },
     "godesk.config.validate": {
       "class": "ConfigValidate",
-      "view": "godesk.configvalidate"
+      "view": "godesk.configvalidate",
+      "layout": "layout.json"
     },
     "godesk.dependencies.edit": {
       "class": "DependenciesEdit",
@@ -28,7 +29,8 @@
     },
     "godesk.dependencies.triggers": {
       "class": "DependenciesTriggers",
-      "view": "godesk.dependencies.triggers"
+      "view": "godesk.dependencies.triggers",
+      "layout": "layout.json"
     },
     "godesk.topology.edit": {
       "class": "DependenciesV2Edit",
@@ -36,7 +38,8 @@
     },
     "godesk.topology.data": {
       "class": "DependenciesV2Data",
-      "view": "godesk.topology.data"
+      "view": "godesk.topology.data",
+      "layout": "layout.json"
     }
   }
 }
