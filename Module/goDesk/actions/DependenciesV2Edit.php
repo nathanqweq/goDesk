@@ -108,11 +108,15 @@ class DependenciesV2Edit extends CController {
 				if ($host === '') {
 					continue;
 				}
+				// a extensão yaml do PHP segue YAML 1.1, onde a chave y SEM
+				// aspas é booleano (yes) → chega como $n[1]; arquivos antigos
+				// foram gravados assim, então aceita as duas formas
+				$y = $n['y'] ?? $n[1] ?? 0;
 				$nodes[] = [
 					'host' => $host,
 					'rack' => trim((string)($n['rack'] ?? '')),
 					'x' => (int)round((float)($n['x'] ?? 0)),
-					'y' => (int)round((float)($n['y'] ?? 0))
+					'y' => (int)round((float)$y)
 				];
 			}
 
@@ -306,8 +310,10 @@ class DependenciesV2Edit extends CController {
 					if ($n['rack'] !== '') {
 						$parts[] = 'rack: '.self::q($n['rack']);
 					}
-					$parts[] = 'x: '.(int)$n['x'];
-					$parts[] = 'y: '.(int)$n['y'];
+					// "y" entre aspas: sem elas o YAML 1.1 (yaml_parse) lê a
+					// chave como booleano
+					$parts[] = '"x": '.(int)$n['x'];
+					$parts[] = '"y": '.(int)$n['y'];
 					$y .= '      - {'.implode(', ', $parts)."}\n";
 				}
 			}
