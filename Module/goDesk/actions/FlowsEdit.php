@@ -89,6 +89,29 @@ class FlowsEdit extends CController {
 		return trim((string)$v);
 	}
 
+	/** Regras de uma condição; regra com "conditions" é um grupo (E/OU) — até 3 níveis. */
+	private static function conds($list, int $depth): array {
+		$out = [];
+		foreach ((array)$list as $c) {
+			if (!is_array($c)) {
+				continue;
+			}
+			if (!empty($c['conditions']) && is_array($c['conditions']) && $depth < 4) {
+				$out[] = [
+					'match' => (self::str($c['match'] ?? '') === 'any') ? 'any' : 'all',
+					'conditions' => self::conds($c['conditions'], $depth + 1)
+				];
+				continue;
+			}
+			$out[] = [
+				'field' => self::str($c['field'] ?? ''),
+				'op' => self::str($c['op'] ?? 'eq'),
+				'value' => self::str($c['value'] ?? '')
+			];
+		}
+		return $out;
+	}
+
 	/**
 	 * Normaliza a estrutura (editor ou arquivo importado): só os campos
 	 * conhecidos, tudo string/int, listas reindexadas. A validação de verdade
@@ -130,13 +153,31 @@ class FlowsEdit extends CController {
 				switch ($node['type']) {
 					case 'if':
 						$node['match'] = (self::str($n['match'] ?? '') === 'any') ? 'any' : 'all';
-						$node['conditions'] = [];
-						foreach ((array)($n['conditions'] ?? []) as $c) {
-							if (is_array($c)) {
-								$node['conditions'][] = [
-									'field' => self::str($c['field'] ?? ''),
-									'op' => self::str($c['op'] ?? 'eq'),
-									'value' => self::str($c['value'] ?? '')
+						$node['conditions'] = self::conds($n['conditions'] ?? [], 1);
+						break;
+					case 'branch':
+						$node['branches'] = [];
+						foreach ((array)($n['branches'] ?? []) as $b) {
+							if (is_array($b)) {
+								$node['branches'][] = [
+									'id' => self::str($b['id'] ?? ''),
+									'label' => self::str($b['label'] ?? ''),
+									'match' => (self::str($b['match'] ?? '') === 'any') ? 'any' : 'all',
+									'conditions' => self::conds($b['conditions'] ?? [], 1)
+								];
+							}
+						}
+						break;
+					case 'transform':
+						$node['transforms'] = [];
+						foreach ((array)($n['transforms'] ?? []) as $t) {
+							if (is_array($t)) {
+								$node['transforms'][] = [
+									'var' => self::str($t['var'] ?? ''),
+									'from' => self::str($t['from'] ?? ''),
+									'op' => self::str($t['op'] ?? 'set') ?: 'set',
+									'arg' => self::str($t['arg'] ?? ''),
+									'arg2' => self::str($t['arg2'] ?? '')
 								];
 							}
 						}

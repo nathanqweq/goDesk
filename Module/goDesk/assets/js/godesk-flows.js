@@ -27,6 +27,8 @@
     if: { icon: "◇", name: "Condição" },
     switch: { icon: "⑂", name: "Switch" },
     set: { icon: "✎", name: "Definir campos" },
+    branch: { icon: "⑃", name: "Condição múltipla" },
+    transform: { icon: "ƒ", name: "Transformar texto" },
     table: { icon: "▦", name: "Tabela" },
     update: { icon: "⤴", name: "Atualizar chamado" },
     http: { icon: "⇄", name: "HTTP" },
@@ -41,6 +43,13 @@
     ["exists", "preenchido"], ["not_exists", "vazio"],
     ["gt", ">"], ["gte", "≥"], ["lt", "<"], ["lte", "≤"],
     ["is_true", "é verdadeiro"], ["is_false", "é falso"],
+    ["starts", "começa com"], ["ends", "termina com"],
+    ["regex", "regex"], ["not_regex", "não casa a regex"],
+    ["between", "entre (início..fim)"],
+  ];
+  const TRANSFORM_OPS = [
+    ["set", "texto (com variáveis)"], ["extract", "extrair por regex"], ["replace", "substituir"],
+    ["upper", "MAIÚSCULAS"], ["lower", "minúsculas"], ["trim", "aparar espaços"], ["default", "valor padrão se vazio"],
   ];
   const OP_LABEL = Object.fromEntries(OPS);
   const NOVALUE_OPS = new Set(["exists", "not_exists", "is_true", "is_false"]);
@@ -67,7 +76,8 @@
   // mesma lista do config.FlowUpdateFields
   const UPDATE_FIELDS = [["urgency", "Urgência"], ["impact", "Impacto"], ["priority", "Prioridade"], ["oper_group", "Grupo operador (ID)"], ["operator", "Operador (ID)"]];
   const HTTP_METHODS = ["POST", "GET", "PUT", "PATCH", "DELETE"];
-  const PORT_LABEL = { true: "sim", false: "não", default: "outro", found: "achou", not_found: "não achou", next: "" };
+  const PORT_LABEL = { true: "sim", false: "não", default: "outro", found: "achou", not_found: "não achou", else: "senão", next: "" };
+  const MAX_COND_DEPTH = 3;
 
   // mesmos campos do eventResolver (internal/app/flow.go) + os do motor
   const FIELDS = [
@@ -81,6 +91,7 @@
     ["event.acked_by_user", "reconhecido pelo atendimento (true/false)"], ["event.acknowledged", "reconhecido por qualquer um, inclusive o goDesk"],
     ["now.weekday", "dia da semana (dom..sab)"], ["now.hour", "hora (00-23)"], ["now.time", "hora HH:MM"], ["now.date", "data AAAA-MM-DD"],
     ["set.", "campo já definido no fluxo — set.<campo>"],
+    ["var.", "variável criada no Transformar texto — var.<nome>"],
   ];
   const VARS = ["host", "host.name", "trigger", "severity", "value", "host.tag.", "event.tag.", "cliente", "now.time", "event.age", "ticket.number"];
 
@@ -163,8 +174,44 @@
       }
       case "is_true": return any((v) => { const [b, ok] = parseBool(v); return ok && b; });
       case "is_false": return !evalCondition(vals, "is_true", want);
+      case "starts": return any((v) => String(v).toLowerCase().startsWith(String(want).toLowerCase()));
+      case "ends": return any((v) => String(v).toLowerCase().endsWith(String(want).toLowerCase()));
+      case "regex": { const re = flowRegex(want); return re ? any((v) => re.test(String(v))) : false; }
+      case "not_regex": return flowRegex(want) ? !evalCondition(vals, "regex", want) : false;
+      case "between": {
+        const p = betweenParts(want);
+        if (!p) return false;
+        return any((v) => between(String(v).trim(), p[0], p[1]));
+      }
     }
     return false;
+  }
+
+  // regex sem diferenciar maiúsculas (igual ao config.CompileFlowRegex);
+  // inválida = null
+  function flowRegex(p) {
+    // "u": escape inválido vira erro (como no RE2 do Go) e . / maiúsculas
+    // seguem Unicode, igual ao Go
+    try { return new RegExp(String(p), "iu"); } catch (e) { return null; }
+  }
+
+  function betweenParts(v) {
+    v = String(v);
+    const i = v.indexOf("..");
+    if (i < 0) return null;
+    const lo = v.slice(0, i).trim(), hi = v.slice(i + 2).trim();
+    return lo !== "" && hi !== "" ? [lo, hi] : null;
+  }
+
+  // igual ao between do Go: número compara como número, o resto como texto;
+  // início > fim atravessa a virada (22:00..06:00)
+  function between(v, lo, hi) {
+    if (v === "") return false;
+    const fv = num(v), flo = num(lo), fhi = num(hi);
+    if (!isNaN(fv) && !isNaN(flo) && !isNaN(fhi)) {
+      return flo <= fhi ? fv >= flo && fv <= fhi : fv >= flo || fv <= fhi;
+    }
+    return lo <= hi ? v >= lo && v <= hi : v >= lo || v <= hi;
   }
 
   function findCalendar(cals, name) {
@@ -207,7 +254,7 @@
   }
 
   function runFlow(data, fl, resolve, now) {
-    const r = { flow: fl.name, action: "open", comment: "", set: [], updates: [], http: [], trace: [], error: "" };
+    const r = { flow: fl.name, action: "open", comment: "", set: [], updates: [], http: [], vars: {}, trace: [], error: "" };
     const valueOf = (field) => { for (let i = r.set.length - 1; i >= 0; i--) if (r.set[i].field === field) return r.set[i].value; return null; };
 
     const values = (field) => {
@@ -221,6 +268,7 @@
       if (lower === "now.hour") return [pad(now.getHours())];
       if (lower === "now.time") return [fmtTime(now)];
       if (lower === "now.date") return [fmtDate(now)];
+      if (lower.startsWith("var.")) { const k = lower.slice(4); return Object.prototype.hasOwnProperty.call(r.vars, k) ? [r.vars[k]] : []; }
       if (lower.startsWith("set.")) { const v = valueOf(lower.slice(4)); return v == null ? [] : [v]; }
       return resolve(field) || [];
     };
@@ -233,6 +281,50 @@
       });
     };
 
+    // regras com E/OU; grupo avalia recursivamente (igual ao evalConds do Go)
+    function evalConds(match, conds) {
+      const anyMode = match === "any";
+      let result = !anyMode;
+      const parts = [];
+      conds.forEach((c) => {
+        let ok;
+        if (c.conditions && c.conditions.length) {
+          const [gok, gdetail] = evalConds(c.match, c.conditions);
+          ok = gok;
+          parts.push(`${ok ? "✓" : "✗"} (${gdetail})`);
+        }
+        else {
+          const vals = values(c.field);
+          const want = render(c.value);
+          ok = evalCondition(vals, c.op || "eq", want);
+          parts.push(`${ok ? "✓" : "✗"} ${c.field} ${c.op || "eq"}${want !== "" ? " " + want : ""} (${showValues(vals)})`);
+        }
+        if (anyMode && ok) result = true;
+        if (!anyMode && !ok) result = false;
+      });
+      return [result, parts.join(anyMode ? " OU " : " E ")];
+    }
+
+    // igual ao transform do Go
+    function transform(t) {
+      const src = render(t.from);
+      switch (t.op) {
+        case "extract": {
+          const re = flowRegex(t.arg);
+          if (!re) return "";
+          const m = src.match(re);
+          if (!m) return "";
+          return m.length > 1 ? (m[1] == null ? "" : m[1]) : m[0];
+        }
+        case "replace": return t.arg === "" ? src : src.split(t.arg).join(render(t.arg2 || ""));
+        case "upper": return src.toUpperCase();
+        case "lower": return src.toLowerCase();
+        case "trim": return src.trim();
+        case "default": return src.trim() === "" ? render(t.arg || "") : src;
+      }
+      return src;
+    }
+
     let cur = fl.nodes.find((n) => n.type === "start");
     if (!cur) { r.error = "fluxo sem bloco de início"; return r; }
 
@@ -244,19 +336,29 @@
         port = "next";
       }
       else if (cur.type === "if") {
-        const anyMode = cur.match === "any";
-        let result = !anyMode;
+        const [ok, detail] = evalConds(cur.match, cur.conditions || []);
+        step.detail = detail;
+        port = ok ? "true" : "false";
+      }
+      else if (cur.type === "branch") {
+        port = "else";
         const parts = [];
-        (cur.conditions || []).forEach((c) => {
-          const vals = values(c.field);
-          const want = render(c.value);
-          const ok = evalCondition(vals, c.op || "eq", want);
-          parts.push(`${ok ? "✓" : "✗"} ${c.field} ${c.op || "eq"}${want !== "" ? " " + want : ""} (${showValues(vals)})`);
-          if (anyMode && ok) result = true;
-          if (!anyMode && !ok) result = false;
+        for (const b of cur.branches || []) {
+          const [ok, detail] = evalConds(b.match, b.conditions || []);
+          parts.push(`${ok ? "✓" : "✗"} ${b.label || b.id}: ${detail}`);
+          if (ok) { port = b.id; break; }
+        }
+        step.detail = parts.join(" | ");
+      }
+      else if (cur.type === "transform") {
+        const done = [];
+        (cur.transforms || []).forEach((t) => {
+          const v = transform(t);
+          r.vars[String(t.var).toLowerCase()] = v;
+          done.push("var." + t.var + "=" + v);
         });
-        step.detail = parts.join(anyMode ? " OU " : " E ");
-        port = result ? "true" : "false";
+        step.detail = done.join("; ");
+        port = "next";
       }
       else if (cur.type === "switch") {
         const vals = values(cur.field);
@@ -352,7 +454,8 @@
 
   function ports(n) {
     switch (n.type) {
-      case "start": case "set": case "update": case "http": return [{ port: "next", label: "" }];
+      case "start": case "set": case "update": case "http": case "transform": return [{ port: "next", label: "" }];
+      case "branch": return (n.branches || []).map((b) => ({ port: b.id, label: b.label || b.id })).concat([{ port: "else", label: "senão" }]);
       case "if": return [{ port: "true", label: "sim" }, { port: "false", label: "não" }];
       case "table": return [{ port: "found", label: "achou" }, { port: "not_found", label: "não achou" }];
       case "switch": return (n.cases || []).map((c) => ({ port: c.value, label: c.value })).concat([{ port: "default", label: "outro" }]);
@@ -372,6 +475,13 @@
     if (type === "switch") { n.field = "host.tag.Criticidade"; n.cases = [{ value: "Critico" }]; }
     if (type === "set") { n.set = [{ field: "instrucao", value: "" }]; }
     if (type === "end") { n.action = "open"; n.comment = ""; }
+    if (type === "branch") {
+      n.branches = [
+        { id: "r1", label: "Crítico", match: "all", conditions: [{ field: "severity.level", op: "gte", value: "4" }] },
+        { id: "r2", label: "Médio", match: "all", conditions: [{ field: "severity.level", op: "eq", value: "3" }] },
+      ];
+    }
+    if (type === "transform") { n.transforms = [{ var: "interface", from: "{trigger}", op: "extract", arg: "interface (\\S+)", arg2: "" }]; }
     if (type === "table") { n.field = "host.group"; n.columns = ["oper_group"]; n.rows = [{ match: "GRUPO/*", values: [""] }]; }
     if (type === "update") { n.set = [{ field: "urgency", value: "" }]; n.note = ""; n.teams = false; n.repeat = false; }
     if (type === "http") { n.method = "POST"; n.url = "https://"; n.headers = []; n.body = ""; n.timeout = 10; }
@@ -381,6 +491,21 @@
   function newFlow(name) {
     return { name, description: "", nodes: [{ id: "inicio", type: "start", label: "", x: 420, y: 30 }], links: [] };
   }
+
+  // regras (com grupos) do arquivo → modelo do editor
+  function prepConds(list) {
+    return (list || []).map((c) => (c.conditions && c.conditions.length
+      ? { match: c.match === "any" ? "any" : "all", conditions: prepConds(c.conditions) }
+      : { field: String(c.field || ""), op: String(c.op || "eq"), value: String(c.value == null ? "" : c.value) }));
+  }
+
+  function cleanConds(list) {
+    return list.map((c) => (isGroup(c)
+      ? { match: c.match, conditions: cleanConds(c.conditions) }
+      : { field: c.field.trim(), op: c.op, value: NOVALUE_OPS.has(c.op) ? "" : c.value }));
+  }
+
+  function isGroup(c) { return !!(c && c.conditions); }
 
   function prepData(raw) {
     const d = { calendars: {}, flows: [] };
@@ -392,7 +517,13 @@
       const fl = { name: String(f.name || ""), description: String(f.description || ""), nodes: [], links: [] };
       (f.nodes || []).forEach((n) => {
         const node = { id: String(n.id || ""), type: String(n.type || ""), label: String(n.label || ""), x: +n.x || 0, y: +n.y || 0 };
-        if (node.type === "if") { node.match = n.match === "any" ? "any" : "all"; node.conditions = (n.conditions || []).map((c) => ({ field: String(c.field || ""), op: String(c.op || "eq"), value: String(c.value == null ? "" : c.value) })); }
+        if (node.type === "if") { node.match = n.match === "any" ? "any" : "all"; node.conditions = prepConds(n.conditions); }
+        if (node.type === "branch") {
+          node.branches = (n.branches || []).map((b) => ({ id: String(b.id || ""), label: String(b.label || ""), match: b.match === "any" ? "any" : "all", conditions: prepConds(b.conditions) }));
+        }
+        if (node.type === "transform") {
+          node.transforms = (n.transforms || []).map((t) => ({ var: String(t.var || ""), from: String(t.from == null ? "" : t.from), op: String(t.op || "set"), arg: String(t.arg == null ? "" : t.arg), arg2: String(t.arg2 == null ? "" : t.arg2) }));
+        }
         if (node.type === "switch") { node.field = String(n.field || ""); node.cases = (n.cases || []).map((c) => ({ value: String(c.value == null ? "" : c.value) })); }
         if (node.type === "set") { node.set = (n.set || []).map((a) => ({ field: String(a.field || ""), value: String(a.value == null ? "" : a.value) })); }
         if (node.type === "end") { node.action = n.action === "skip" ? "skip" : "open"; node.comment = String(n.comment || ""); }
@@ -431,7 +562,9 @@
         description: f.description.trim(),
         nodes: f.nodes.map((n) => {
           const o = { id: n.id, type: n.type, label: n.label.trim(), x: Math.round(n.x), y: Math.round(n.y) };
-          if (n.type === "if") { o.match = n.match; o.conditions = n.conditions.map((c) => ({ field: c.field.trim(), op: c.op, value: NOVALUE_OPS.has(c.op) ? "" : c.value })); }
+          if (n.type === "if") { o.match = n.match; o.conditions = cleanConds(n.conditions); }
+          if (n.type === "branch") { o.branches = n.branches.map((b) => ({ id: b.id, label: b.label.trim(), match: b.match, conditions: cleanConds(b.conditions) })); }
+          if (n.type === "transform") { o.transforms = n.transforms.map((t) => ({ var: t.var.trim(), from: t.from, op: t.op, arg: t.arg, arg2: t.arg2 })); }
           if (n.type === "switch") { o.field = n.field.trim(); o.cases = n.cases.map((c) => ({ value: c.value.trim() })); }
           if (n.type === "set") { o.set = n.set.map((a) => ({ field: a.field, value: a.value })); }
           if (n.type === "end") { o.action = n.action; o.comment = n.action === "skip" ? n.comment : ""; }
@@ -482,12 +615,40 @@
       names.add(lc(f.name));
       f.nodes.forEach((n) => {
         const who = `Fluxo ${fname}, bloco ${n.label || n.id}`;
-        if (n.type === "if") {
-          if (!n.conditions.length) errs.push(`${who}: adicione pelo menos uma regra.`);
-          n.conditions.forEach((c, i) => {
-            if (!c.field.trim()) errs.push(`${who}: regra #${i + 1} sem campo.`);
-            const e = calRef(c.field); if (e) errs.push(`${who}: ${e}.`);
-            tplRefs(c.value).forEach((e2) => errs.push(`${who}: ${e2}.`));
+        const checkConds = (where, list, depth) => {
+          if (!list.length) errs.push(`${where}: adicione pelo menos uma regra.`);
+          list.forEach((c, i) => {
+            if (isGroup(c)) {
+              if (depth >= MAX_COND_DEPTH) errs.push(`${where}: grupos aninhados demais (máx ${MAX_COND_DEPTH} níveis).`);
+              checkConds(`${where}, grupo #${i + 1}`, c.conditions, depth + 1);
+              return;
+            }
+            if (!c.field.trim()) errs.push(`${where}: regra #${i + 1} sem campo.`);
+            const e = calRef(c.field); if (e) errs.push(`${where}: ${e}.`);
+            if (String(c.value).indexOf("{") < 0) {
+              if ((c.op === "regex" || c.op === "not_regex") && !flowRegex(c.value)) errs.push(`${where}: regex inválida (${c.value}).`);
+              if (c.op === "between" && !betweenParts(c.value)) errs.push(`${where}: "entre" espera início..fim (ex: 30..60 ou 22:00..06:00).`);
+            }
+            tplRefs(c.value).forEach((e2) => errs.push(`${where}: ${e2}.`));
+          });
+        };
+        if (n.type === "if") checkConds(who, n.conditions, 1);
+        if (n.type === "branch") {
+          if (!n.branches.length) errs.push(`${who}: adicione pelo menos um ramo.`);
+          const ids = new Set(["else", "next"]);
+          n.branches.forEach((b, i) => {
+            if (!b.id || ids.has(lc(b.id))) errs.push(`${who}: ramo #${i + 1} com id inválido ou repetido.`);
+            ids.add(lc(b.id));
+            checkConds(`${who}, ramo ${b.label || b.id}`, b.conditions, 1);
+          });
+        }
+        if (n.type === "transform") {
+          if (!n.transforms.length) errs.push(`${who}: adicione pelo menos uma operação.`);
+          n.transforms.forEach((t, i) => {
+            if (!/^[A-Za-z0-9_]+$/.test(t.var.trim())) errs.push(`${who}: operação #${i + 1}, nome da variável só com letras, números e _.`);
+            if (t.op === "extract" && (!t.arg.trim() || !flowRegex(t.arg))) errs.push(`${who}: operação #${i + 1}, regex inválida.`);
+            if (t.op === "replace" && t.arg === "") errs.push(`${who}: operação #${i + 1}, informe o texto a procurar.`);
+            [t.from, t.arg2].concat(t.op === "default" ? [t.arg] : []).forEach((s) => tplRefs(s).forEach((e2) => errs.push(`${who}: ${e2}.`)));
           });
         }
         if (n.type === "switch") {
@@ -547,7 +708,7 @@
   // layout
   // =========================================================
 
-  function nodeWidth(n) { return n.type === "switch" ? Math.max(NODE_W, ports(n).length * 76) : NODE_W; }
+  function nodeWidth(n) { return n.type === "switch" || n.type === "branch" ? Math.max(NODE_W, ports(n).length * 76) : NODE_W; }
 
   function summary(fl, n) {
     const w = Math.floor(nodeWidth(n) / 6.6);
@@ -555,9 +716,19 @@
       case "start": return ["Alerta recebido"];
       case "if": {
         const join = n.match === "any" ? "OU " : "E ";
-        const lines = n.conditions.slice(0, 3).map((c, i) => trunc((i ? join : "") + `${c.field} ${OP_LABEL[c.op] || c.op}${NOVALUE_OPS.has(c.op) ? "" : " " + c.value}`, w));
+        const lines = n.conditions.slice(0, 3).map((c, i) => trunc((i ? join : "") + condText(c), w));
         if (n.conditions.length > 3) lines.push(`+${n.conditions.length - 3} regra(s)`);
         return lines.length ? lines : ["(sem regras)"];
+      }
+      case "branch": {
+        const lines = n.branches.slice(0, 3).map((b, i) => trunc(`${i ? "senão se" : "se"} ${b.label || b.id}: ${b.conditions.map(condText).join(b.match === "any" ? " OU " : " E ")}`, w));
+        if (n.branches.length > 3) lines.push(`+${n.branches.length - 3} ramo(s)`);
+        return lines.length ? lines : ["(sem ramos)"];
+      }
+      case "transform": {
+        const lines = n.transforms.slice(0, 3).map((t) => trunc(`var.${t.var} ← ${(TRANSFORM_OPS.find(([k]) => k === t.op) || [t.op, t.op])[1]}`, w));
+        if (n.transforms.length > 3) lines.push(`+${n.transforms.length - 3} operação(ões)`);
+        return lines.length ? lines : ["(nenhuma operação)"];
       }
       case "switch": return [trunc("valor de " + (n.field || "?"), w)];
       case "set": {
@@ -582,6 +753,12 @@
       case "http": return [trunc(`${n.method} ${n.url}`, w)];
     }
     return [];
+  }
+
+  // texto curto de uma regra (grupo vira "(… OU …)")
+  function condText(c) {
+    if (isGroup(c)) return "(" + c.conditions.map(condText).join(c.match === "any" ? " OU " : " E ") + ")";
+    return `${c.field} ${OP_LABEL[c.op] || c.op}${NOVALUE_OPS.has(c.op) ? "" : " " + c.value}`;
   }
 
   function nodeHeight(fl, n) { return HEAD_H + summary(fl, n).length * LINE_H + 10 + (ports(n).length ? PORT_ZONE - 10 : 0); }
@@ -832,6 +1009,57 @@
     return `<div class="gd-flow-vars"><span class="gd-muted">Variáveis (clique para inserir):</span> ${VARS.map((v) => `<button type="button" class="gd-flow-var" data-gd-var="${escapeHtml(v)}">{${escapeHtml(v)}${v.endsWith(".") ? "…" : ""}}</button>`).join(" ")}</div>`;
   }
 
+  // ---------- editor de regras com grupos ----------
+  // chave de uma lista de regras: "if" (bloco condição), "br:<i>" (ramo da
+  // condição múltipla) e "<chave>/<j>" (grupo j dentro da lista).
+
+  function condOwner(n, key) {
+    const parts = key.split("/");
+    let owner = parts[0] === "if" ? n : n.branches[+parts[0].slice(3)];
+    for (const j of parts.slice(1)) owner = owner.conditions[+j];
+    return owner;
+  }
+
+  function matchSelect(key, match) {
+    return `<select data-gd-cl-match="${escapeHtml(key)}">
+      <option value="all"${match !== "any" ? " selected" : ""}>todas (E)</option>
+      <option value="any"${match === "any" ? " selected" : ""}>qualquer (OU)</option></select>`;
+  }
+
+  function condsHtml(n, key, depth) {
+    const owner = condOwner(n, key);
+    let html = "";
+    owner.conditions.forEach((c, j) => {
+      const ref = escapeHtml(key + "|" + j);
+      if (isGroup(c)) {
+        html += `<div class="gd-flow-group">
+          <div class="gd-flow-group-head">grupo: ${matchSelect(key + "/" + j, c.match)}
+            <button type="button" class="gd-btn gd-btn-danger gd-btn-xs" data-gd-c-remove="${ref}">✕</button></div>
+          ${condsHtml(n, key + "/" + j, depth + 1)}
+        </div>`;
+        return;
+      }
+      html += `<div class="gd-flow-rule">
+        <input type="text" list="gd-flow-fields" autocomplete="off" data-gd-c="${ref}" data-k="field" value="${escapeHtml(c.field)}" placeholder="campo">
+        <select data-gd-c="${ref}" data-k="op">${opOptions(c.op)}</select>
+        <input type="text" data-gd-c="${ref}" data-k="value" value="${escapeHtml(c.value)}" placeholder="${c.op === "between" ? "início..fim" : "valor"}"${NOVALUE_OPS.has(c.op) ? " disabled" : ""}>
+        <button type="button" class="gd-btn gd-btn-danger gd-btn-xs" data-gd-c-remove="${ref}">✕</button></div>`;
+    });
+    html += `<div class="gd-actions gd-flow-cond-actions"><button type="button" class="gd-btn gd-btn-xs" data-gd-c-add="${escapeHtml(key)}">+ Regra</button>` +
+      (depth < MAX_COND_DEPTH ? `<button type="button" class="gd-btn gd-btn-xs" data-gd-g-add="${escapeHtml(key)}">+ Grupo (E/OU)</button>` : "") + "</div>";
+    return html;
+  }
+
+  function condsHelp() {
+    return '<div class="gd-muted">Campo com vários valores (grupos, tags repetidas): “igual/contém/corresponde” vale se <b>algum</b> bater; “diferente/não…” se <b>nenhum</b> bater. Lista: valores separados por vírgula, aceita <code>*</code>. <b>Grupo</b>: regras com o próprio E/OU — ex: (tag = Critico OU grupo começa com Core/) E fora do horário. <b>Entre</b>: <code>30..60</code> ou <code>22:00..06:00</code> (atravessa a meia-noite). <b>Regex</b> sem diferenciar maiúsculas.</div>';
+  }
+
+  function newBranchId(n) {
+    let i = 1;
+    while (n.branches.some((b) => lc(b.id) === "r" + i)) i++;
+    return "r" + i;
+  }
+
   function renderSide() {
     const box = $("gd-flow-side");
     const fl = flow();
@@ -881,19 +1109,46 @@
     }
 
     if (n.type === "if") {
-      html += `<div class="gd-field" style="margin-top:8px;"><label>Vale quando</label><select data-gd-node-prop="match">
-          <option value="all"${n.match !== "any" ? " selected" : ""}>todas as regras (E)</option>
-          <option value="any"${n.match === "any" ? " selected" : ""}>qualquer regra (OU)</option></select></div>`;
+      html += `<div class="gd-field" style="margin-top:8px;"><label>Vale quando</label>${matchSelect("if", n.match)}</div>`;
       html += '<div class="gd-small-title" style="margin-top:10px;">Regras</div>';
-      n.conditions.forEach((c, i) => {
-        html += `<div class="gd-flow-rule">
-          <input type="text" list="gd-flow-fields" autocomplete="off" data-gd-cond="${i}" data-k="field" value="${escapeHtml(c.field)}" placeholder="campo">
-          <select data-gd-cond="${i}" data-k="op">${opOptions(c.op)}</select>
-          <input type="text" data-gd-cond="${i}" data-k="value" value="${escapeHtml(c.value)}" placeholder="valor"${NOVALUE_OPS.has(c.op) ? " disabled" : ""}>
-          <button type="button" class="gd-btn gd-btn-danger gd-btn-xs" data-gd-cond-remove="${i}">✕</button></div>`;
+      html += condsHtml(n, "if", 1);
+      html += condsHelp();
+    }
+
+    if (n.type === "branch") {
+      html += '<div class="gd-muted" style="margin-top:6px;">Os ramos são testados <b>em ordem</b>: o primeiro que valer escolhe a saída; nenhum = <b>senão</b>.</div>';
+      n.branches.forEach((b, i) => {
+        html += `<div class="gd-flow-branch">
+          <div class="gd-flow-branch-head"><b>${i ? "senão se" : "se"}</b>
+            <input type="text" data-gd-br="${i}" data-k="label" value="${escapeHtml(b.label)}" placeholder="${escapeHtml(b.id)}" title="nome da saída">
+            <button type="button" class="gd-btn gd-btn-xs" data-gd-br-move="${i}:-1" title="subir">↑</button>
+            <button type="button" class="gd-btn gd-btn-xs" data-gd-br-move="${i}:1" title="descer">↓</button>
+            <button type="button" class="gd-btn gd-btn-danger gd-btn-xs" data-gd-br-remove="${i}">✕</button></div>
+          <div class="gd-field"><label>Vale quando</label>${matchSelect("br:" + i, b.match)}</div>
+          ${condsHtml(n, "br:" + i, 1)}
+        </div>`;
       });
-      html += '<div class="gd-actions"><button type="button" class="gd-btn" data-gd-flow="cond-add">+ Regra</button></div>';
-      html += '<div class="gd-muted">Campo com vários valores (grupos, tags repetidas): “igual/contém/corresponde” vale se <b>algum</b> bater; “diferente/não…” se <b>nenhum</b> bater. Lista: valores separados por vírgula, aceita <code>*</code>.</div>';
+      html += '<div class="gd-flow-branch gd-flow-branch-else"><b>senão</b> <span class="gd-muted">— nenhum ramo valeu (saída “senão”)</span></div>';
+      html += '<div class="gd-actions"><button type="button" class="gd-btn" data-gd-flow="br-add">+ Ramo (senão se)</button></div>';
+      html += condsHelp();
+    }
+
+    if (n.type === "transform") {
+      html += '<div class="gd-muted" style="margin-top:6px;">Cada operação cria a variável <code>{var.nome}</code>, que pode ser usada nos blocos seguintes (condições e textos) — inclusive pelas operações abaixo dela.</div>';
+      n.transforms.forEach((t, i) => {
+        const needArg = t.op === "extract" || t.op === "replace" || t.op === "default";
+        const argPh = t.op === "extract" ? "regex — ex: interface (\\S+)" : t.op === "replace" ? "procurar" : "valor se vazio";
+        html += `<div class="gd-flow-branch">
+          <div class="gd-flow-rule"><span class="gd-muted">var.</span><input type="text" data-gd-tf="${i}" data-k="var" value="${escapeHtml(t.var)}" placeholder="nome">
+            <select data-gd-tf="${i}" data-k="op">${TRANSFORM_OPS.map(([v, l]) => `<option value="${v}"${v === t.op ? " selected" : ""}>${escapeHtml(l)}</option>`).join("")}</select>
+            <button type="button" class="gd-btn gd-btn-danger gd-btn-xs" data-gd-tf-remove="${i}">✕</button></div>
+          <div class="gd-flow-rule"><input type="text" data-gd-tf="${i}" data-k="from" value="${escapeHtml(t.from)}" placeholder="de — ex: {trigger}"></div>
+          ${needArg ? `<div class="gd-flow-rule"><input type="text" data-gd-tf="${i}" data-k="arg" value="${escapeHtml(t.arg)}" placeholder="${escapeHtml(argPh)}">${t.op === "replace" ? `<input type="text" data-gd-tf="${i}" data-k="arg2" value="${escapeHtml(t.arg2)}" placeholder="trocar por">` : ""}</div>` : ""}
+        </div>`;
+      });
+      html += '<div class="gd-actions"><button type="button" class="gd-btn" data-gd-flow="tf-add">+ Operação</button></div>';
+      html += varChips();
+      html += '<div class="gd-muted"><b>Extrair por regex</b>: pega o 1º grupo entre parênteses (ou o trecho todo), sem diferenciar maiúsculas — ex: de <code>{trigger}</code> com <code>interface (\\S+)</code> sai <code>Gi0/1</code>. <b>Substituir</b> troca todas as ocorrências do texto. <b>Valor padrão</b> só entra quando a origem vem vazia.</div>';
     }
 
     if (n.type === "switch") {
@@ -1455,6 +1710,31 @@
         return;
       }
 
+      // regras/grupos (condição e condição múltipla), ramos e transformar
+      const lsAct = n && !S.readonly ? e.target.closest("[data-gd-c-remove],[data-gd-c-add],[data-gd-g-add],[data-gd-br-move],[data-gd-br-remove],[data-gd-tf-remove]") : null;
+      if (lsAct) {
+        const ds = lsAct.dataset;
+        if (ds.gdCRemove !== undefined) {
+          const [key, j] = ds.gdCRemove.split("|");
+          condOwner(n, key).conditions.splice(+j, 1);
+        }
+        else if (ds.gdCAdd !== undefined) condOwner(n, ds.gdCAdd).conditions.push({ field: "", op: "eq", value: "" });
+        else if (ds.gdGAdd !== undefined) condOwner(n, ds.gdGAdd).conditions.push({ match: "any", conditions: [{ field: "", op: "eq", value: "" }] });
+        else if (ds.gdBrMove !== undefined) {
+          const [i, d] = ds.gdBrMove.split(":").map(Number);
+          const k = i + d;
+          if (k >= 0 && k < n.branches.length) { const t = n.branches[i]; n.branches[i] = n.branches[k]; n.branches[k] = t; }
+        }
+        else if (ds.gdBrRemove !== undefined) {
+          const b = n.branches[+ds.gdBrRemove];
+          fl.links = fl.links.filter((l) => !(l.from === n.id && lc(l.port || "") === lc(b.id)));
+          n.branches.splice(+ds.gdBrRemove, 1);
+        }
+        else if (ds.gdTfRemove !== undefined) n.transforms.splice(+ds.gdTfRemove, 1);
+        dirty(); renderCanvas(); renderSide(); renderTest();
+        return;
+      }
+
       const act = e.target.closest("[data-gd-flow]");
       if (!act) return;
       const a = act.dataset.gdFlow;
@@ -1496,6 +1776,16 @@
         let v = "valor"; let i = 2;
         while (n.cases.some((c) => lc(c.value) === lc(v))) v = "valor" + i++;
         n.cases.push({ value: v }); dirty(); renderCanvas(); renderSide();
+      }
+      else if (a === "br-add" && n) {
+        n.branches.push({ id: newBranchId(n), label: "", match: "all", conditions: [{ field: "", op: "eq", value: "" }] });
+        dirty(); renderCanvas(); renderSide();
+      }
+      else if (a === "tf-add" && n) {
+        let k = n.transforms.length + 1;
+        while (n.transforms.some((t) => lc(t.var) === "v" + k)) k++;
+        n.transforms.push({ var: "v" + k, from: "", op: "set", arg: "", arg2: "" });
+        dirty(); renderCanvas(); renderSide();
       }
       else if (a === "tcol-add" && n) {
         const used = new Set(n.columns);
@@ -1549,6 +1839,19 @@
         n.set[+t.dataset.gdSet][t.dataset.k] = t.value; dirty(); renderCanvas(); renderTest();
         return;
       }
+      if (t.dataset.gdC !== undefined && n && t.tagName !== "SELECT") {
+        const [key, j] = t.dataset.gdC.split("|");
+        condOwner(n, key).conditions[+j][t.dataset.k] = t.value; dirty(); renderCanvas(); renderTest();
+        return;
+      }
+      if (t.dataset.gdBr !== undefined && n) {
+        n.branches[+t.dataset.gdBr][t.dataset.k] = t.value; dirty(); renderCanvas(); renderTest();
+        return;
+      }
+      if (t.dataset.gdTf !== undefined && n && t.tagName !== "SELECT") {
+        n.transforms[+t.dataset.gdTf][t.dataset.k] = t.value; dirty(); renderCanvas(); renderTest();
+        return;
+      }
       if (t.dataset.gdUpd !== undefined && n && t.tagName !== "SELECT") {
         n.set[+t.dataset.gdUpd][t.dataset.k] = t.value; dirty(); renderCanvas(); renderTest();
         return;
@@ -1598,6 +1901,19 @@
         return;
       }
       if (S.readonly && t.dataset.gdTest === undefined) return;
+      if (t.dataset.gdC !== undefined && n && t.tagName === "SELECT") {
+        const [key, j] = t.dataset.gdC.split("|");
+        condOwner(n, key).conditions[+j][t.dataset.k] = t.value; dirty(); renderCanvas(); renderSide(); renderTest();
+        return;
+      }
+      if (t.dataset.gdClMatch !== undefined && n) {
+        condOwner(n, t.dataset.gdClMatch).match = t.value; dirty(); renderCanvas(); renderTest();
+        return;
+      }
+      if (t.dataset.gdTf !== undefined && n && t.tagName === "SELECT") {
+        n.transforms[+t.dataset.gdTf][t.dataset.k] = t.value; dirty(); renderCanvas(); renderSide(); renderTest();
+        return;
+      }
       if (t.dataset.gdNodeCheck && n) {
         n[t.dataset.gdNodeCheck] = t.checked; dirty(); renderCanvas(); renderTest();
         return;

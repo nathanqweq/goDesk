@@ -10,7 +10,7 @@ function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 
 $f = $data['filters'] ?? [];
 $entries = $data['entries'] ?? [];
-$port_label = ['true' => 'sim', 'false' => 'não', 'default' => 'outro', 'found' => 'achou', 'not_found' => 'não achou', 'next' => ''];
+$port_label = ['true' => 'sim', 'false' => 'não', 'default' => 'outro', 'found' => 'achou', 'not_found' => 'não achou', 'else' => 'senão', 'next' => ''];
 $field_label = [
 	'instrucao' => 'Instrução', 'urgency' => 'Urgência', 'impact' => 'Impacto', 'priority' => 'Prioridade',
 	'oper_group' => 'Grupo operador', 'operator' => 'Operador', 'contract' => 'Contrato'

@@ -314,7 +314,7 @@ func runFlow(cfg config.RuntimeConfig, zx flowZabbix, p rawdata.Payload, pol con
 	if err != nil {
 		return fail("fluxo %q: %v (caminho até o erro: %s)", name, err, r.Path())
 	}
-	fr.entry.Action, fr.entry.Set, fr.entry.Updates, fr.entry.HTTP = r.Action, r.Set, r.Updates, r.HTTP
+	fr.entry.Action, fr.entry.Set, fr.entry.Updates, fr.entry.HTTP, fr.entry.Vars = r.Action, r.Set, r.Updates, r.HTTP, r.Vars
 
 	sets := make([]string, 0, len(r.Set))
 	for _, a := range r.Set {

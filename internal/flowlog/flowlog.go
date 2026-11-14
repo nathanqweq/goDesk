@@ -50,6 +50,7 @@ type Entry struct {
 	Updates []flow.Update     `json:"updates,omitempty"`
 	HTTP    []flow.HTTPCall   `json:"http,omitempty"`
 	Trace   []flow.Step       `json:"trace,omitempty"`
+	Vars    map[string]string `json:"vars,omitempty"`
 	Path    string            `json:"path"`
 	Error   string            `json:"error,omitempty"`
 	Notes   []string          `json:"notes,omitempty"` // o que o app fez/pulou (ex: update já aplicado)

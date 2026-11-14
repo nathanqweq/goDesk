@@ -710,3 +710,31 @@
 [theme='dark-theme'] .godesk-module .gd-flow-hist-item,
 [theme='dark-theme'] .godesk-module .gd-flow-hist-item[open] summary { border-color: #333; }
 [theme='dark-theme'] .godesk-module .gd-warn-pill { background: #5a3a10; color: #f5d2a0; }
+
+/* fluxos: condição múltipla, grupos de regras, transformar */
+.godesk-module .gd-flow-t-branch .gd-flow-head { fill: #f6e7b8; }
+.godesk-module .gd-flow-t-transform .gd-flow-head { fill: #e6ecd2; }
+.godesk-module .gd-flow-group {
+  margin-top: 6px;
+  padding: 6px 6px 2px 8px;
+  border-left: 3px solid #b9c6da;
+  background: rgba(47, 111, 223, .04);
+  border-radius: 4px;
+}
+.godesk-module .gd-flow-group-head { display: flex; gap: 6px; align-items: center; font-size: 11px; }
+.godesk-module .gd-flow-group-head select { flex: 0 0 auto; }
+.godesk-module .gd-flow-cond-actions { margin-top: 4px; gap: 4px; }
+.godesk-module .gd-flow-branch {
+  margin-top: 8px;
+  padding: 6px 8px;
+  border: 1px solid #e1e4e8;
+  border-radius: 6px;
+}
+.godesk-module .gd-flow-branch-head { display: flex; gap: 4px; align-items: center; margin-bottom: 4px; }
+.godesk-module .gd-flow-branch-head input { flex: 1 1 auto; min-width: 0; }
+.godesk-module .gd-flow-branch-else { background: rgba(0, 0, 0, .03); }
+[theme='dark-theme'] .godesk-module .gd-flow-t-branch .gd-flow-head { fill: #5a4a1a; }
+[theme='dark-theme'] .godesk-module .gd-flow-t-transform .gd-flow-head { fill: #3d4a26; }
+[theme='dark-theme'] .godesk-module .gd-flow-group { border-left-color: #35506f; background: rgba(47, 111, 223, .08); }
+[theme='dark-theme'] .godesk-module .gd-flow-branch { border-color: #333; }
+[theme='dark-theme'] .godesk-module .gd-flow-branch-else { background: rgba(255, 255, 255, .04); }

@@ -68,13 +68,14 @@ type HTTPCall struct {
 }
 
 type Result struct {
-	Flow    string       `json:"flow"`
-	Action  string       `json:"action"`  // open | skip
-	Comment string       `json:"comment"` // comentário no evento (skip)
-	Set     []Assignment `json:"set"`
-	Updates []Update     `json:"updates,omitempty"`
-	HTTP    []HTTPCall   `json:"http,omitempty"`
-	Trace   []Step       `json:"trace"`
+	Vars    map[string]string `json:"vars,omitempty"` // variáveis do bloco transform ({var.nome})
+	Flow    string            `json:"flow"`
+	Action  string            `json:"action"`  // open | skip
+	Comment string            `json:"comment"` // comentário no evento (skip)
+	Set     []Assignment      `json:"set"`
+	Updates []Update          `json:"updates,omitempty"`
+	HTTP    []HTTPCall        `json:"http,omitempty"`
+	Trace   []Step            `json:"trace"`
 }
 
 // Value devolve o último valor definido pro campo.
@@ -110,7 +111,7 @@ var templateRe = regexp.MustCompile(`\{[^{}]+\}`)
 // Run executa o fluxo a partir do bloco de início. Porta sem ligação
 // termina com "open" (segue a rule com o que já foi definido).
 func Run(f config.FlowsFile, fl config.Flow, res Resolver, now time.Time) (Result, error) {
-	r := Result{Flow: fl.Name, Action: config.FlowActionOpen}
+	r := Result{Flow: fl.Name, Action: config.FlowActionOpen, Vars: map[string]string{}}
 	ev := evaluator{file: f, res: res, now: now, result: &r}
 
 	cur, ok := fl.Start()
@@ -151,6 +152,37 @@ func Run(f config.FlowsFile, fl config.Flow, res Resolver, now time.Time) (Resul
 				v := ev.render(a.Value)
 				r.Set = append(r.Set, Assignment{Field: a.Field, Value: v})
 				done = append(done, a.Field+"="+v)
+			}
+			step.Detail = strings.Join(done, "; ")
+			port = config.PortNext
+
+		case config.NodeBranch:
+			port = config.PortElse
+			var parts []string
+			for _, b := range cur.Branches {
+				ok, detail := ev.evalConds(b.Match, b.Conditions)
+				name := b.Label
+				if name == "" {
+					name = b.ID
+				}
+				mark := "✗"
+				if ok {
+					mark = "✓"
+				}
+				parts = append(parts, fmt.Sprintf("%s %s: %s", mark, name, detail))
+				if ok {
+					port = b.ID
+					break
+				}
+			}
+			step.Detail = strings.Join(parts, " | ")
+
+		case config.NodeTransform:
+			var done []string
+			for _, t := range cur.Transforms {
+				v := ev.transform(t)
+				r.Vars[strings.ToLower(t.Var)] = v
+				done = append(done, "var."+t.Var+"="+v)
 			}
 			step.Detail = strings.Join(done, "; ")
 			port = config.PortNext
@@ -269,6 +301,11 @@ func (e evaluator) values(field string) []string {
 		return []string{e.now.Format("15:04")}
 	case lower == "now.date":
 		return []string{e.now.Format("2006-01-02")}
+	case strings.HasPrefix(lower, "var."):
+		if v, ok := e.result.Vars[lower[len("var."):]]; ok {
+			return []string{v}
+		}
+		return nil
 	case strings.HasPrefix(lower, "set."):
 		if v, ok := e.result.Value(lower[len("set."):]); ok {
 			return []string{v}
@@ -312,11 +349,32 @@ func ApplyFilter(v, filter string) string {
 }
 
 func (e evaluator) evalIf(n config.FlowNode) (bool, string) {
-	anyMode := n.Match == "any"
+	return e.evalConds(n.Match, n.Conditions)
+}
+
+// evalConds avalia uma lista de regras com E (all) ou OU (any); regra que
+// é grupo avalia recursivamente e aparece entre parênteses no detalhe.
+func (e evaluator) evalConds(match string, conds []config.FlowCondition) (bool, string) {
+	anyMode := match == "any"
 	result := !anyMode
 	var parts []string
 
-	for _, c := range n.Conditions {
+	for _, c := range conds {
+		if c.IsGroup() {
+			ok, detail := e.evalConds(c.Match, c.Conditions)
+			mark := "✗"
+			if ok {
+				mark = "✓"
+			}
+			parts = append(parts, fmt.Sprintf("%s (%s)", mark, detail))
+			if anyMode && ok {
+				result = true
+			}
+			if !anyMode && !ok {
+				result = false
+			}
+			continue
+		}
 		vals := e.values(c.Field)
 		want := e.render(c.Value)
 		ok := EvalCondition(vals, c.Op, want)
@@ -404,8 +462,91 @@ func EvalCondition(vals []string, op, want string) bool {
 		return anyValue(vals, func(v string) bool { b, ok := config.ParseFlowBool(v); return ok && b })
 	case "is_false":
 		return !EvalCondition(vals, "is_true", want)
+	case "starts":
+		w := strings.ToLower(want)
+		return anyValue(vals, func(v string) bool { return strings.HasPrefix(strings.ToLower(v), w) })
+	case "ends":
+		w := strings.ToLower(want)
+		return anyValue(vals, func(v string) bool { return strings.HasSuffix(strings.ToLower(v), w) })
+	case "regex":
+		re, err := config.CompileFlowRegex(want)
+		if err != nil {
+			return false
+		}
+		return anyValue(vals, re.MatchString)
+	case "not_regex":
+		if _, err := config.CompileFlowRegex(want); err != nil {
+			return false
+		}
+		return !EvalCondition(vals, "regex", want)
+	case "between":
+		lo, hi, ok := config.BetweenParts(want)
+		if !ok {
+			return false
+		}
+		return anyValue(vals, func(v string) bool { return between(strings.TrimSpace(v), lo, hi) })
 	}
 	return false
+}
+
+// between: inclusivo nas duas pontas. Números comparam como número; o
+// resto como texto (serve pra horário HH:MM). Início maior que o fim
+// atravessa a virada (ex: 22:00..06:00 = das 22h às 6h).
+func between(v, lo, hi string) bool {
+	if v == "" {
+		return false
+	}
+	fv, e1 := parseNum(v)
+	flo, e2 := parseNum(lo)
+	fhi, e3 := parseNum(hi)
+	if e1 == nil && e2 == nil && e3 == nil {
+		if flo <= fhi {
+			return fv >= flo && fv <= fhi
+		}
+		return fv >= flo || fv <= fhi
+	}
+	if lo <= hi {
+		return v >= lo && v <= hi
+	}
+	return v >= lo || v <= hi
+}
+
+func parseNum(s string) (float64, error) {
+	return strconv.ParseFloat(strings.ReplaceAll(strings.TrimSpace(s), ",", "."), 64)
+}
+
+// transform aplica uma operação do bloco transform.
+func (e evaluator) transform(t config.FlowTransform) string {
+	src := e.render(t.From)
+	switch t.Op {
+	case "extract":
+		re, err := config.CompileFlowRegex(t.Arg)
+		if err != nil {
+			return ""
+		}
+		m := re.FindStringSubmatch(src)
+		if m == nil {
+			return ""
+		}
+		if len(m) > 1 {
+			return m[1]
+		}
+		return m[0]
+	case "replace":
+		return strings.ReplaceAll(src, t.Arg, e.render(t.Arg2))
+	case "upper":
+		return strings.ToUpper(src)
+	case "lower":
+		return strings.ToLower(src)
+	case "trim":
+		return strings.TrimSpace(src)
+	case "default":
+		if strings.TrimSpace(src) == "" {
+			return e.render(t.Arg)
+		}
+		return src
+	}
+	return src
 }
 
 // matchCase: o valor do caso aceita lista (vírgula) e curinga *.

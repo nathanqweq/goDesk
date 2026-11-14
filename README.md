@@ -122,7 +122,9 @@ As localidades ficam em `/etc/zabbix/godesk/godesk-dependencies-v2.yaml` (caminh
 Em vez de criar uma rule nova para cada variação ("host crítico liga", "fora do horário liga sempre", "informativo não abre"), a rule aponta para um **fluxo**, e o fluxo decide na hora do alerta.
 
 1. Em **Alerts → goDesk → Fluxos**, crie um fluxo e monte os blocos:
-   - **Condição** (sim/não), com regras E/OU sobre o evento.
+   - **Condição** (sim/não), com regras E/OU sobre o evento. Regras podem ser agrupadas: `(tag = Critico OU grupo começa com Core/) E fora do horário` (até 3 níveis).
+   - **Condição múltipla** (se / senão se / senão): vários ramos, cada um com suas regras, testados em ordem. O primeiro que valer escolhe a saída; se nenhum valer, sai pelo "senão".
+   - **Transformar texto**: cria variáveis `{var.nome}` a partir de um campo, com estas operações: extrair por regex (por exemplo, a interface do nome do trigger), maiúsculas, minúsculas, substituir, aparar espaços ou valor padrão quando vier vazio. As variáveis valem nas condições e nos textos dos blocos seguintes.
    - **Switch**, com um caminho por valor. Exemplo: `host.tag.Criticidade` = `Critico`, `Alta,Media` ou outro.
    - **Tabela**: a primeira linha que bater com um campo (ex: `host.group` = `POWERPLANT/*`) define várias colunas de uma vez (grupo operador, contrato, webhook do Teams...). Saídas *achou* / *não achou*.
    - **Definir campos**: urgência, impacto, grupo operador, operador, contrato, Teams (`teams_webhook` aceita vários, separados por vírgula; `teams_title` e `teams_message` personalizam o card), e-mail etc. e a **instrução** pro atendimento (ex: *"LIGAR para o cliente ({host})"*).
@@ -147,6 +149,9 @@ Campos disponíveis nas condições e nos textos (`{campo}`):
 | `rule`, `cliente`, `equipe`, `ticket.exists`, `ticket.status`, `ticket.number` | contexto do goDesk |
 | `calendar.<nome>`, `now.weekday`, `now.hour`, `now.time`, `now.date` | horário |
 | `set.<campo>` | valor já definido antes no próprio fluxo |
+| `var.<nome>` | variável criada pelo bloco Transformar texto |
+
+Operadores das regras: igual, diferente, contém, corresponde (`*`), está na lista, preenchido/vazio, maior/menor, verdadeiro/falso, **começa com**, **termina com**, **regex** (sem diferenciar maiúsculas; sintaxe RE2, sem lookahead) e **entre** (`30..60` para números; `22:00..06:00` para horário, atravessando a meia-noite quando o início é maior que o fim).
 
 Nos textos, `{campo|json}` escapa o valor para dentro de uma string JSON (corpo do bloco HTTP) e `{campo|url}` codifica para URL. As tags do host (`host.tag.*`) incluem as herdadas dos templates.
 

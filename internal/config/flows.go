@@ -77,14 +77,16 @@ func NormalizeFlowMode(v string) string {
 
 // Tipos de bloco.
 const (
-	NodeStart  = "start"
-	NodeIf     = "if"
-	NodeSwitch = "switch"
-	NodeSet    = "set"
-	NodeEnd    = "end"
-	NodeTable  = "table"
-	NodeUpdate = "update"
-	NodeHTTP   = "http"
+	NodeStart     = "start"
+	NodeIf        = "if"
+	NodeSwitch    = "switch"
+	NodeSet       = "set"
+	NodeEnd       = "end"
+	NodeTable     = "table"
+	NodeUpdate    = "update"
+	NodeHTTP      = "http"
+	NodeBranch    = "branch"    // se / senão se / senão
+	NodeTransform = "transform" // cria variáveis {var.nome}
 )
 
 // Ações do bloco end.
@@ -101,6 +103,7 @@ const (
 	PortDefault  = "default"
 	PortFound    = "found"
 	PortNotFound = "not_found"
+	PortElse     = "else"
 )
 
 // Operadores das condições.
@@ -112,6 +115,30 @@ var FlowOps = []string{
 	"exists", "not_exists",
 	"gt", "gte", "lt", "lte",
 	"is_true", "is_false",
+	"starts", "ends",
+	"regex", "not_regex",
+	"between",
+}
+
+// Operações do bloco transform.
+var FlowTransformOps = []string{"set", "extract", "replace", "upper", "lower", "trim", "default"}
+
+var varNameRe = regexp.MustCompile(`^[A-Za-z0-9_]+$`)
+
+// betweenParts separa "a..b" (os dois lados obrigatórios).
+func BetweenParts(v string) (lo, hi string, ok bool) {
+	i := strings.Index(v, "..")
+	if i < 0 {
+		return "", "", false
+	}
+	lo, hi = strings.TrimSpace(v[:i]), strings.TrimSpace(v[i+2:])
+	return lo, hi, lo != "" && hi != ""
+}
+
+// CompileFlowRegex: regex das condições e do transform, sempre sem
+// diferenciar maiúsculas.
+func CompileFlowRegex(p string) (*regexp.Regexp, error) {
+	return regexp.Compile("(?i)" + p)
 }
 
 // FlowSettableFields: campos que um bloco set pode definir. Os de texto
@@ -171,10 +198,39 @@ type Calendar struct {
 	Holidays []string `yaml:"holidays,omitempty"`
 }
 
+// FlowCondition é uma regra (campo + operador + valor) ou, com
+// Conditions preenchido, um GRUPO de regras com o próprio Match (E/OU) —
+// ex: (tag = Critico OU grupo = Core) E fora do horário.
 type FlowCondition struct {
-	Field string `yaml:"field"`
-	Op    string `yaml:"op"`
+	Field string `yaml:"field,omitempty"`
+	Op    string `yaml:"op,omitempty"`
 	Value string `yaml:"value,omitempty"`
+
+	Match      string          `yaml:"match,omitempty"`
+	Conditions []FlowCondition `yaml:"conditions,omitempty"`
+}
+
+// IsGroup: a regra é um grupo de regras.
+func (c FlowCondition) IsGroup() bool { return len(c.Conditions) > 0 }
+
+// FlowBranch é um ramo da condição múltipla: ID é o nome da saída.
+type FlowBranch struct {
+	ID         string          `yaml:"id"`
+	Label      string          `yaml:"label,omitempty"`
+	Match      string          `yaml:"match,omitempty"`
+	Conditions []FlowCondition `yaml:"conditions"`
+}
+
+// FlowTransform cria/atualiza a variável {var.<Var>} a partir de From
+// (template): set (o próprio texto), extract (Arg = regex; 1º grupo ou o
+// trecho todo), replace (troca Arg por Arg2), upper, lower, trim, default
+// (From vazio → Arg).
+type FlowTransform struct {
+	Var  string `yaml:"var"`
+	From string `yaml:"from"`
+	Op   string `yaml:"op"`
+	Arg  string `yaml:"arg,omitempty"`
+	Arg2 string `yaml:"arg2,omitempty"`
 }
 
 type FlowCase struct {
@@ -223,6 +279,12 @@ type FlowNode struct {
 	Note   string `yaml:"note,omitempty"`
 	Teams  bool   `yaml:"teams,omitempty"`
 	Repeat bool   `yaml:"repeat,omitempty"`
+
+	// branch (se / senão se / senão)
+	Branches []FlowBranch `yaml:"branches,omitempty"`
+
+	// transform
+	Transforms []FlowTransform `yaml:"transforms,omitempty"`
 
 	// http
 	Method  string   `yaml:"method,omitempty"`
@@ -316,8 +378,14 @@ func linkPort(l FlowLink) string {
 // Ports devolve as portas de saída válidas do bloco.
 func (n FlowNode) Ports() []string {
 	switch n.Type {
-	case NodeStart, NodeSet, NodeUpdate, NodeHTTP:
+	case NodeStart, NodeSet, NodeUpdate, NodeHTTP, NodeTransform:
 		return []string{PortNext}
+	case NodeBranch:
+		out := make([]string, 0, len(n.Branches)+1)
+		for _, b := range n.Branches {
+			out = append(out, b.ID)
+		}
+		return append(out, PortElse)
 	case NodeTable:
 		return []string{PortFound, PortNotFound}
 	case NodeIf:
@@ -419,18 +487,16 @@ func validateFlow(f FlowsFile, fl *Flow) error {
 			starts++
 
 		case NodeIf:
-			n.Match = strings.ToLower(strings.TrimSpace(n.Match))
-			if n.Match == "" {
-				n.Match = "all"
+			m, err := normalizeMatch(n.Match)
+			if err != nil {
+				return fmt.Errorf("bloco %q: %w", n.ID, err)
 			}
-			if n.Match != "all" && n.Match != "any" {
-				return fmt.Errorf("bloco %q: match deve ser all ou any", n.ID)
-			}
+			n.Match = m
 			if len(n.Conditions) == 0 {
 				return fmt.Errorf("bloco %q: condição sem regras", n.ID)
 			}
 			for j := range n.Conditions {
-				if err := validateCondition(f, &n.Conditions[j]); err != nil {
+				if err := validateCondition(f, &n.Conditions[j], 1); err != nil {
 					return fmt.Errorf("bloco %q, regra #%d: %w", n.ID, j+1, err)
 				}
 			}
@@ -494,6 +560,46 @@ func validateFlow(f FlowsFile, fl *Flow) error {
 		case NodeTable:
 			if err := validateTable(f, n); err != nil {
 				return err
+			}
+
+		case NodeBranch:
+			if len(n.Branches) == 0 {
+				return fmt.Errorf("bloco %q: condição múltipla sem ramos", n.ID)
+			}
+			seen := map[string]bool{PortElse: true, PortNext: true}
+			for j := range n.Branches {
+				b := &n.Branches[j]
+				b.ID = strings.TrimSpace(b.ID)
+				if b.ID == "" {
+					return fmt.Errorf("bloco %q: ramo #%d sem id", n.ID, j+1)
+				}
+				if seen[strings.ToLower(b.ID)] {
+					return fmt.Errorf("bloco %q: ramo %q repetido (ou reservado)", n.ID, b.ID)
+				}
+				seen[strings.ToLower(b.ID)] = true
+				m, err := normalizeMatch(b.Match)
+				if err != nil {
+					return fmt.Errorf("bloco %q, ramo %q: %w", n.ID, b.ID, err)
+				}
+				b.Match = m
+				if len(b.Conditions) == 0 {
+					return fmt.Errorf("bloco %q: ramo %q sem regras", n.ID, b.ID)
+				}
+				for k := range b.Conditions {
+					if err := validateCondition(f, &b.Conditions[k], 1); err != nil {
+						return fmt.Errorf("bloco %q, ramo %q, regra #%d: %w", n.ID, b.ID, k+1, err)
+					}
+				}
+			}
+
+		case NodeTransform:
+			if len(n.Transforms) == 0 {
+				return fmt.Errorf("bloco %q: transformar sem operações", n.ID)
+			}
+			for j := range n.Transforms {
+				if err := validateTransform(f, &n.Transforms[j]); err != nil {
+					return fmt.Errorf("bloco %q, operação #%d: %w", n.ID, j+1, err)
+				}
 			}
 
 		case NodeUpdate:
@@ -599,7 +705,39 @@ func validateFlow(f FlowsFile, fl *Flow) error {
 	return nil
 }
 
-func validateCondition(f FlowsFile, c *FlowCondition) error {
+func normalizeMatch(m string) (string, error) {
+	m = strings.ToLower(strings.TrimSpace(m))
+	if m == "" {
+		m = "all"
+	}
+	if m != "all" && m != "any" {
+		return "", fmt.Errorf("match deve ser all ou any")
+	}
+	return m, nil
+}
+
+// maxCondDepth: grupos dentro de grupos (3 níveis bastam e evitam abuso).
+const maxCondDepth = 3
+
+func validateCondition(f FlowsFile, c *FlowCondition, depth int) error {
+	if c.IsGroup() {
+		if depth > maxCondDepth {
+			return fmt.Errorf("grupos aninhados demais (máx %d níveis)", maxCondDepth)
+		}
+		m, err := normalizeMatch(c.Match)
+		if err != nil {
+			return err
+		}
+		c.Match = m
+		c.Field, c.Op, c.Value = "", "", ""
+		for j := range c.Conditions {
+			if err := validateCondition(f, &c.Conditions[j], depth+1); err != nil {
+				return fmt.Errorf("grupo, regra #%d: %w", j+1, err)
+			}
+		}
+		return nil
+	}
+	c.Match = ""
 	c.Field = strings.TrimSpace(c.Field)
 	c.Op = strings.ToLower(strings.TrimSpace(c.Op))
 	if c.Field == "" {
@@ -621,7 +759,53 @@ func validateCondition(f FlowsFile, c *FlowCondition) error {
 	if !ok {
 		return fmt.Errorf("operador %q inválido (válidos: %s)", c.Op, strings.Join(FlowOps, ", "))
 	}
+	// valor fixo (sem {variável}) dá pra conferir agora
+	if !strings.Contains(c.Value, "{") {
+		switch c.Op {
+		case "regex", "not_regex":
+			if _, err := CompileFlowRegex(c.Value); err != nil {
+				return fmt.Errorf("regex inválida %q: %v", c.Value, err)
+			}
+		case "between":
+			if _, _, ok := BetweenParts(c.Value); !ok {
+				return fmt.Errorf("\"entre\" espera início..fim (ex: 30..60 ou 22:00..06:00), veio %q", c.Value)
+			}
+		}
+	}
 	return validateTemplate(f, c.Value)
+}
+
+func validateTransform(f FlowsFile, t *FlowTransform) error {
+	t.Var = strings.TrimSpace(t.Var)
+	t.Op = strings.ToLower(strings.TrimSpace(t.Op))
+	if t.Op == "" {
+		t.Op = "set"
+	}
+	if !varNameRe.MatchString(t.Var) {
+		return fmt.Errorf("nome da variável %q inválido (letras, números e _)", t.Var)
+	}
+	if !inList(FlowTransformOps, t.Op) {
+		return fmt.Errorf("operação %q inválida (%s)", t.Op, strings.Join(FlowTransformOps, ", "))
+	}
+	switch t.Op {
+	case "extract":
+		if _, err := CompileFlowRegex(t.Arg); err != nil || strings.TrimSpace(t.Arg) == "" {
+			return fmt.Errorf("extrair precisa de uma regex válida, veio %q", t.Arg)
+		}
+	case "replace":
+		if t.Arg == "" {
+			return fmt.Errorf("substituir precisa do texto a procurar")
+		}
+	}
+	for _, s := range []string{t.From, t.Arg2} {
+		if err := validateTemplate(f, s); err != nil {
+			return err
+		}
+	}
+	if t.Op == "default" {
+		return validateTemplate(f, t.Arg)
+	}
+	return nil
 }
 
 // validateField só confere o que é do próprio arquivo: calendário citado

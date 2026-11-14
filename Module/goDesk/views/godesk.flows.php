@@ -80,6 +80,8 @@ echo '<div class="gd-row gd-flow-toolbar">';
 echo '<span class="gd-muted">Adicionar:</span>';
 echo '<button class="gd-btn gd-flow-add-if" type="button" data-gd-flow-add="if">◇ Condição</button>';
 echo '<button class="gd-btn gd-flow-add-switch" type="button" data-gd-flow-add="switch">⑂ Switch</button>';
+echo '<button class="gd-btn gd-flow-add-branch" type="button" data-gd-flow-add="branch">⑃ Condição múltipla</button>';
+echo '<button class="gd-btn gd-flow-add-transform" type="button" data-gd-flow-add="transform">ƒ Transformar</button>';
 echo '<button class="gd-btn gd-flow-add-table" type="button" data-gd-flow-add="table">▦ Tabela</button>';
 echo '<button class="gd-btn gd-flow-add-set" type="button" data-gd-flow-add="set">✎ Definir campos</button>';
 echo '<button class="gd-btn gd-flow-add-update" type="button" data-gd-flow-add="update">⤴ Atualizar chamado</button>';
