@@ -508,6 +508,20 @@
           </div>
         </div>
 
+        <div class="gd-row">
+          <div class="gd-field">
+            <label>Fluxo <span class="gd-muted">(vazio = rule fixa · <a href="zabbix.php?action=godesk.flows.edit">editar fluxos</a>)</span></label>
+            <input type="text" name="clients[${i}][flow]" list="gd-flow-names" autocomplete="off" value="" placeholder="nome do fluxo">
+          </div>
+          <div class="gd-field gd-field-tight">
+            <label>Modo do fluxo</label>
+            <select name="clients[${i}][flow_mode]">
+              <option value="on" selected>ativo (o fluxo decide)</option>
+              <option value="shadow">shadow (rule fixa decide, fluxo só loga)</option>
+            </select>
+          </div>
+        </div>
+
         <div class="gd-row gd-customstatus-box" style="display:none">
           <div class="gd-field">
             <label>Status abertura (ID no TopDesk)</label>

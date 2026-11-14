@@ -117,6 +117,42 @@ Como a v2 decide, na hora do alerta:
 
 As localidades ficam em `/etc/zabbix/godesk/godesk-dependencies-v2.yaml` (caminho alterável com `GODESK_DEPENDENCIES_V2_FILE`), sincronizado pelo `godesk-client dependencies-v2` → `POST /dependencies-v2`. Exportar/Importar funcionam como na v1. O estado da localidade é lido com 3 chamadas à API do Zabbix por alerta (`host.get`, `problem.get`, `trigger.get`), independente do número de hosts.
 
+### 10. (Opcional) Fluxos: decisão por condições, com poucas rules
+
+Em vez de criar uma rule nova para cada variação ("host crítico liga", "fora do horário liga sempre", "informativo não abre"), a rule aponta para um **fluxo**, e o fluxo decide na hora do alerta.
+
+1. Em **Alerts → goDesk → Fluxos**, crie um fluxo e monte os blocos:
+   - **Condição** (sim/não), com regras E/OU sobre o evento.
+   - **Switch**, com um caminho por valor. Exemplo: `host.tag.Criticidade` = `Critico`, `Alta,Media` ou outro.
+   - **Definir campos**: urgência, impacto, grupo operador, operador, contrato, Teams, e-mail etc. e a **instrução** pro atendimento (ex: *"LIGAR para o cliente ({host})"*).
+   - **Fim**: abrir chamado, ou **não abrir** (só comenta no evento). Uma saída sem ligação também abre o chamado com o que já foi definido.
+2. Em **Calendários**, cadastre por exemplo `comercial` (seg a sex, 08:00–18:00, feriados). Nas condições, use `calendar.comercial` "é falso" para pegar o que está fora do horário.
+3. Use **🧪 Testar** com um problema real (ou valores digitados): a tela mostra o caminho, os campos definidos e se abre ou não. É a mesma decisão do goDesk.
+4. Em **Config (editar)**, preencha o **Fluxo** da rule e o **Modo do fluxo**:
+   - **ativo**: o fluxo decide.
+   - **shadow**: a rule fixa decide, e o fluxo só registra no log o que faria (`[flow-shadow] ... caminho: ... | definiria: ...`).
+
+Campos disponíveis nas condições e nos textos (`{campo}`):
+
+| Campo | O que é |
+|---|---|
+| `host`, `host.name`, `host.id` | host do alerta (nome técnico, visível, id) |
+| `host.group` | grupos do host (vários valores) |
+| `host.tag.<nome>`, `event.tag.<nome>` | tags do host e do evento |
+| `trigger`, `severity`, `severity.level` (0–5), `value`, `status`, `event.kind` (`problem`/`recovery`) | dados do evento |
+| `rule`, `cliente`, `equipe`, `ticket.exists`, `ticket.status` | contexto do goDesk |
+| `calendar.<nome>`, `now.weekday`, `now.hour`, `now.time`, `now.date` | horário |
+| `set.<campo>` | valor já definido antes no próprio fluxo |
+
+Regras do fluxo:
+- O que o fluxo define **sobrescreve** a rule, inclusive o que vier por tag do Zabbix. Um texto que resolve vazio não apaga o valor da rule.
+- A **instrução** é gravada no chamado como ação **invisível pro solicitante** e aparece em destaque no card do Teams. **Não** vai no e-mail do cliente.
+- **Não abrir** só vale na abertura. A atualização e a normalização de um chamado já aberto seguem normais.
+- Tags e grupos do host só são consultados no Zabbix se o fluxo chegar num bloco que use esses campos (1 `host.get` e/ou 1 `event.get` por alerta).
+- Se der erro (fluxo inexistente, arquivo inválido), a rule segue fixa, como se não tivesse fluxo. Isso conta em `flows_errors_total`. Outras métricas: `flows_evaluated_total`, `flows_skipped_total` e `flows_shadow_evaluated_total`.
+
+Os fluxos ficam em `/etc/zabbix/godesk/godesk-flows.yaml` (alterável com `GODESK_FLOWS_FILE`), gravado em JSON indentado (JSON é YAML válido). O arquivo é validado pelo próprio goDesk antes de salvar (`godesk-client flows-check`) e sincronizado por `godesk-client flows` → `POST /flows`.
+
 ## Instalação manual (sem apt)
 
 Use [install.sh](install.sh) — compila/copia os arquivos na mão, com as mesmas opções (módulo, binário, configs, serviço systemd). Útil se o host não tem acesso ao repositório APT.

@@ -140,6 +140,96 @@ func (c Client) HostsByName(names []string) (map[string]Host, error) {
 	return out, nil
 }
 
+// Tag é uma tag do Zabbix (host, trigger ou evento).
+type Tag struct {
+	Tag   string `json:"tag"`
+	Value string `json:"value"`
+}
+
+// HostInfo é o contexto do host usado pelos fluxos (campos host.name,
+// host.tag.X e host.group).
+type HostInfo struct {
+	HostID string
+	Host   string
+	Name   string
+	Tags   []Tag
+	Groups []string
+}
+
+// HostInfo busca nome visível, tags e grupos do host pelo hostid (ou, sem
+// hostid, pelo nome técnico). Uma chamada host.get. Host inexistente =
+// HostInfo vazio, sem erro.
+func (c Client) HostInfo(hostID, host string) (HostInfo, error) {
+	params := map[string]any{
+		"output":           []string{"hostid", "host", "name"},
+		"selectTags":       []string{"tag", "value"},
+		"selectHostGroups": []string{"name"},
+	}
+	switch {
+	case strings.TrimSpace(hostID) != "":
+		params["hostids"] = []string{hostID}
+	case strings.TrimSpace(host) != "":
+		params["filter"] = map[string]any{"host": []string{host}}
+	default:
+		return HostInfo{}, nil
+	}
+
+	raw, err := c.call("host.get", params)
+	if err != nil {
+		return HostInfo{}, err
+	}
+
+	var hosts []struct {
+		HostID     string `json:"hostid"`
+		Host       string `json:"host"`
+		Name       string `json:"name"`
+		Tags       []Tag  `json:"tags"`
+		HostGroups []struct {
+			Name string `json:"name"`
+		} `json:"hostgroups"`
+	}
+	if err := json.Unmarshal(raw, &hosts); err != nil {
+		return HostInfo{}, fmt.Errorf("host.get: %w", err)
+	}
+	if len(hosts) == 0 {
+		return HostInfo{}, nil
+	}
+
+	h := hosts[0]
+	info := HostInfo{HostID: h.HostID, Host: h.Host, Name: h.Name, Tags: h.Tags}
+	for _, g := range h.HostGroups {
+		info.Groups = append(info.Groups, g.Name)
+	}
+	return info, nil
+}
+
+// EventTags devolve as tags do evento (as do trigger, item e host que o
+// Zabbix copia pro evento, mais as de ações). Evento inexistente = nil.
+func (c Client) EventTags(eventID string) ([]Tag, error) {
+	if strings.TrimSpace(eventID) == "" {
+		return nil, nil
+	}
+	raw, err := c.call("event.get", map[string]any{
+		"output":     []string{"eventid"},
+		"eventids":   []string{eventID},
+		"selectTags": []string{"tag", "value"},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var events []struct {
+		Tags []Tag `json:"tags"`
+	}
+	if err := json.Unmarshal(raw, &events); err != nil {
+		return nil, fmt.Errorf("event.get: %w", err)
+	}
+	if len(events) == 0 {
+		return nil, nil
+	}
+	return events[0].Tags, nil
+}
+
 // Problem é um problema ativo (problem.get).
 type Problem struct {
 	EventID  string `json:"eventid"`

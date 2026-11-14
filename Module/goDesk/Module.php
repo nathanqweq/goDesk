@@ -24,6 +24,7 @@ class Module extends CModule {
 		];
 		if ($admin) {
 			$items[] = (new CMenuItem(_('Config (editar)')))->setAction('godesk.config.edit');
+			$items[] = (new CMenuItem(_('Fluxos')))->setAction('godesk.flows.edit');
 			$items[] = (new CMenuItem(_('Dependências')))->setAction('godesk.dependencies.edit');
 			$items[] = (new CMenuItem(_('Dependências v2 (arquitetura)')))->setAction('godesk.topology.edit');
 		}

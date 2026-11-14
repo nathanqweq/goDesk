@@ -31,6 +31,14 @@ type Snapshot struct {
 	DependencyShadowEvaluated int64 `json:"dependency_shadow_evaluated_total"`
 	DependencyShadowDiverged  int64 `json:"dependency_shadow_diverged_total"`
 
+	// Fluxos (godesk-flows.yaml): execuções aplicadas, quantas decidiram
+	// não abrir chamado, execuções em shadow (só log) e erros (fluxo não
+	// encontrado, arquivo inválido — a rule segue fixa).
+	FlowsEvaluated       int64 `json:"flows_evaluated_total"`
+	FlowsSkipped         int64 `json:"flows_skipped_total"`
+	FlowsShadowEvaluated int64 `json:"flows_shadow_evaluated_total"`
+	FlowsErrors          int64 `json:"flows_errors_total"`
+
 	TicketsCreated      int64 `json:"tickets_created_total"`
 	TicketsCreateErrors int64 `json:"tickets_create_errors_total"`
 

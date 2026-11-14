@@ -538,3 +538,137 @@
 [theme='dark-theme'] .godesk-module .gd-topo-status text { fill: #e8e8e8; }
 [theme='dark-theme'] .godesk-module .gd-topo-linklist li { border-bottom-color: rgba(255,255,255,.08); }
 [theme='dark-theme'] .godesk-module .gd-topo-legend-item i.is-isolated { background: #2b2f36; }
+
+/* =========================================================
+   Fluxos (godesk.flows.edit)
+========================================================= */
+.godesk-module .gd-flow-toolbar { align-items: center; gap: 8px; }
+.godesk-module .gd-flow-sep { flex: 1; }
+.godesk-module .gd-flow-rules { padding: 6px 0; line-height: 1.8; }
+
+.godesk-module .gd-flow-main {
+  display: flex;
+  gap: 14px;
+  margin-top: 14px;
+  align-items: stretch;
+}
+.godesk-module .gd-flow-canvas-wrap {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  max-height: 74vh;
+  border: 1px solid #dcdcdc;
+  border-radius: 8px;
+  background-color: #fafbfc;
+  background-image: radial-gradient(circle, #d9dde3 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+.godesk-module .gd-flow-svg { display: block; user-select: none; touch-action: none; }
+.godesk-module .gd-flow-side {
+  width: 340px;
+  flex: 0 0 340px;
+  max-height: 74vh;
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid #dcdcdc;
+  border-radius: 8px;
+  font-size: 12px;
+}
+.godesk-module .gd-flow-side .gd-field { min-width: 0; }
+.godesk-module .gd-flow-side .gd-banner { margin: 8px 0 0 0; font-size: 12px; }
+.godesk-module .gd-flow-rule {
+  display: flex;
+  gap: 4px;
+  align-items: flex-start;
+  margin-top: 6px;
+}
+.godesk-module .gd-flow-rule input,
+.godesk-module .gd-flow-rule select,
+.godesk-module .gd-flow-rule textarea { min-width: 0; flex: 1 1 0; }
+.godesk-module .gd-flow-rule select { flex: 0 0 auto; max-width: 120px; }
+.godesk-module .gd-flow-setrow select { max-width: 130px; }
+.godesk-module .gd-flow-vars { margin-top: 8px; line-height: 2; }
+.godesk-module .gd-flow-var {
+  border: 1px solid #c9d3e1;
+  background: #f1f5fb;
+  border-radius: 10px;
+  padding: 1px 7px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.godesk-module .gd-flow-node { cursor: grab; }
+.godesk-module .gd-flow-box { fill: #fff; stroke: #9aa5b5; stroke-width: 1.2; }
+.godesk-module .gd-flow-head { fill: #e9eef5; }
+.godesk-module .gd-flow-title { font-size: 12px; font-weight: 700; fill: #1f2933; }
+.godesk-module .gd-flow-line { font-size: 11px; fill: #3b4552; }
+.godesk-module .gd-flow-port-label { font-size: 10px; fill: #5b6676; }
+.godesk-module .gd-flow-t-start .gd-flow-head { fill: #d6e6fb; }
+.godesk-module .gd-flow-t-if .gd-flow-head { fill: #fdf0d2; }
+.godesk-module .gd-flow-t-switch .gd-flow-head { fill: #ece2fb; }
+.godesk-module .gd-flow-t-set .gd-flow-head { fill: #dcf3e4; }
+.godesk-module .gd-flow-t-end .gd-flow-head { fill: #e3e6ea; }
+.godesk-module .gd-flow-node.is-skip .gd-flow-head { fill: #f8d9d9; }
+.godesk-module .gd-flow-node.is-selected .gd-flow-box { stroke: #2f6fdf; stroke-width: 2.5; }
+.godesk-module .gd-flow-node.is-path .gd-flow-box { stroke: #2e9e5b; stroke-width: 3; }
+.godesk-module .gd-flow-port-in { fill: #fff; stroke: #9aa5b5; stroke-width: 1.2; }
+.godesk-module .gd-flow-port-out { fill: #fff; stroke: #2f6fdf; stroke-width: 2; cursor: crosshair; }
+.godesk-module .gd-flow-port-out.is-linked { fill: #2f6fdf; }
+.godesk-module .gd-flow-port-out:hover { r: 9; }
+.godesk-module .gd-flow-link { fill: none; stroke: #8a95a5; stroke-width: 2; }
+.godesk-module .gd-flow-link.is-selected { stroke: #2f6fdf; stroke-width: 3; }
+.godesk-module .gd-flow-link.is-path { stroke: #2e9e5b; stroke-width: 3.5; }
+.godesk-module .gd-flow-link.is-temp { stroke: #2f6fdf; stroke-dasharray: 5 4; }
+.godesk-module .gd-flow-link-hit { fill: none; stroke: transparent; stroke-width: 12; cursor: pointer; }
+.godesk-module .gd-flow-arrowhead { fill: #8a95a5; }
+.godesk-module .gd-flow-arrowhead.is-path { fill: #2e9e5b; }
+.godesk-module .gd-flow-empty { font-size: 14px; fill: #777; }
+
+.godesk-module .gd-flow-cal { align-items: flex-end; border-bottom: 1px dashed #e1e4e8; padding-bottom: 8px; margin-bottom: 8px; }
+.godesk-module .gd-flow-days { display: flex; flex-wrap: wrap; gap: 8px; padding: 6px 0; }
+.godesk-module .gd-flow-day { display: inline-flex; gap: 3px; align-items: center; font-size: 12px; }
+
+.godesk-module .gd-flow-test {
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #f3f6fb;
+  border: 1px dashed #b9c6da;
+}
+.godesk-module .gd-flow-test textarea { font-family: monospace; font-size: 12px; }
+.godesk-module .gd-flow-test-grid { display: grid; grid-template-columns: 1fr 1.4fr; gap: 16px; margin-top: 10px; }
+.godesk-module .gd-flow-res,
+.godesk-module .gd-flow-trace { margin: 6px 0 0 0; padding-left: 18px; font-size: 12px; }
+.godesk-module .gd-flow-trace li { margin-bottom: 5px; }
+
+@media (max-width: 1100px) {
+  .godesk-module .gd-flow-main { flex-direction: column; }
+  .godesk-module .gd-flow-side { width: auto; flex: 1 1 auto; }
+  .godesk-module .gd-flow-test-grid { grid-template-columns: 1fr; }
+}
+
+[theme='dark-theme'] .godesk-module .gd-flow-canvas-wrap {
+  background-color: #17171a;
+  background-image: radial-gradient(circle, #2c2c33 1px, transparent 1px);
+  border-color: #333;
+}
+[theme='dark-theme'] .godesk-module .gd-flow-side { border-color: #333; }
+[theme='dark-theme'] .godesk-module .gd-flow-box { fill: #2b2f36; stroke: #7d8899; }
+[theme='dark-theme'] .godesk-module .gd-flow-title,
+[theme='dark-theme'] .godesk-module .gd-flow-line { fill: #e8e8e8; }
+[theme='dark-theme'] .godesk-module .gd-flow-port-label { fill: #aab3bf; }
+[theme='dark-theme'] .godesk-module .gd-flow-head { fill: #39404a; }
+[theme='dark-theme'] .godesk-module .gd-flow-t-start .gd-flow-head { fill: #2d4669; }
+[theme='dark-theme'] .godesk-module .gd-flow-t-if .gd-flow-head { fill: #5c4a1e; }
+[theme='dark-theme'] .godesk-module .gd-flow-t-switch .gd-flow-head { fill: #4a3a66; }
+[theme='dark-theme'] .godesk-module .gd-flow-t-set .gd-flow-head { fill: #24513a; }
+[theme='dark-theme'] .godesk-module .gd-flow-t-end .gd-flow-head { fill: #3b4048; }
+[theme='dark-theme'] .godesk-module .gd-flow-node.is-skip .gd-flow-head { fill: #6a2a2a; }
+[theme='dark-theme'] .godesk-module .gd-flow-port-in,
+[theme='dark-theme'] .godesk-module .gd-flow-port-out { fill: #2b2f36; }
+[theme='dark-theme'] .godesk-module .gd-flow-port-out.is-linked { fill: #2f6fdf; }
+[theme='dark-theme'] .godesk-module .gd-flow-link { stroke: #6b7686; }
+[theme='dark-theme'] .godesk-module .gd-flow-arrowhead { fill: #6b7686; }
+[theme='dark-theme'] .godesk-module .gd-flow-test { background: #1c2430; border-color: #35506f; }
+[theme='dark-theme'] .godesk-module .gd-flow-var { background: #24303f; border-color: #35506f; color: #e8e8e8; }
+[theme='dark-theme'] .godesk-module .gd-flow-cal { border-bottom-color: #333; }

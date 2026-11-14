@@ -136,6 +136,8 @@ class ConfigEdit extends CController {
 			$rules[$rule]['custom_status'] ??= false;
 			$rules[$rule]['dependency'] ??= false;
 			$rules[$rule]['dependency_version'] = $this->depVersion($rules[$rule]['dependency_version'] ?? '');
+			$rules[$rule]['flow'] = trim((string)($rules[$rule]['flow'] ?? ''));
+			$rules[$rule]['flow_mode'] = $this->flowMode($rules[$rule]['flow_mode'] ?? '');
 			$rules[$rule]['status_open'] ??= '';
 			$rules[$rule]['status_update'] ??= '';
 			$rules[$rule]['topdesk'] ??= [];
@@ -178,6 +180,27 @@ class ConfigEdit extends CController {
 	private function depVersion($v): string {
 		$v = strtolower(trim((string)$v));
 		return in_array($v, ['v2', 'shadow'], true) ? $v : 'v1';
+	}
+
+	/** Mesma regra do config.NormalizeFlowMode no Go: vazio/desconhecido = on. */
+	private function flowMode($v): string {
+		return (strtolower(trim((string)$v)) === 'shadow') ? 'shadow' : 'on';
+	}
+
+	/** Nomes dos fluxos do godesk-flows.yaml (sugestões no campo Fluxo da rule). */
+	private function flowNames(): array {
+		$path = '/etc/zabbix/godesk/godesk-flows.yaml';
+		if (!function_exists('yaml_parse') || !is_readable($path)) {
+			return [];
+		}
+		$parsed = @yaml_parse((string)@file_get_contents($path));
+		$names = [];
+		foreach ((array)($parsed['flows'] ?? []) as $f) {
+			if (is_array($f) && trim((string)($f['name'] ?? '')) !== '') {
+				$names[] = trim((string)$f['name']);
+			}
+		}
+		return $names;
 	}
 
 	private function normalizeNullString($v): string {
@@ -260,6 +283,8 @@ class ConfigEdit extends CController {
 				'custom_status' => $this->toBool($row['custom_status'] ?? false),
 				'dependency' => $this->toBool($row['dependency'] ?? false),
 				'dependency_version' => $this->depVersion($row['dependency_version'] ?? ''),
+				'flow' => trim((string)($row['flow'] ?? '')),
+				'flow_mode' => $this->flowMode($row['flow_mode'] ?? ''),
 				'status_open' => (string)($row['status_open'] ?? ''),
 				'status_update' => (string)($row['status_update'] ?? ''),
 				'topdesk' => $this->normalizeTopdeskFromPost($td)
@@ -520,6 +545,8 @@ class ConfigEdit extends CController {
 					'custom_status' => (bool)($r['custom_status'] ?? false),
 					'dependency' => (bool)($r['dependency'] ?? false),
 					'dependency_version' => $this->depVersion($r['dependency_version'] ?? ''),
+					'flow' => trim((string)($r['flow'] ?? '')),
+					'flow_mode' => $this->flowMode($r['flow_mode'] ?? ''),
 					'status_open' => (string)($r['status_open'] ?? ''),
 					'status_update' => (string)($r['status_update'] ?? ''),
 					'topdesk' => (array)($r['topdesk'] ?? [])
@@ -553,7 +580,8 @@ class ConfigEdit extends CController {
 			'default' => (array)($cfg['default'] ?? []),
 			'named_clients' => $named_clients_list,
 			'rules' => $rules_list,
-			'rules_export' => $this->buildRulesExport()
+			'rules_export' => $this->buildRulesExport(),
+			'flow_names' => $this->flowNames()
 		]));
 	}
 }

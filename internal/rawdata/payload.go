@@ -28,6 +28,12 @@ type Payload struct {
 	// chamado; vazia/*UNKNOWN*/macro não resolvida = linha omitida.
 	Equipe string `json:"equipe"`
 
+	// Instrucao: orientação pro atendimento ("Ligar para o cliente",
+	// "Só acompanhar"...). Normalmente vem do fluxo da rule (campo
+	// instrucao do bloco "definir campos"), mas também aceita tag do
+	// evento. Vazia = linha omitida no chamado, no Teams e no e-mail.
+	Instrucao string `json:"instrucao"`
+
 	// ===== TAGS / TOPDESK =====
 	Contract        string `json:"contract"`
 	OperGroup       string `json:"oper_group"`

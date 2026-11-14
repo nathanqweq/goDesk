@@ -29,6 +29,29 @@ func main() {
 				os.Exit(1)
 			}
 			return
+		case "flows-check":
+			// valida um godesk-flows.yaml sem enviar nada (o módulo chama
+			// antes de gravar, pra usar exatamente a validação do Go)
+			if len(os.Args) < 3 {
+				fmt.Fprintln(os.Stderr, "uso: godesk-client flows-check <arquivo>")
+				os.Exit(2)
+			}
+			data, err := os.ReadFile(os.Args[2])
+			if err == nil {
+				_, err = config.ParseFlows(data)
+			}
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err.Error())
+				os.Exit(1)
+			}
+			fmt.Println("ok")
+			return
+		case "flows":
+			if err := runFlows(); err != nil {
+				fmt.Fprintln(os.Stderr, "godesk-client: "+err.Error())
+				os.Exit(1)
+			}
+			return
 		case "dependencies-v2":
 			if err := runDependenciesV2(); err != nil {
 				fmt.Fprintln(os.Stderr, "godesk-client: "+err.Error())
@@ -162,6 +185,32 @@ func runDependenciesV2() error {
 	}
 
 	fmt.Printf("dependências v2 enviadas com sucesso para %s (lidas de %s)\n", serverURL, path)
+	return nil
+}
+
+// runFlows manda o godesk-flows.yaml local (gravado pela página "Fluxos"
+// do módulo) pro POST /flows.
+func runFlows() error {
+	env, serverURL, token, err := loadClientEnv()
+	if err != nil {
+		return err
+	}
+
+	path := resolve(env, "GODESK_FLOWS_FILE", config.DefaultFlowsFile)
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("falha ao ler %s: %w", path, err)
+	}
+	if _, err := config.ParseFlows(data); err != nil {
+		return fmt.Errorf("yaml inválido em %s: %w", path, err)
+	}
+
+	if _, err := postYAML(serverURL, token, "/flows", data); err != nil {
+		return err
+	}
+
+	fmt.Printf("fluxos enviados com sucesso para %s (lidos de %s)\n", serverURL, path)
 	return nil
 }
 

@@ -68,6 +68,14 @@ type Policy struct {
 	// v2 só registra no log o que teria feito). Também sempre da regra.
 	DependencyVersion string `yaml:"dependency_version"`
 
+	// Flow: nome do fluxo de decisão (godesk-flows.yaml, ver flows.go) que
+	// roda antes de abrir/atualizar o chamado e pode sobrescrever campos,
+	// mensagem (instrucao) e decidir não abrir. Vazio = rule fixa, como
+	// sempre. FlowMode: on (padrão) ou shadow (só registra no log o que o
+	// fluxo faria). Os dois sempre pertencem à regra.
+	Flow     string `yaml:"flow"`
+	FlowMode string `yaml:"flow_mode"`
+
 	TopDesk TopDeskDefaults `yaml:"topdesk"`
 }
 
@@ -98,8 +106,11 @@ type RulePolicy struct {
 	StatusUpdate string `yaml:"status_update"`
 	Dependency   bool   `yaml:"dependency"`
 	// DependencyVersion: v1 | v2 | shadow (ver Policy.DependencyVersion)
-	DependencyVersion string          `yaml:"dependency_version"`
-	TopDesk           TopDeskDefaults `yaml:"topdesk"`
+	DependencyVersion string `yaml:"dependency_version"`
+	// Flow / FlowMode: ver Policy.Flow
+	Flow     string          `yaml:"flow"`
+	FlowMode string          `yaml:"flow_mode"`
+	TopDesk  TopDeskDefaults `yaml:"topdesk"`
 }
 
 // policiesFileV2 é o formato novo do YAML — só usado internamente durante
@@ -218,6 +229,8 @@ func flattenRules(v2 policiesFileV2) PoliciesFile {
 		p.AutoClose = rule.AutoClose
 		p.Dependency = rule.Dependency
 		p.DependencyVersion = rule.DependencyVersion
+		p.Flow = rule.Flow
+		p.FlowMode = rule.FlowMode
 
 		p.CustomStatus = rule.CustomStatus
 		if strings.TrimSpace(rule.StatusOpen) != "" {
@@ -318,6 +331,8 @@ func mergePolicy(def Policy, over Policy) Policy {
 	def.AutoClose = over.AutoClose
 	def.Dependency = over.Dependency
 	def.DependencyVersion = over.DependencyVersion
+	def.Flow = over.Flow
+	def.FlowMode = over.FlowMode
 
 	def.CustomStatus = over.CustomStatus
 	if strings.TrimSpace(over.StatusOpen) != "" {

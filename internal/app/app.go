@@ -111,8 +111,41 @@ func Run(cfg config.RuntimeConfig) (err error) {
 		return err
 	}
 
+	// fluxo da rule (godesk-flows.yaml): sobrescreve campos resolvidos e
+	// pode decidir não abrir — ver flow.go
+	flowRes := runFlow(cfg, zx, p, pol, exists, status, flowNow())
+	if flowRes != nil {
+		applyFlow(*flowRes, &pol, &p, map[string]*string{
+			"contract":         &contract,
+			"operator":         &operator,
+			"oper_group":       &operGrp,
+			"main_caller":      &mainCaller,
+			"secundary_caller": &secCaller,
+			"sla":              &slaID,
+			"category":         &category,
+			"sub_category":     &subCategory,
+			"call_type":        &callType,
+			"priority":         &priority,
+			"urgency":          &pol.Urgency,
+			"impact":           &pol.Impact,
+		})
+		if flowRes.Action == config.FlowActionSkip && !(eventKind == "ProblemStart" && !exists) {
+			log.Printf("[flow] ação \"não abrir\" ignorada: só vale pra abertura (kind=%s, chamado existe=%v)\n", eventKind, exists)
+		}
+	}
+
 	switch {
 	case !exists && eventKind == "ProblemStart":
+		if flowRes != nil && flowRes.Action == config.FlowActionSkip {
+			recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.FlowsSkipped++ })
+			// só comentário, sem ack — igual à dependência
+			if err := zx.AddMessage(p.EventID, flowSkipComment(*flowRes)); err != nil {
+				recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.ZabbixAckErrors++ })
+				log.Printf("[zabbix] ACK ERROR: %v\n", err)
+			}
+			return nil
+		}
+
 		if pol.Dependency {
 			if msg, hold := runDependency(cfg, zx, p, pol.DependencyVersion); hold {
 				recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.AlertsHeldByDependency++ })
@@ -154,6 +187,17 @@ func Run(cfg config.RuntimeConfig) (err error) {
 			return err
 		}
 		recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.TicketsCreated++ })
+
+		// instrução (normalmente do fluxo): ação interna, invisível pro
+		// solicitante — é orientação pro atendimento, não pro cliente
+		if v := strings.TrimSpace(p.Instrucao); v != "" {
+			if err := td.PatchTicket(created, map[string]any{
+				"action":                   "<strong>Instrução:</strong> " + htmlEscapeText(v),
+				"actionInvisibleForCaller": true,
+			}); err != nil {
+				log.Printf("[topdesk] WARN: falha ao registrar instrução no chamado %s: %v\n", created, err)
+			}
+		}
 
 		if pol.TopDesk.SendMoreInfo {
 			infoMsg := strings.TrimSpace(pol.TopDesk.MoreInfoText)

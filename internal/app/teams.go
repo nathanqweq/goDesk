@@ -52,18 +52,24 @@ func teamsMessage(p rawdata.Payload, ticketID string, closed bool) teams.Message
 	}
 
 	if rawdata.EventKind(p) == "ProblemStart" {
+		lines := []string{
+			"Problema iniciado às " + p.Hour + " em " + p.Date,
+			"Nome do problema: " + p.Trigger,
+			"Host: " + p.Host,
+			"Severidade: " + p.Severity,
+			"Dados operacionais: " + p.ValueItem,
+			"ID do problema original: " + p.EventID,
+			chamado,
+		}
+		// instrução do fluxo (ex: "Ligar para o cliente") em destaque, logo
+		// abaixo do título
+		if v := strings.TrimSpace(p.Instrucao); v != "" {
+			lines = append([]string{"**Instrução: " + v + "**"}, lines...)
+		}
 		return teams.Message{
 			Subject: "Problema: " + p.Trigger,
 			Style:   teams.StyleProblem,
-			Lines: []string{
-				"Problema iniciado às " + p.Hour + " em " + p.Date,
-				"Nome do problema: " + p.Trigger,
-				"Host: " + p.Host,
-				"Severidade: " + p.Severity,
-				"Dados operacionais: " + p.ValueItem,
-				"ID do problema original: " + p.EventID,
-				chamado,
-			},
+			Lines:   lines,
 		}
 	}
 

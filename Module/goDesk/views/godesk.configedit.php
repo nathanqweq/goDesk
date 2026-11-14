@@ -282,6 +282,12 @@ echo '<input type="file" id="gd-rules-import-file" accept=".yaml,.yml,text/yaml"
 echo '</div>';
 echo '<div class="gd-muted" style="margin-bottom:10px">Exportar baixa as rules salvas junto com os clientes cadastrados (as rules referenciam eles pelo nome). Importar <b>substitui</b> todas as rules (e os clientes, se o arquivo trouxer) — o Default não é alterado.</div>';
 
+echo '<datalist id="gd-flow-names">';
+foreach (($data['flow_names'] ?? []) as $fn) {
+	echo '<option value="'.h($fn).'"></option>';
+}
+echo '</datalist>';
+
 echo '<div class="gd-row"><div class="gd-field"><label>🔎 Buscar rule/cliente</label><input type="text" id="gd-filter-rules" placeholder="Filtrar por rule_name ou cliente..."></div></div>';
 
 echo '<div id="gd-clients">';
@@ -298,6 +304,11 @@ foreach ($rules as $c) {
 	$dep_opts = '';
 	foreach (['v1' => 'v1 (cadastro por host)', 'v2' => 'v2 (arquitetura)', 'shadow' => 'shadow (v1 decide, v2 só loga)'] as $dv => $dl) {
 		$dep_opts .= '<option value="'.$dv.'"'.($dep_version === $dv ? ' selected' : '').'>'.$dl.'</option>';
+	}
+	$flow_mode = (string)($c['flow_mode'] ?? 'on');
+	$flow_opts = '';
+	foreach (['on' => 'ativo (o fluxo decide)', 'shadow' => 'shadow (rule fixa decide, fluxo só loga)'] as $fv => $fl) {
+		$flow_opts .= '<option value="'.$fv.'"'.($flow_mode === $fv ? ' selected' : '').'>'.$fl.'</option>';
 	}
 	$custom_status_hidden = !empty($c['custom_status']) ? '' : ' style="display:none"';
 
@@ -362,6 +373,10 @@ foreach ($rules as $c) {
 		<label>Versão da dependência</label>
 		<select name="clients['.$idx.'][dependency_version]">'.$dep_opts.'</select>
 	</div>';
+	echo '</div>';
+	echo '<div class="gd-row">';
+	echo '<div class="gd-field"><label>Fluxo <span class="gd-muted">(vazio = rule fixa · <a href="zabbix.php?action=godesk.flows.edit">editar fluxos</a>)</span></label><input type="text" name="clients['.$idx.'][flow]" list="gd-flow-names" autocomplete="off" value="'.h($c['flow'] ?? '').'" placeholder="nome do fluxo"></div>';
+	echo '<div class="gd-field gd-field-tight"><label>Modo do fluxo</label><select name="clients['.$idx.'][flow_mode]">'.$flow_opts.'</select></div>';
 	echo '</div>';
 	echo '<div class="gd-row gd-customstatus-box"'.$custom_status_hidden.'>';
 	echo '<div class="gd-field"><label>Status abertura (ID no TopDesk)</label><input type="text" name="clients['.$idx.'][status_open]" value="'.h($c['status_open'] ?? '').'"></div>';

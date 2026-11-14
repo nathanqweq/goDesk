@@ -20,6 +20,7 @@ func Normalize(p *Payload) {
 	p.RuleName = clean(p.RuleName)
 	p.Cliente = clean(p.Cliente)
 	p.Equipe = optionalTag(p.Equipe)
+	p.Instrucao = optionalTag(p.Instrucao)
 
 	// topdesk
 	p.Contract = clean(p.Contract)

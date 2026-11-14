@@ -128,6 +128,9 @@ else {
 		if (!empty($c['dependency'])) {
 			$c_auto .= ' <span class="gd-pill gd-true">dependência '.h($c['dependency_version'] ?? 'v1').'</span>';
 		}
+		if (trim((string)($c['flow'] ?? '')) !== '') {
+			$c_auto .= ' <span class="gd-pill gd-true">fluxo '.h($c['flow']).(strtolower((string)($c['flow_mode'] ?? '')) === 'shadow' ? ' (shadow)' : '').'</span>';
+		}
 		echo '<div>'.$c_auto.'</div>';
 		echo '</div>';
 
