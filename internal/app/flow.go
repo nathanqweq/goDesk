@@ -229,25 +229,9 @@ func (r *eventResolver) Values(field string) []string {
 	return nil
 }
 
-// severityLevel: 0 (não classificada) .. 5 (desastre), nomes em inglês
-// ou português, ou o número. -1 = desconhecida.
-func severityLevel(s string) int {
-	switch strings.ToLower(strings.TrimSpace(s)) {
-	case "0", "not classified", "não classificada", "nao classificada":
-		return 0
-	case "1", "information", "informação", "informacao":
-		return 1
-	case "2", "warning", "atenção", "atencao", "aviso":
-		return 2
-	case "3", "average", "média", "media":
-		return 3
-	case "4", "high", "alta":
-		return 4
-	case "5", "disaster", "desastre":
-		return 5
-	}
-	return -1
-}
+// severityLevel: 0 (não classificada) .. 5 (desastre) ou -1 — ver
+// config.SeverityLevel.
+func severityLevel(s string) int { return config.SeverityLevel(s) }
 
 // flowRun é uma execução de fluxo dentro de um alerta: o resultado, se
 // foi aplicado (modo ativo, sem erro) e o que o app fez com ele — vira uma
@@ -315,6 +299,7 @@ func runFlow(cfg config.RuntimeConfig, zx flowZabbix, p rawdata.Payload, pol con
 		return fail("fluxo %q: %v (caminho até o erro: %s)", name, err, r.Path())
 	}
 	fr.entry.Action, fr.entry.Set, fr.entry.Updates, fr.entry.HTTP, fr.entry.Vars = r.Action, r.Set, r.Updates, r.HTTP, r.Vars
+	fr.entry.Zabbix, fr.entry.TicketNotes = r.Zabbix, r.Notes
 
 	sets := make([]string, 0, len(r.Set))
 	for _, a := range r.Set {
@@ -496,6 +481,95 @@ func runHTTPCalls(fr *flowRun, ticket string) {
 		resp.Body.Close()
 		fr.note("http %s %s %s → HTTP %d", c.Node, c.Method, target, resp.StatusCode)
 		log.Printf("[flow] http %s %s %s → HTTP %d %s\n", c.Node, c.Method, target, resp.StatusCode, strings.TrimSpace(string(snippet)))
+	}
+}
+
+type ticketPatcher interface {
+	PatchTicket(ticketID string, payload any) error
+}
+
+type eventActioner interface {
+	EventAction(eventID, message string, ack bool, severity int, suppressUntil int64) error
+}
+
+// noteHTML: texto do bloco note pro TopDesk (escapado, quebras de linha).
+func noteHTML(text string) string {
+	return strings.ReplaceAll(htmlEscapeText(strings.TrimSpace(text)), "\n", "<br>")
+}
+
+// descriptionNotes: textos que entram na descrição do chamado (abertura).
+func (fr *flowRun) descriptionNotes() string {
+	if fr == nil || !fr.applied {
+		return ""
+	}
+	out := ""
+	for _, n := range fr.res.Notes {
+		if n.Target == config.NoteDescription && strings.TrimSpace(n.Text) != "" {
+			out += "<br>" + noteHTML(n.Text) + "<br>"
+			fr.done[n.Node] = true
+			fr.note("texto no chamado %s: na descrição", n.Node)
+		}
+	}
+	return out
+}
+
+// applyNoteActions registra no chamado os blocos note de ação (interna ou
+// visível). reenvio=true: alerta voltou com o chamado já aberto — cada
+// bloco roda uma vez por evento, a menos que peça pra repetir.
+func (fr *flowRun) applyNoteActions(cfg config.RuntimeConfig, td ticketPatcher, eventID, ticket string, reenvio bool) {
+	if fr == nil || !fr.applied {
+		return
+	}
+	for _, n := range fr.res.Notes {
+		if n.Target == config.NoteDescription {
+			if reenvio {
+				fr.note("texto no chamado %s: descrição só vale na abertura", n.Node)
+			}
+			continue
+		}
+		if reenvio && !n.Repeat && fr.done[n.Node] {
+			fr.note("texto no chamado %s: já aplicado neste evento", n.Node)
+			continue
+		}
+		err := td.PatchTicket(ticket, map[string]any{
+			"action":                   noteHTML(n.Text),
+			"actionInvisibleForCaller": n.Target != config.NotePublic,
+		})
+		if err != nil {
+			log.Printf("[topdesk] WARN: falha ao registrar texto do fluxo no chamado %s (bloco %s): %v\n", ticket, n.Node, err)
+			fr.note("texto no chamado %s: falhou no TopDesk: %v", n.Node, err)
+			continue
+		}
+		if err := flowlog.MarkDone(cfg.FlowsStateFile, eventID, n.Node, flowNow()); err != nil {
+			log.Printf("[flow] WARN: falha ao gravar estado do evento: %v\n", err)
+		}
+		fr.done[n.Node] = true
+		fr.note("texto no chamado %s: registrado (%s)", n.Node, n.Target)
+	}
+}
+
+// runZabbixOps executa os blocos "ação no Zabbix" (fim do alerta): uma vez
+// por evento, a menos que o bloco peça pra repetir.
+func (fr *flowRun) runZabbixOps(cfg config.RuntimeConfig, zx eventActioner, eventID string) {
+	for _, op := range fr.res.Zabbix {
+		if !op.Repeat && fr.done[op.Node] {
+			fr.note("ação no Zabbix %s: já aplicada neste evento", op.Node)
+			continue
+		}
+		var until int64
+		if op.SuppressHours > 0 {
+			until = flowNow().Add(time.Duration(op.SuppressHours) * time.Hour).Unix()
+		}
+		if err := zx.EventAction(eventID, op.Message, op.Ack, op.Severity, until); err != nil {
+			log.Printf("[flow] WARN: ação no Zabbix %s falhou: %v\n", op.Node, err)
+			fr.note("ação no Zabbix %s: falhou: %v", op.Node, err)
+			continue
+		}
+		if err := flowlog.MarkDone(cfg.FlowsStateFile, eventID, op.Node, flowNow()); err != nil {
+			log.Printf("[flow] WARN: falha ao gravar estado do evento: %v\n", err)
+		}
+		fr.done[op.Node] = true
+		fr.note("ação no Zabbix %s: aplicada", op.Node)
 	}
 }
 

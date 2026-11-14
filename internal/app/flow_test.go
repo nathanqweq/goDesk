@@ -52,6 +52,19 @@ flows:
       - {from: quieto, to: idade}
       - {from: idade, port: "true", to: escalar}
 
+  - name: acoes
+    nodes:
+      - {id: s, type: start}
+      - {id: desc, type: note, target: description, text: "Procedimento:\nverificar <link> de {host}"}
+      - {id: interna, type: note, target: internal, text: "interna {trigger}"}
+      - {id: publica, type: note, target: public, text: "publica", repeat: true}
+      - {id: zbx, type: zabbix, message: "fluxo: {host}", ack: true, severity: Alta, suppress_hours: 2}
+    links:
+      - {from: s, to: desc}
+      - {from: desc, to: interna}
+      - {from: interna, to: publica}
+      - {from: publica, to: zbx}
+
   - name: tabela
     nodes:
       - {id: s, type: start}
@@ -94,13 +107,14 @@ type httpHit struct {
 // fakeBackend responde como TopDesk (/tas/api/...), Zabbix
 // (/api_jsonrpc.php), Teams (/teams*) e destino do bloco http (/hook).
 type fakeBackend struct {
-	mu       sync.Mutex
-	created  []map[string]any
-	patches  []map[string]any
-	zbxCalls []string
-	acks     []string
-	teams    []httpHit
-	hooks    []httpHit
+	mu        sync.Mutex
+	created   []map[string]any
+	patches   []map[string]any
+	zbxCalls  []string
+	acks      []string
+	ackParams []map[string]any
+	teams     []httpHit
+	hooks     []httpHit
 
 	hostTags     []map[string]string
 	ticketExists bool
@@ -171,6 +185,7 @@ func (f *fakeBackend) handler(w http.ResponseWriter, r *http.Request) {
 			if m, ok := req.Params["message"].(string); ok {
 				f.acks = append(f.acks, m)
 			}
+			f.ackParams = append(f.ackParams, req.Params)
 			result = map[string]any{"eventids": []string{"1"}}
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "result": result, "id": 1})
@@ -438,5 +453,69 @@ func TestSeverityLevel(t *testing.T) {
 		if got := severityLevel(in); got != want {
 			t.Errorf("severityLevel(%q) = %d, esperado %d", in, got, want)
 		}
+	}
+}
+
+func TestRunTextoNoChamadoEAcaoNoZabbix(t *testing.T) {
+	dir := t.TempDir()
+	fb := runFlowAlert(t, alertOpts{flow: "acoes", now: "2026-11-16 10:00", dir: dir})
+	if len(fb.created) != 1 {
+		t.Fatalf("esperado 1 chamado: %v", fb.created)
+	}
+	req, _ := fb.created[0]["request"].(string)
+	if !strings.Contains(req, "Procedimento:<br>verificar &lt;link&gt; de SW_CORE_UHCC_1") {
+		t.Errorf("descrição sem o texto do fluxo (escapado, com quebra): %q", req)
+	}
+	interna := patchWith(fb, "interna Unavailable")
+	publica := patchWith(fb, "publica")
+	if len(interna) != 1 || interna[0]["actionInvisibleForCaller"] != true {
+		t.Errorf("ação interna: %v", interna)
+	}
+	if len(publica) != 1 || publica[0]["actionInvisibleForCaller"] != false {
+		t.Errorf("ação pública: %v", publica)
+	}
+
+	// ação no Zabbix: comentário + ack + severidade 4 + supressão de 2h, numa chamada só
+	var zop map[string]any
+	for _, p := range fb.ackParams {
+		if m, _ := p["message"].(string); m == "fluxo: SW_CORE_UHCC_1" {
+			zop = p
+		}
+	}
+	if zop == nil {
+		t.Fatalf("ação no Zabbix não chamada: %v", fb.ackParams)
+	}
+	if a, _ := zop["action"].(float64); int(a) != 2|4|8|32 {
+		t.Errorf("action = %v, esperado %d", zop["action"], 2|4|8|32)
+	}
+	if s, _ := zop["severity"].(float64); int(s) != 4 {
+		t.Errorf("severity = %v", zop["severity"])
+	}
+	want := time.Date(2026, 11, 16, 12, 0, 0, 0, time.Local).Unix()
+	if u, _ := zop["suppress_until"].(float64); int64(u) != want {
+		t.Errorf("suppress_until = %v, esperado %d", zop["suppress_until"], want)
+	}
+
+	// reenvio com o chamado aberto: interna e Zabbix não repetem; a pública (repeat) repete
+	fb.ticketExists = true
+	runFlowAlert(t, alertOpts{flow: "acoes", now: "2026-11-16 10:10", fb: fb, dir: dir})
+	if n := len(patchWith(fb, "interna Unavailable")); n != 1 {
+		t.Errorf("ação interna repetiu no reenvio: %d", n)
+	}
+	if n := len(patchWith(fb, "publica")); n != 2 {
+		t.Errorf("ação pública (repetir) devia ter 2, veio %d", n)
+	}
+	count := 0
+	for _, p := range fb.ackParams {
+		if m, _ := p["message"].(string); m == "fluxo: SW_CORE_UHCC_1" {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Errorf("ação no Zabbix repetiu no reenvio: %d", count)
+	}
+	h, _ := flowlog.List(filepath.Join(dir, "history.jsonl"), flowlog.Filter{})
+	if len(h) != 2 || !strings.Contains(strings.Join(h[0].Notes, ";"), "já aplicada") {
+		t.Errorf("histórico: %+v", h[0].Notes)
 	}
 }

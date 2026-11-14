@@ -31,6 +31,8 @@
     transform: { icon: "ƒ", name: "Transformar texto" },
     table: { icon: "▦", name: "Tabela" },
     update: { icon: "⤴", name: "Atualizar chamado" },
+    note: { icon: "✉", name: "Texto no chamado" },
+    zabbix: { icon: "⚑", name: "Ação no Zabbix" },
     http: { icon: "⇄", name: "HTTP" },
     end: { icon: "■", name: "Fim" },
   };
@@ -78,6 +80,21 @@
   const HTTP_METHODS = ["POST", "GET", "PUT", "PATCH", "DELETE"];
   const PORT_LABEL = { true: "sim", false: "não", default: "outro", found: "achou", not_found: "não achou", else: "senão", next: "" };
   const MAX_COND_DEPTH = 3;
+  const SEVERITIES = [["", "não muda"], ["0", "Não classificada"], ["1", "Informação"], ["2", "Atenção"], ["3", "Média"], ["4", "Alta"], ["5", "Desastre"]];
+  const NOTE_TARGETS = [["internal", "Ação interna (invisível ao solicitante)"], ["public", "Ação visível ao solicitante"], ["description", "Descrição do chamado (na abertura)"]];
+
+  // igual ao config.SeverityLevel do Go
+  function severityLevel(s) {
+    switch (lc(s)) {
+      case "0": case "not classified": case "não classificada": case "nao classificada": return 0;
+      case "1": case "information": case "informação": case "informacao": return 1;
+      case "2": case "warning": case "atenção": case "atencao": case "aviso": return 2;
+      case "3": case "average": case "média": case "media": return 3;
+      case "4": case "high": case "alta": return 4;
+      case "5": case "disaster": case "desastre": return 5;
+    }
+    return -1;
+  }
 
   // mesmos campos do eventResolver (internal/app/flow.go) + os do motor
   const FIELDS = [
@@ -254,7 +271,7 @@
   }
 
   function runFlow(data, fl, resolve, now) {
-    const r = { flow: fl.name, action: "open", comment: "", set: [], updates: [], http: [], vars: {}, trace: [], error: "" };
+    const r = { flow: fl.name, action: "open", comment: "", set: [], updates: [], http: [], zabbix: [], notes: [], vars: {}, trace: [], error: "" };
     const valueOf = (field) => { for (let i = r.set.length - 1; i >= 0; i--) if (r.set[i].field === field) return r.set[i].value; return null; };
 
     const values = (field) => {
@@ -411,6 +428,23 @@
         step.detail = "atualizar chamado: " + done.join("; ");
         port = "next";
       }
+      else if (cur.type === "zabbix") {
+        const op = { node: cur.id, message: render(cur.message || ""), ack: !!cur.ack, severity: cur.severity ? severityLevel(cur.severity) : -1, suppress_hours: +cur.suppress_hours || 0, repeat: !!cur.repeat };
+        r.zabbix.push(op);
+        const done = [];
+        if (op.message !== "") done.push("comentário");
+        if (op.ack) done.push("ack");
+        if (op.severity >= 0) done.push("severidade " + op.severity);
+        if (op.suppress_hours > 0) done.push("suprimir " + op.suppress_hours + "h");
+        step.detail = "Zabbix: " + done.join(", ");
+        port = "next";
+      }
+      else if (cur.type === "note") {
+        const note = { node: cur.id, text: render(cur.text || ""), target: cur.target || "internal", repeat: !!cur.repeat };
+        r.notes.push(note);
+        step.detail = "chamado (" + note.target + "): " + note.text;
+        port = "next";
+      }
       else if (cur.type === "http") {
         const call = { node: cur.id, method: cur.method || "POST", url: render(cur.url || ""), headers: (cur.headers || []).map(render), body: render(cur.body || ""), timeout: cur.timeout || 0 };
         r.http.push(call);
@@ -454,7 +488,7 @@
 
   function ports(n) {
     switch (n.type) {
-      case "start": case "set": case "update": case "http": case "transform": return [{ port: "next", label: "" }];
+      case "start": case "set": case "update": case "http": case "transform": case "zabbix": case "note": return [{ port: "next", label: "" }];
       case "branch": return (n.branches || []).map((b) => ({ port: b.id, label: b.label || b.id })).concat([{ port: "else", label: "senão" }]);
       case "if": return [{ port: "true", label: "sim" }, { port: "false", label: "não" }];
       case "table": return [{ port: "found", label: "achou" }, { port: "not_found", label: "não achou" }];
@@ -481,6 +515,8 @@
         { id: "r2", label: "Médio", match: "all", conditions: [{ field: "severity.level", op: "eq", value: "3" }] },
       ];
     }
+    if (type === "zabbix") { n.message = "goDesk: {trigger} — tratado pelo fluxo"; n.ack = false; n.severity = ""; n.suppress_hours = 0; n.repeat = false; }
+    if (type === "note") { n.text = ""; n.target = "internal"; n.repeat = false; }
     if (type === "transform") { n.transforms = [{ var: "interface", from: "{trigger}", op: "extract", arg: "interface (\\S+)", arg2: "" }]; }
     if (type === "table") { n.field = "host.group"; n.columns = ["oper_group"]; n.rows = [{ match: "GRUPO/*", values: [""] }]; }
     if (type === "update") { n.set = [{ field: "urgency", value: "" }]; n.note = ""; n.teams = false; n.repeat = false; }
@@ -521,6 +557,11 @@
         if (node.type === "branch") {
           node.branches = (n.branches || []).map((b) => ({ id: String(b.id || ""), label: String(b.label || ""), match: b.match === "any" ? "any" : "all", conditions: prepConds(b.conditions) }));
         }
+        if (node.type === "zabbix") {
+          node.message = String(n.message || ""); node.ack = !!n.ack; node.severity = n.severity == null ? "" : String(n.severity);
+          node.suppress_hours = +n.suppress_hours || 0; node.repeat = !!n.repeat;
+        }
+        if (node.type === "note") { node.text = String(n.text || ""); node.target = n.target || "internal"; node.repeat = !!n.repeat; }
         if (node.type === "transform") {
           node.transforms = (n.transforms || []).map((t) => ({ var: String(t.var || ""), from: String(t.from == null ? "" : t.from), op: String(t.op || "set"), arg: String(t.arg == null ? "" : t.arg), arg2: String(t.arg2 == null ? "" : t.arg2) }));
         }
@@ -564,6 +605,8 @@
           const o = { id: n.id, type: n.type, label: n.label.trim(), x: Math.round(n.x), y: Math.round(n.y) };
           if (n.type === "if") { o.match = n.match; o.conditions = cleanConds(n.conditions); }
           if (n.type === "branch") { o.branches = n.branches.map((b) => ({ id: b.id, label: b.label.trim(), match: b.match, conditions: cleanConds(b.conditions) })); }
+          if (n.type === "zabbix") { o.message = n.message; o.ack = n.ack; o.severity = n.severity; o.suppress_hours = Math.max(0, Math.min(720, +n.suppress_hours || 0)); o.repeat = n.repeat; }
+          if (n.type === "note") { o.text = n.text; o.target = n.target; o.repeat = n.repeat; }
           if (n.type === "transform") { o.transforms = n.transforms.map((t) => ({ var: t.var.trim(), from: t.from, op: t.op, arg: t.arg, arg2: t.arg2 })); }
           if (n.type === "switch") { o.field = n.field.trim(); o.cases = n.cases.map((c) => ({ value: c.value.trim() })); }
           if (n.type === "set") { o.set = n.set.map((a) => ({ field: a.field, value: a.value })); }
@@ -641,6 +684,15 @@
             ids.add(lc(b.id));
             checkConds(`${who}, ramo ${b.label || b.id}`, b.conditions, 1);
           });
+        }
+        if (n.type === "zabbix") {
+          if (!n.message.trim() && !n.ack && !n.severity && !(+n.suppress_hours)) errs.push(`${who}: escolha pelo menos uma ação (comentário, ack, severidade ou suprimir).`);
+          if (+n.suppress_hours < 0 || +n.suppress_hours > 720) errs.push(`${who}: suprimir entre 1 e 720 horas.`);
+          tplRefs(n.message).forEach((e2) => errs.push(`${who}: ${e2}.`));
+        }
+        if (n.type === "note") {
+          if (!n.text.trim()) errs.push(`${who}: escreva o texto.`);
+          tplRefs(n.text).forEach((e2) => errs.push(`${who}: ${e2}.`));
         }
         if (n.type === "transform") {
           if (!n.transforms.length) errs.push(`${who}: adicione pelo menos uma operação.`);
@@ -724,6 +776,18 @@
         const lines = n.branches.slice(0, 3).map((b, i) => trunc(`${i ? "senão se" : "se"} ${b.label || b.id}: ${b.conditions.map(condText).join(b.match === "any" ? " OU " : " E ")}`, w));
         if (n.branches.length > 3) lines.push(`+${n.branches.length - 3} ramo(s)`);
         return lines.length ? lines : ["(sem ramos)"];
+      }
+      case "zabbix": {
+        const lines = [];
+        if (n.message) lines.push(trunc("💬 " + n.message, w));
+        const acts = [n.ack ? "ack" : "", n.severity !== "" ? "sev. " + ((SEVERITIES.find(([k]) => k === String(severityLevel(n.severity))) || ["", n.severity])[1]) : "", +n.suppress_hours ? "suprime " + n.suppress_hours + "h" : ""].filter(Boolean);
+        if (acts.length) lines.push(trunc(acts.join(" · "), w));
+        lines.push(n.repeat ? "a cada reenvio" : "1x por evento");
+        return lines;
+      }
+      case "note": {
+        const where = { internal: "interna", public: "visível", description: "descrição" }[n.target] || n.target;
+        return [trunc(`[${where}] ${n.text || "(vazio)"}`, w)];
       }
       case "transform": {
         const lines = n.transforms.slice(0, 3).map((t) => trunc(`var.${t.var} ← ${(TRANSFORM_OPS.find(([k]) => k === t.op) || [t.op, t.op])[1]}`, w));
@@ -1133,6 +1197,26 @@
       html += condsHelp();
     }
 
+    if (n.type === "zabbix") {
+      html += `<div class="gd-field" style="margin-top:8px;"><label>Comentário no evento <span class="gd-muted">(vazio = sem comentário)</span></label><textarea rows="2" data-gd-node-prop="message" placeholder="ex: Analisado pelo fluxo: {var.interface} — plantão acionado">${escapeHtml(n.message)}</textarea></div>`;
+      html += `<label class="gd-check" style="margin-top:8px;"><input type="checkbox" data-gd-node-check="ack"${n.ack ? " checked" : ""}> <span>Reconhecer o evento (ack)</span></label>`;
+      html += `<div class="gd-row" style="margin-top:8px;"><div class="gd-field gd-field-tight"><label>Mudar severidade</label><select data-gd-node-prop="severity">${SEVERITIES.map(([v, l]) => `<option value="${v}"${String(n.severity === "" ? "" : severityLevel(n.severity)) === v ? " selected" : ""}>${escapeHtml(l)}</option>`).join("")}</select></div>
+        <div class="gd-field gd-field-tight" style="min-width:110px;"><label>Suprimir por (h)</label><input type="number" min="0" max="720" data-gd-node-prop="suppress_hours" value="${escapeHtml(n.suppress_hours || 0)}"></div></div>`;
+      html += `<label class="gd-check" style="margin-top:6px;"><input type="checkbox" data-gd-node-check="repeat"${n.repeat ? " checked" : ""}> <span>Repetir a cada reenvio <span class="gd-muted">(padrão: uma vez por evento)</span></span></label>`;
+      html += varChips();
+      html += '<div class="gd-muted">Executa no fim do alerta (só no modo ativo). O ack feito aqui é do usuário do goDesk e <b>não</b> conta como “reconhecido pelo atendimento” (<code>event.acked_by_user</code>) — o goDesk se reconhece pelas mensagens que começam com “Chamado …” ou “goDesk …”; num fluxo que não abre chamado, comece o comentário com “goDesk”. Mudar severidade e suprimir dependem da permissão do usuário do token (suprimir: Zabbix 6.2+).</div>';
+    }
+
+    if (n.type === "note") {
+      html += `<div class="gd-field" style="margin-top:8px;"><label>Onde</label><select data-gd-node-prop="target">${NOTE_TARGETS.map(([v, l]) => `<option value="${v}"${v === n.target ? " selected" : ""}>${escapeHtml(l)}</option>`).join("")}</select></div>`;
+      html += `<div class="gd-field" style="margin-top:8px;"><label>Texto</label><textarea rows="4" data-gd-node-prop="text" placeholder="ex: Procedimento: verificar o link da operadora {host.tag.Operadora} antes de acionar o cliente.">${escapeHtml(n.text)}</textarea></div>`;
+      if (n.target !== "description") {
+        html += `<label class="gd-check" style="margin-top:6px;"><input type="checkbox" data-gd-node-check="repeat"${n.repeat ? " checked" : ""}> <span>Repetir a cada reenvio <span class="gd-muted">(padrão: uma vez por evento)</span></span></label>`;
+      }
+      html += varChips();
+      html += '<div class="gd-muted"><b>Descrição</b>: entra no texto de abertura do chamado (o solicitante vê). <b>Ação interna/visível</b>: registrada logo depois de abrir e, se o alerta voltar com o chamado aberto, uma vez por evento (ou a cada reenvio, se marcado).</div>';
+    }
+
     if (n.type === "transform") {
       html += '<div class="gd-muted" style="margin-top:6px;">Cada operação cria a variável <code>{var.nome}</code>, que pode ser usada nos blocos seguintes (condições e textos) — inclusive pelas operações abaixo dela.</div>';
       n.transforms.forEach((t, i) => {
@@ -1272,6 +1356,33 @@
       <ul class="gd-flow-res">${items}</ul>`;
   }
 
+  function notesHtml(r) {
+    if (!r.notes || !r.notes.length) return "";
+    const where = { internal: "ação interna", public: "ação visível", description: "descrição" };
+    return `<div class="gd-small-title" style="margin-top:10px;">Texto no chamado</div>
+      <ul class="gd-flow-res">${r.notes.map((n) => `<li><b>${escapeHtml(where[n.target] || n.target)}</b>: <span style="white-space:pre-wrap">${escapeHtml(n.text)}</span></li>`).join("")}</ul>`;
+  }
+
+  function zabbixHtml(r) {
+    if (!r.zabbix || !r.zabbix.length) return "";
+    return `<div class="gd-small-title" style="margin-top:10px;">Ação no Zabbix <span class="gd-muted">(no fim do alerta)</span></div>
+      <ul class="gd-flow-res">${r.zabbix.map((z) => {
+        const parts = [];
+        if (z.message) parts.push("comentário: " + z.message);
+        if (z.ack) parts.push("ack");
+        if (z.severity >= 0) parts.push("severidade → " + SEVERITIES[z.severity + 1][1]);
+        if (z.suppress_hours > 0) parts.push("suprimir " + z.suppress_hours + "h");
+        return `<li>${escapeHtml(parts.join(" · "))} <span class="gd-muted">(${z.repeat ? "a cada reenvio" : "uma vez por evento"})</span></li>`;
+      }).join("")}</ul>`;
+  }
+
+  function varsHtml(r) {
+    const keys = Object.keys(r.vars || {});
+    if (!keys.length) return "";
+    return `<div class="gd-small-title" style="margin-top:10px;">Variáveis</div>
+      <ul class="gd-flow-res">${keys.map((k) => `<li><code>{var.${escapeHtml(k)}}</code> = ${escapeHtml(r.vars[k] === "" ? "(vazio)" : r.vars[k])}</li>`).join("")}</ul>`;
+  }
+
   function httpHtml(r) {
     if (!r.http || !r.http.length) return "";
     return `<div class="gd-small-title" style="margin-top:10px;">HTTP <span class="gd-muted">(depois de tratar o chamado; não é chamado no teste)</span></div>
@@ -1348,7 +1459,7 @@
           ${r.error ? `<div class="gd-banner gd-err">${escapeHtml(r.error)} — no goDesk, a rule seguiria fixa.</div>` : ""}
           ${r.action === "skip" ? `<div class="gd-muted" style="margin-top:6px;">Comentário: ${escapeHtml(r.comment || "goDesk (fluxo " + r.flow + "): chamado não aberto — caminho: …")}</div>` : ""}
           <div class="gd-small-title" style="margin-top:10px;">Campos definidos pelo fluxo</div>${sets}
-          ${updatesHtml(r)}${httpHtml(r)}</div>
+          ${updatesHtml(r)}${notesHtml(r)}${zabbixHtml(r)}${httpHtml(r)}${varsHtml(r)}</div>
         <div><div class="gd-small-title">Caminho percorrido</div>${trace}</div>
       </div>`;
   }

@@ -87,7 +87,36 @@ const (
 	NodeHTTP      = "http"
 	NodeBranch    = "branch"    // se / senão se / senão
 	NodeTransform = "transform" // cria variáveis {var.nome}
+	NodeZabbix    = "zabbix"    // comentário/ack/severidade/supressão no evento
+	NodeNote      = "note"      // texto na descrição ou ação no chamado
 )
+
+// Destinos do bloco note.
+const (
+	NoteDescription = "description" // descrição do chamado (abertura; visível ao solicitante)
+	NoteInternal    = "internal"    // ação interna (invisível ao solicitante)
+	NotePublic      = "public"      // ação visível ao solicitante
+)
+
+// SeverityLevel: 0 (não classificada) .. 5 (desastre) — nomes em inglês
+// ou português, ou o número. -1 = desconhecida.
+func SeverityLevel(s string) int {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "0", "not classified", "não classificada", "nao classificada":
+		return 0
+	case "1", "information", "informação", "informacao":
+		return 1
+	case "2", "warning", "atenção", "atencao", "aviso":
+		return 2
+	case "3", "average", "média", "media":
+		return 3
+	case "4", "high", "alta":
+		return 4
+	case "5", "disaster", "desastre":
+		return 5
+	}
+	return -1
+}
 
 // Ações do bloco end.
 const (
@@ -286,6 +315,19 @@ type FlowNode struct {
 	// transform
 	Transforms []FlowTransform `yaml:"transforms,omitempty"`
 
+	// zabbix (ação no evento): Message = comentário (template), Ack,
+	// Severity (vazio = não muda), SuppressHours (0 = não suprime). Repeat
+	// vale aqui também (padrão: uma vez por evento).
+	Message       string `yaml:"message,omitempty"`
+	Ack           bool   `yaml:"ack,omitempty"`
+	Severity      string `yaml:"severity,omitempty"`
+	SuppressHours int    `yaml:"suppress_hours,omitempty"`
+
+	// note (texto no chamado): Text (template) e Target (description |
+	// internal | public). Repeat vale pras ações no reenvio.
+	Text   string `yaml:"text,omitempty"`
+	Target string `yaml:"target,omitempty"`
+
 	// http
 	Method  string   `yaml:"method,omitempty"`
 	URL     string   `yaml:"url,omitempty"`
@@ -378,7 +420,7 @@ func linkPort(l FlowLink) string {
 // Ports devolve as portas de saída válidas do bloco.
 func (n FlowNode) Ports() []string {
 	switch n.Type {
-	case NodeStart, NodeSet, NodeUpdate, NodeHTTP, NodeTransform:
+	case NodeStart, NodeSet, NodeUpdate, NodeHTTP, NodeTransform, NodeZabbix, NodeNote:
 		return []string{PortNext}
 	case NodeBranch:
 		out := make([]string, 0, len(n.Branches)+1)
@@ -590,6 +632,36 @@ func validateFlow(f FlowsFile, fl *Flow) error {
 						return fmt.Errorf("bloco %q, ramo %q, regra #%d: %w", n.ID, b.ID, k+1, err)
 					}
 				}
+			}
+
+		case NodeZabbix:
+			n.Severity = strings.TrimSpace(n.Severity)
+			if strings.TrimSpace(n.Message) == "" && !n.Ack && n.Severity == "" && n.SuppressHours == 0 {
+				return fmt.Errorf("bloco %q: ação no Zabbix sem nada pra fazer (comentário, ack, severidade ou supressão)", n.ID)
+			}
+			if n.Severity != "" && SeverityLevel(n.Severity) < 0 {
+				return fmt.Errorf("bloco %q: severidade %q inválida (0 a 5 ou o nome)", n.ID, n.Severity)
+			}
+			if n.SuppressHours < 0 || n.SuppressHours > 720 {
+				return fmt.Errorf("bloco %q: suprimir entre 1 e 720 horas", n.ID)
+			}
+			if err := validateTemplate(f, n.Message); err != nil {
+				return fmt.Errorf("bloco %q, comentário: %w", n.ID, err)
+			}
+
+		case NodeNote:
+			n.Target = strings.ToLower(strings.TrimSpace(n.Target))
+			if n.Target == "" {
+				n.Target = NoteInternal
+			}
+			if n.Target != NoteDescription && n.Target != NoteInternal && n.Target != NotePublic {
+				return fmt.Errorf("bloco %q: destino %q inválido (description, internal, public)", n.ID, n.Target)
+			}
+			if strings.TrimSpace(n.Text) == "" {
+				return fmt.Errorf("bloco %q: texto no chamado vazio", n.ID)
+			}
+			if err := validateTemplate(f, n.Text); err != nil {
+				return fmt.Errorf("bloco %q: %w", n.ID, err)
 			}
 
 		case NodeTransform:

@@ -115,6 +115,41 @@ else {
 			}
 			echo '</ul>';
 		}
+		if (!empty($e['ticket_notes'])) {
+			$where = ['internal' => 'ação interna', 'public' => 'ação visível', 'description' => 'descrição'];
+			echo '<div class="gd-small-title" style="margin-top:8px;">Texto no chamado</div><ul class="gd-flow-res">';
+			foreach ((array)$e['ticket_notes'] as $n) {
+				echo '<li><b>'.h($where[$n['target'] ?? ''] ?? ($n['target'] ?? '')).'</b>: <span style="white-space:pre-wrap">'.h($n['text'] ?? '').'</span></li>';
+			}
+			echo '</ul>';
+		}
+		if (!empty($e['zabbix'])) {
+			echo '<div class="gd-small-title" style="margin-top:8px;">Ação no Zabbix</div><ul class="gd-flow-res">';
+			foreach ((array)$e['zabbix'] as $z) {
+				$parts = [];
+				if (!empty($z['message'])) {
+					$parts[] = 'comentário: '.$z['message'];
+				}
+				if (!empty($z['ack'])) {
+					$parts[] = 'ack';
+				}
+				if (isset($z['severity']) && (int)$z['severity'] >= 0) {
+					$parts[] = 'severidade '.(int)$z['severity'];
+				}
+				if (!empty($z['suppress_hours'])) {
+					$parts[] = 'suprimir '.(int)$z['suppress_hours'].'h';
+				}
+				echo '<li><b>'.h($z['node'] ?? '').'</b>: '.h(implode(' · ', $parts)).'</li>';
+			}
+			echo '</ul>';
+		}
+		if (!empty($e['vars'])) {
+			echo '<div class="gd-small-title" style="margin-top:8px;">Variáveis</div><ul class="gd-flow-res">';
+			foreach ((array)$e['vars'] as $k => $v) {
+				echo '<li><code>{var.'.h($k).'}</code> = '.h($v).'</li>';
+			}
+			echo '</ul>';
+		}
 		if (!empty($e['http'])) {
 			echo '<div class="gd-small-title" style="margin-top:8px;">HTTP</div><ul class="gd-flow-res">';
 			foreach ((array)$e['http'] as $c) {

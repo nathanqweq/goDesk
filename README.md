@@ -129,6 +129,8 @@ Em vez de criar uma rule nova para cada variação ("host crítico liga", "fora 
    - **Tabela**: a primeira linha que bater com um campo (ex: `host.group` = `POWERPLANT/*`) define várias colunas de uma vez (grupo operador, contrato, webhook do Teams...). Saídas *achou* / *não achou*.
    - **Definir campos**: urgência, impacto, grupo operador, operador, contrato, Teams (`teams_webhook` aceita vários, separados por vírgula; `teams_title` e `teams_message` personalizam o card), e-mail etc. e a **instrução** pro atendimento (ex: *"LIGAR para o cliente ({host})"*).
    - **Atualizar chamado** (escalonamento): veja abaixo.
+   - **Texto no chamado**: escreve um texto (com variáveis) na **descrição** do chamado, visível ao solicitante, ou como **ação** interna ou visível. Exemplo: um procedimento padrão para aquele tipo de alerta.
+   - **Ação no Zabbix**: comenta no evento, reconhece (ack), muda a severidade e/ou suprime o problema por X horas (Zabbix 6.2+). Roda no fim do alerta, só no modo ativo.
    - **HTTP**: chama outro sistema depois de tratar o chamado (método, URL, cabeçalhos e corpo com variáveis; `{ticket.number}` é o número do chamado). Só no modo ativo, e o resultado aparece no Histórico.
    - **Fim**: abrir chamado, ou **não abrir** (só comenta no evento). Uma saída sem ligação também abre o chamado com o que já foi definido.
 2. Em **Calendários**, cadastre por exemplo `comercial` (seg a sex, 08:00–18:00, feriados). Nas condições, use `calendar.comercial` "é falso" para pegar o que está fora do horário.
@@ -166,6 +168,8 @@ Regras do fluxo:
 - A **instrução** é gravada no chamado como ação **invisível pro solicitante** e aparece em destaque no card do Teams. **Não** vai no e-mail do cliente.
 - **Não abrir** só vale na abertura. A atualização e a normalização de um chamado já aberto seguem normais.
 - **Atualizar chamado** só vale quando o alerta volta e o chamado já existe. Na abertura, o bloco é ignorado.
+- **Texto no chamado** (ações) e **Ação no Zabbix** rodam na abertura e, quando o alerta volta, **uma vez por evento**, a não ser que o bloco esteja marcado para repetir. O texto na **descrição** só entra na abertura.
+- O ack feito pelo fluxo usa o usuário do goDesk e não conta como "reconhecido pelo atendimento" (`event.acked_by_user`).
 - Tags e grupos do host só são consultados no Zabbix se o fluxo chegar num bloco que use esses campos (1 `host.get` e/ou 1 `event.get` por alerta).
 - Se der erro (fluxo inexistente, arquivo inválido), a rule segue fixa, como se não tivesse fluxo. Isso conta em `flows_errors_total`. Outras métricas: `flows_evaluated_total`, `flows_skipped_total` e `flows_shadow_evaluated_total`.
 

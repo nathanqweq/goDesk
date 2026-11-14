@@ -124,6 +124,9 @@ func Run(cfg config.RuntimeConfig) (err error) {
 			if fr.applied && len(fr.res.HTTP) > 0 {
 				runHTTPCalls(fr, ticketRef)
 			}
+			if fr.applied && len(fr.res.Zabbix) > 0 {
+				fr.runZabbixOps(cfg, zx, p.EventID)
+			}
 			fr.record(cfg, ticketRef)
 		}()
 	}
@@ -184,7 +187,8 @@ func Run(cfg config.RuntimeConfig) (err error) {
 			}
 		}
 
-		msgHTML := topdesk.CreateHTML(p, contract)
+		// texto do fluxo na descrição (bloco "texto no chamado")
+		msgHTML := topdesk.CreateHTML(p, contract) + fr.descriptionNotes()
 
 		payload := buildCreatePayload(
 			ticketName,
@@ -223,6 +227,7 @@ func Run(cfg config.RuntimeConfig) (err error) {
 				log.Printf("[topdesk] WARN: falha ao registrar instrução no chamado %s: %v\n", created, err)
 			}
 		}
+		fr.applyNoteActions(cfg, td, p.EventID, created, false)
 
 		if pol.TopDesk.SendMoreInfo {
 			infoMsg := strings.TrimSpace(pol.TopDesk.MoreInfoText)
@@ -332,6 +337,7 @@ func Run(cfg config.RuntimeConfig) (err error) {
 				log.Printf("[flow] chamado %s escalado pelo bloco %s\n", ticketID, u.Node)
 			}
 		}
+		fr.applyNoteActions(cfg, td, p.EventID, ticketID, true)
 		if err := zx.Acknowledge(p.EventID, "Chamado já existe: "+ticketID); err != nil {
 			recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.ZabbixAckErrors++ })
 			log.Printf("[zabbix] ACK ERROR: %v\n", err)

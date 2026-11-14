@@ -36,24 +36,26 @@ const (
 
 // Entry é uma execução de fluxo.
 type Entry struct {
-	Time    time.Time         `json:"time"`
-	EventID string            `json:"event_id"`
-	Host    string            `json:"host"`
-	Trigger string            `json:"trigger"`
-	Rule    string            `json:"rule"`
-	Flow    string            `json:"flow"`
-	Mode    string            `json:"mode"` // on | shadow
-	Kind    string            `json:"kind"` // problem | recovery
-	Ticket  string            `json:"ticket,omitempty"`
-	Action  string            `json:"action"`
-	Set     []flow.Assignment `json:"set,omitempty"`
-	Updates []flow.Update     `json:"updates,omitempty"`
-	HTTP    []flow.HTTPCall   `json:"http,omitempty"`
-	Trace   []flow.Step       `json:"trace,omitempty"`
-	Vars    map[string]string `json:"vars,omitempty"`
-	Path    string            `json:"path"`
-	Error   string            `json:"error,omitempty"`
-	Notes   []string          `json:"notes,omitempty"` // o que o app fez/pulou (ex: update já aplicado)
+	Time        time.Time         `json:"time"`
+	EventID     string            `json:"event_id"`
+	Host        string            `json:"host"`
+	Trigger     string            `json:"trigger"`
+	Rule        string            `json:"rule"`
+	Flow        string            `json:"flow"`
+	Mode        string            `json:"mode"` // on | shadow
+	Kind        string            `json:"kind"` // problem | recovery
+	Ticket      string            `json:"ticket,omitempty"`
+	Action      string            `json:"action"`
+	Set         []flow.Assignment `json:"set,omitempty"`
+	Updates     []flow.Update     `json:"updates,omitempty"`
+	HTTP        []flow.HTTPCall   `json:"http,omitempty"`
+	Trace       []flow.Step       `json:"trace,omitempty"`
+	Vars        map[string]string `json:"vars,omitempty"`
+	Zabbix      []flow.ZabbixOp   `json:"zabbix,omitempty"`
+	TicketNotes []flow.TicketNote `json:"ticket_notes,omitempty"`
+	Path        string            `json:"path"`
+	Error       string            `json:"error,omitempty"`
+	Notes       []string          `json:"notes,omitempty"` // o que o app fez/pulou (ex: update já aplicado)
 }
 
 func withLock(path string, fn func() error) error {

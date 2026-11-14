@@ -166,3 +166,38 @@ func TestValidacaoLogica(t *testing.T) {
 		t.Errorf("regex com variável recusada: %v", err)
 	}
 }
+
+func TestAcoesZabbixENota(t *testing.T) {
+	head := "flows:\n  - name: f\n    nodes:\n      - {id: s, type: start}\n"
+	bad := map[string]string{
+		"zabbix vazio":       "      - {id: z, type: zabbix}\n",
+		"zabbix severidade":  "      - {id: z, type: zabbix, severity: urgente}\n",
+		"zabbix supressão":   "      - {id: z, type: zabbix, suppress_hours: 1000}\n",
+		"nota vazia":         "      - {id: n, type: note, text: '  '}\n",
+		"nota destino":       "      - {id: n, type: note, text: x, target: email}\n",
+		"nota template ruim": "      - {id: n, type: note, text: '{host|base64}'}\n",
+	}
+	for name, nodes := range bad {
+		if _, err := config.ParseFlows([]byte(head + nodes + "    links: []\n")); err == nil {
+			t.Errorf("%s: esperado erro de validação", name)
+		}
+	}
+
+	y := head + "      - {id: z, type: zabbix, message: 'oi {host}', severity: desastre, repeat: true}\n      - {id: n, type: note, text: 'nota {host}'}\n" +
+		"    links: [{from: s, to: z}, {from: z, to: n}]\n"
+	f, err := config.ParseFlows([]byte(y))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fl, _ := f.Find("f")
+	r, err := Run(f, fl, fakeEvent{"host": {"H"}}, at("2026-11-16 10:00"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r.Zabbix) != 1 || r.Zabbix[0].Message != "oi H" || r.Zabbix[0].Severity != 5 || !r.Zabbix[0].Repeat || r.Zabbix[0].Ack {
+		t.Errorf("zabbix = %+v", r.Zabbix)
+	}
+	if len(r.Notes) != 1 || r.Notes[0].Text != "nota H" || r.Notes[0].Target != "internal" {
+		t.Errorf("nota = %+v (destino padrão é internal)", r.Notes)
+	}
+}

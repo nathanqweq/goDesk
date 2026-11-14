@@ -67,6 +67,25 @@ type HTTPCall struct {
 	Timeout int      `json:"timeout,omitempty"`
 }
 
+// ZabbixOp é um bloco "ação no Zabbix" percorrido (o app executa depois
+// de tratar o chamado). Severity < 0 = não muda.
+type ZabbixOp struct {
+	Node          string `json:"node"`
+	Message       string `json:"message,omitempty"`
+	Ack           bool   `json:"ack,omitempty"`
+	Severity      int    `json:"severity"`
+	SuppressHours int    `json:"suppress_hours,omitempty"`
+	Repeat        bool   `json:"repeat,omitempty"`
+}
+
+// TicketNote é um bloco "texto no chamado" percorrido.
+type TicketNote struct {
+	Node   string `json:"node"`
+	Text   string `json:"text"`
+	Target string `json:"target"` // description | internal | public
+	Repeat bool   `json:"repeat,omitempty"`
+}
+
 type Result struct {
 	Vars    map[string]string `json:"vars,omitempty"` // variáveis do bloco transform ({var.nome})
 	Flow    string            `json:"flow"`
@@ -75,6 +94,8 @@ type Result struct {
 	Set     []Assignment      `json:"set"`
 	Updates []Update          `json:"updates,omitempty"`
 	HTTP    []HTTPCall        `json:"http,omitempty"`
+	Zabbix  []ZabbixOp        `json:"zabbix,omitempty"`
+	Notes   []TicketNote      `json:"notes,omitempty"`
 	Trace   []Step            `json:"trace"`
 }
 
@@ -225,6 +246,37 @@ func Run(f config.FlowsFile, fl config.Flow, res Resolver, now time.Time) (Resul
 			}
 			r.Updates = append(r.Updates, u)
 			step.Detail = "atualizar chamado: " + strings.Join(done, "; ")
+			port = config.PortNext
+
+		case config.NodeZabbix:
+			op := ZabbixOp{Node: cur.ID, Message: ev.render(cur.Message), Ack: cur.Ack, Severity: -1, SuppressHours: cur.SuppressHours, Repeat: cur.Repeat}
+			if cur.Severity != "" {
+				op.Severity = config.SeverityLevel(cur.Severity)
+			}
+			r.Zabbix = append(r.Zabbix, op)
+			var done []string
+			if op.Message != "" {
+				done = append(done, "comentário")
+			}
+			if op.Ack {
+				done = append(done, "ack")
+			}
+			if op.Severity >= 0 {
+				done = append(done, fmt.Sprintf("severidade %d", op.Severity))
+			}
+			if op.SuppressHours > 0 {
+				done = append(done, fmt.Sprintf("suprimir %dh", op.SuppressHours))
+			}
+			step.Detail = "Zabbix: " + strings.Join(done, ", ")
+			port = config.PortNext
+
+		case config.NodeNote:
+			note := TicketNote{Node: cur.ID, Text: ev.render(cur.Text), Target: cur.Target, Repeat: cur.Repeat}
+			if note.Target == "" {
+				note.Target = config.NoteInternal
+			}
+			r.Notes = append(r.Notes, note)
+			step.Detail = "chamado (" + note.Target + "): " + note.Text
 			port = config.PortNext
 
 		case config.NodeHTTP:

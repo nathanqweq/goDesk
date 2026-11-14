@@ -738,3 +738,9 @@
 [theme='dark-theme'] .godesk-module .gd-flow-group { border-left-color: #35506f; background: rgba(47, 111, 223, .08); }
 [theme='dark-theme'] .godesk-module .gd-flow-branch { border-color: #333; }
 [theme='dark-theme'] .godesk-module .gd-flow-branch-else { background: rgba(255, 255, 255, .04); }
+
+/* fluxos: texto no chamado, ação no Zabbix */
+.godesk-module .gd-flow-t-note .gd-flow-head { fill: #f3dcef; }
+.godesk-module .gd-flow-t-zabbix .gd-flow-head { fill: #f9d6d0; }
+[theme='dark-theme'] .godesk-module .gd-flow-t-note .gd-flow-head { fill: #5a2f55; }
+[theme='dark-theme'] .godesk-module .gd-flow-t-zabbix .gd-flow-head { fill: #5e2a22; }

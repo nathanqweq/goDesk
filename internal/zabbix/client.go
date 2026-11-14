@@ -82,6 +82,43 @@ func (c Client) acknowledge(eventID string, action int, message string) error {
 	return nil
 }
 
+// EventAction faz várias ações num evento de uma vez (bloco "ação no
+// Zabbix" dos fluxos): comentário (message), reconhecer (ack), mudar
+// severidade (0-5; < 0 = não muda) e suprimir até suppressUntil (unix;
+// 0 = não suprime — Zabbix 6.2+). Nada pra fazer = nada é chamado.
+func (c Client) EventAction(eventID, message string, ack bool, severity int, suppressUntil int64) error {
+	eventID = strings.TrimSpace(eventID)
+	if eventID == "" || !c.configured() {
+		return nil
+	}
+	action := 0
+	params := map[string]any{"eventids": []string{eventID}}
+	if strings.TrimSpace(message) != "" {
+		action |= ackActionMessage
+		params["message"] = message
+	}
+	if ack {
+		action |= ackActionAcknowledge
+	}
+	if severity >= 0 && severity <= 5 {
+		action |= 8
+		params["severity"] = severity
+	}
+	if suppressUntil > 0 {
+		action |= 32
+		params["suppress_until"] = suppressUntil
+	}
+	if action == 0 {
+		return nil
+	}
+	params["action"] = action
+	if _, err := c.call("event.acknowledge", params); err != nil {
+		return fmt.Errorf("Zabbix event.acknowledge eventid=%s action=%d: %w", eventID, action, err)
+	}
+	log.Printf("[zabbix] AÇÃO OK eventid=%q action=%d\n", eventID, action)
+	return nil
+}
+
 // Host é o mínimo de host.get que o goDesk precisa.
 type Host struct {
 	HostID string `json:"hostid"`
