@@ -86,12 +86,15 @@ class FlowsData extends CController {
 
 		$host_tags = [];
 		$groups = [];
+		$extra = [];
 		if ($h['hostid'] !== '') {
 			$params = [
 				'output' => ['hostid'],
 				'hostids' => [$h['hostid']],
 				'selectTags' => ['tag', 'value'],
 				'selectHostGroups' => ['name'],
+				'selectInventory' => 'extend',
+				'selectMacros' => ['macro', 'value'],
 				// tags herdadas dos templates (o goDesk também considera)
 				'selectInheritedTags' => ['tag', 'value']
 			];
@@ -115,7 +118,20 @@ class FlowsData extends CController {
 					}
 				}
 				$groups = array_column($hosts[0]['hostgroups'] ?? [], 'name');
+				// campos extras do fluxo (inventário, macros do host)
+				if (is_array($hosts[0]['inventory'] ?? null)) {
+					foreach ($hosts[0]['inventory'] as $k => $v) {
+						if (is_string($v) && $v !== '' && $k !== 'hostid' && $k !== 'inventory_mode') {
+							$extra[] = 'host.inventory.'.$k.'='.$v;
+						}
+					}
+				}
+				foreach ($hosts[0]['macros'] ?? [] as $m) {
+					$name = trim((string)$m['macro'], '{}$');
+					$extra[] = 'host.macro.'.$name.'='.(string)($m['value'] ?? '');
+				}
 			}
+			$extra[] = 'host.problems='.(int)\API::Problem()->get(['countOutput' => true, 'hostids' => [$h['hostid']], 'source' => 0, 'object' => 0]);
 		}
 
 		// reconhecido pelo atendimento: ack de alguém além do usuário do
@@ -162,6 +178,7 @@ class FlowsData extends CController {
 				'event.age' => (string)max(0, (int)floor((time() - (int)$e['clock']) / 60)),
 				'event.acknowledged' => $acked ? 'true' : 'false',
 				'event.acked_by_user' => $acked_user ? 'true' : 'false',
+				'extra' => $extra,
 				'clock' => date('Y-m-d\TH:i', (int)$e['clock'])
 			]
 		];

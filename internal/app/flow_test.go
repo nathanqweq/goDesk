@@ -65,6 +65,22 @@ flows:
       - {from: interna, to: publica}
       - {from: publica, to: zbx}
 
+  - name: dados
+    nodes:
+      - {id: s, type: start}
+      - id: c
+        type: if
+        conditions:
+          - {field: host.inventory.location, op: eq, value: "usina x"}
+          - {field: host.macro.SITE, op: eq, value: UHCC}
+          - {field: "item:ups.status", op: eq, value: "1"}
+          - {field: host.problems, op: gte, value: "2"}
+          - {field: "group.problems.POWERPLANT/*", op: gte, value: "10"}
+      - {id: a, type: set, set: [{field: instrucao, value: "contato {host.inventory.contact} site {host.macro.SITE} ups {item:ups.status} probs {host.problems}/{group.problems.POWERPLANT/*} nada [{item:nao.existe}]"}]}
+    links:
+      - {from: s, to: c}
+      - {from: c, port: "true", to: a}
+
   - name: tabela
     nodes:
       - {id: s, type: start}
@@ -167,6 +183,8 @@ func (f *fakeBackend) handler(w http.ResponseWriter, r *http.Request) {
 			result = []any{map[string]any{
 				"hostid": "10500", "host": "SW_CORE_UHCC_1", "name": "Switch Core UHCC 1",
 				"tags": tags, "inheritedTags": []any{map[string]any{"tag": "Herdada", "value": "sim"}},
+				"inventory":  map[string]any{"location": "Usina X", "contact": "Fulano"},
+				"macros":     []any{map[string]any{"macro": "{$SITE}", "value": "UHCC"}},
 				"hostgroups": []any{map[string]any{"name": "POWERPLANT/GERACAO/UHCC"}},
 			}}
 		case "event.get":
@@ -181,6 +199,18 @@ func (f *fakeBackend) handler(w http.ResponseWriter, r *http.Request) {
 				clock = time.Now()
 			}
 			result = []any{map[string]any{"eventid": "1", "clock": itoa(clock.Unix()), "acknowledged": acked, "tags": []any{}, "acknowledges": acks}}
+		case "item.get":
+			if flt, _ := req.Params["filter"].(map[string]any); flt != nil && flt["key_"] == "ups.status" {
+				result = []any{map[string]any{"itemid": "9", "lastvalue": "1"}}
+			}
+		case "problem.get":
+			if _, ok := req.Params["hostids"]; ok {
+				result = "3"
+			} else {
+				result = "12"
+			}
+		case "hostgroup.get":
+			result = []any{map[string]any{"groupid": "7"}}
 		case "event.acknowledge":
 			if m, ok := req.Params["message"].(string); ok {
 				f.acks = append(f.acks, m)
@@ -517,5 +547,32 @@ func TestRunTextoNoChamadoEAcaoNoZabbix(t *testing.T) {
 	h, _ := flowlog.List(filepath.Join(dir, "history.jsonl"), flowlog.Filter{})
 	if len(h) != 2 || !strings.Contains(strings.Join(h[0].Notes, ";"), "já aplicada") {
 		t.Errorf("histórico: %+v", h[0].Notes)
+	}
+}
+
+func TestRunMaisDados(t *testing.T) {
+	fb := runFlowAlert(t, alertOpts{flow: "dados", now: "2026-11-16 10:00"})
+	ins := patchWith(fb, "Instrução:")
+	if len(ins) != 1 {
+		t.Fatalf("condição com inventário/macro/item/contagens não passou: patches=%v calls=%v", fb.patches, fb.zbxCalls)
+	}
+	if a := ins[0]["action"].(string); !strings.Contains(a, "contato Fulano site UHCC ups 1 probs 3/12 nada []") {
+		t.Errorf("instrução = %q", a)
+	}
+	// uma consulta por campo (cache), mesmo usado na condição e no texto
+	count := map[string]int{}
+	for _, m := range fb.zbxCalls {
+		count[m]++
+	}
+	if count["host.get"] != 1 || count["item.get"] != 2 || count["problem.get"] != 2 || count["hostgroup.get"] != 1 {
+		t.Errorf("chamadas ao Zabbix: %v (esperado host.get 1, item.get 2 [ups.status e nao.existe], problem.get 2, hostgroup.get 1)", count)
+	}
+}
+
+func TestMacroName(t *testing.T) {
+	for in, want := range map[string]string{"SITE": "{$SITE}", "$site": "{$SITE}", "{$Site}": "{$SITE}", " {$A.B} ": "{$A.B}"} {
+		if got := macroName(in); got != want {
+			t.Errorf("macroName(%q) = %q, esperado %q", in, got, want)
+		}
 	}
 }

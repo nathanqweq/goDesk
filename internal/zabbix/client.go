@@ -192,6 +192,12 @@ type HostInfo struct {
 	Name   string
 	Tags   []Tag
 	Groups []string
+	// Inventory: campos do inventário do host (chave em minúsculas);
+	// vazio se o inventário estiver desligado.
+	Inventory map[string]string
+	// Macros: macros definidas no próprio host ({$NOME} → valor; macro
+	// secreta vem sem valor).
+	Macros map[string]string
 }
 
 // HostInfo busca nome visível, tags e grupos do host pelo hostid (ou, sem
@@ -202,6 +208,8 @@ func (c Client) HostInfo(hostID, host string) (HostInfo, error) {
 		"output":           []string{"hostid", "host", "name"},
 		"selectTags":       []string{"tag", "value"},
 		"selectHostGroups": []string{"name"},
+		"selectInventory":  "extend",
+		"selectMacros":     []string{"macro", "value"},
 	}
 	switch {
 	case strings.TrimSpace(hostID) != "":
@@ -230,7 +238,13 @@ func (c Client) HostInfo(hostID, host string) (HostInfo, error) {
 		Name          string `json:"name"`
 		Tags          []Tag  `json:"tags"`
 		InheritedTags []Tag  `json:"inheritedTags"`
-		HostGroups    []struct {
+		// inventário desligado vem como [] (array), ligado como objeto
+		Inventory json.RawMessage `json:"inventory"`
+		Macros    []struct {
+			Macro string `json:"macro"`
+			Value string `json:"value"`
+		} `json:"macros"`
+		HostGroups []struct {
 			Name string `json:"name"`
 		} `json:"hostgroups"`
 	}
@@ -242,11 +256,109 @@ func (c Client) HostInfo(hostID, host string) (HostInfo, error) {
 	}
 
 	h := hosts[0]
-	info := HostInfo{HostID: h.HostID, Host: h.Host, Name: h.Name, Tags: mergeTags(h.Tags, h.InheritedTags)}
+	info := HostInfo{HostID: h.HostID, Host: h.Host, Name: h.Name, Tags: mergeTags(h.Tags, h.InheritedTags),
+		Inventory: map[string]string{}, Macros: map[string]string{}}
 	for _, g := range h.HostGroups {
 		info.Groups = append(info.Groups, g.Name)
 	}
+	var inv map[string]any
+	if json.Unmarshal(h.Inventory, &inv) == nil {
+		for k, v := range inv {
+			if s, ok := v.(string); ok {
+				info.Inventory[strings.ToLower(k)] = s
+			}
+		}
+	}
+	for _, m := range h.Macros {
+		info.Macros[strings.ToUpper(m.Macro)] = m.Value
+	}
 	return info, nil
+}
+
+// ItemLastValue devolve o último valor do item (pela chave exata) do
+// host. ok=false = item não existe nesse host.
+func (c Client) ItemLastValue(hostID, key string) (value string, ok bool, err error) {
+	if strings.TrimSpace(hostID) == "" || strings.TrimSpace(key) == "" {
+		return "", false, nil
+	}
+	raw, err := c.call("item.get", map[string]any{
+		"output":  []string{"itemid", "lastvalue"},
+		"hostids": []string{hostID},
+		"filter":  map[string]any{"key_": key},
+		"limit":   1,
+	})
+	if err != nil {
+		return "", false, err
+	}
+	var items []struct {
+		LastValue string `json:"lastvalue"`
+	}
+	if err := json.Unmarshal(raw, &items); err != nil {
+		return "", false, fmt.Errorf("item.get: %w", err)
+	}
+	if len(items) == 0 {
+		return "", false, nil
+	}
+	return items[0].LastValue, true, nil
+}
+
+// ProblemCount conta problemas ativos (de trigger) com severidade >=
+// minSeverity, nos hosts OU nos grupos informados. Grupo aceita curinga *
+// (resolvido por hostgroup.get). Grupo inexistente = 0.
+func (c Client) ProblemCount(hostIDs []string, groupPattern string, minSeverity int) (int, error) {
+	params := map[string]any{"countOutput": true, "source": 0, "object": 0}
+	if minSeverity > 0 {
+		sev := []int{}
+		for s := minSeverity; s <= 5; s++ {
+			sev = append(sev, s)
+		}
+		params["severities"] = sev
+	}
+	switch {
+	case len(hostIDs) > 0:
+		params["hostids"] = hostIDs
+	case strings.TrimSpace(groupPattern) != "":
+		gp := map[string]any{"output": []string{"groupid"}}
+		if strings.Contains(groupPattern, "*") {
+			gp["search"] = map[string]any{"name": groupPattern}
+			gp["searchWildcardsEnabled"] = true
+		} else {
+			gp["filter"] = map[string]any{"name": []string{groupPattern}}
+		}
+		raw, err := c.call("hostgroup.get", gp)
+		if err != nil {
+			return 0, err
+		}
+		var groups []struct {
+			GroupID string `json:"groupid"`
+		}
+		if err := json.Unmarshal(raw, &groups); err != nil {
+			return 0, fmt.Errorf("hostgroup.get: %w", err)
+		}
+		if len(groups) == 0 {
+			return 0, nil
+		}
+		ids := make([]string, 0, len(groups))
+		for _, g := range groups {
+			ids = append(ids, g.GroupID)
+		}
+		params["groupids"] = ids
+	default:
+		return 0, nil
+	}
+	raw, err := c.call("problem.get", params)
+	if err != nil {
+		return 0, err
+	}
+	var s string
+	if err := json.Unmarshal(raw, &s); err != nil {
+		var n int
+		if err2 := json.Unmarshal(raw, &n); err2 != nil {
+			return 0, fmt.Errorf("problem.get count: %w", err)
+		}
+		return n, nil
+	}
+	return strconv.Atoi(s)
 }
 
 // mergeTags junta as tags do host com as herdadas, sem repetir tag=valor

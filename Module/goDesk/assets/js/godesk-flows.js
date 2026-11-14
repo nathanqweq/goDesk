@@ -109,6 +109,12 @@
     ["now.weekday", "dia da semana (dom..sab)"], ["now.hour", "hora (00-23)"], ["now.time", "hora HH:MM"], ["now.date", "data AAAA-MM-DD"],
     ["set.", "campo já definido no fluxo — set.<campo>"],
     ["var.", "variável criada no Transformar texto — var.<nome>"],
+    ["host.inventory.", "inventário do host — host.inventory.<campo> (location, contact, os...)"],
+    ["host.macro.", "macro do host — host.macro.<NOME> ({$NOME})"],
+    ["item:", "último valor de um item do host — item:<chave> (ex: item:icmpping)"],
+    ["host.problems", "problemas ativos do host agora (número)"],
+    ["host.problems.", "problemas do host com severidade ≥ nível — host.problems.4"],
+    ["group.problems.", "problemas ativos de um grupo — group.problems.<grupo> (aceita *)"],
   ];
   const VARS = ["host", "host.name", "trigger", "severity", "value", "host.tag.", "event.tag.", "cliente", "now.time", "event.age", "ticket.number"];
 
@@ -1690,6 +1696,9 @@
         set("host.group", (ev["host.group"] || []).join("\n"));
         set("host_tags", (ev.host_tags || []).map((t) => t.tag + "=" + t.value).join("\n"));
         set("event_tags", (ev.event_tags || []).map((t) => t.tag + "=" + t.value).join("\n"));
+        // inventário, macros e problemas do host; item:<chave> e
+        // group.problems.<grupo> o usuário digita aqui se o fluxo usar
+        set("extra", (ev.extra || []).join("\n"));
         $("gd-flow-test-eventid").value = eventid;
         renderCanvas(); renderTest();
       })

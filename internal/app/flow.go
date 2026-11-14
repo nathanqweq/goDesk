@@ -40,6 +40,8 @@ var flowNow = time.Now
 type flowZabbix interface {
 	HostInfo(hostID, host string) (zabbix.HostInfo, error)
 	EventInfo(eventID string) (zabbix.EventInfo, error)
+	ItemLastValue(hostID, key string) (string, bool, error)
+	ProblemCount(hostIDs []string, groupPattern string, minSeverity int) (int, error)
 }
 
 // ticketNumberPlaceholder: no momento do fluxo o chamado pode ainda não
@@ -62,6 +64,44 @@ type eventResolver struct {
 	host       zabbix.HostInfo
 	evLoaded   bool
 	ev         zabbix.EventInfo
+
+	// cache das consultas sob demanda (item:<chave>, host.problems,
+	// group.problems.<grupo>) — uma chamada por campo, no máximo
+	cache map[string][]string
+}
+
+// cached guarda o resultado de fn pro campo (erro = vazio, já logado).
+func (r *eventResolver) cached(key string, fn func() ([]string, error)) []string {
+	if r.cache == nil {
+		r.cache = map[string][]string{}
+	}
+	if v, ok := r.cache[key]; ok {
+		return v
+	}
+	v, err := fn()
+	if err != nil {
+		log.Printf("[flow] WARN: falha ao consultar %s no Zabbix (campo vem vazio): %v\n", key, err)
+		v = nil
+	}
+	r.cache[key] = v
+	return v
+}
+
+// hostID do alerta (RAWDATA) ou, sem ele, do host.get.
+func (r *eventResolver) hostID() string {
+	if strings.TrimSpace(r.p.HostID) != "" {
+		return r.p.HostID
+	}
+	r.loadHost()
+	return r.host.HostID
+}
+
+// macroName: "SITE", "$SITE" ou "{$SITE}" → "{$SITE}".
+func macroName(s string) string {
+	s = strings.ToUpper(strings.TrimSpace(s))
+	s = strings.TrimSuffix(strings.TrimPrefix(s, "{"), "}")
+	s = strings.TrimPrefix(s, "$")
+	return "{$" + s + "}"
 }
 
 func one(v string) []string {
@@ -135,6 +175,8 @@ var FlowFields = []string{
 	"trigger", "trigger.id", "severity", "severity.level",
 	"status", "event.kind", "event.id", "event.tag.<nome>", "value",
 	"event.age", "event.resends", "event.acknowledged", "event.acked_by_user",
+	"host.inventory.<campo>", "host.macro.<NOME>", "item:<chave>",
+	"host.problems", "host.problems.<nível>", "group.problems.<grupo>",
 	"date", "hour", "rule", "cliente", "equipe",
 	"ticket.exists", "ticket.status", "ticket.number",
 	"calendar.<nome>", "now.weekday", "now.hour", "now.time", "now.date", "set.<campo>",
@@ -216,6 +258,57 @@ func (r *eventResolver) Values(field string) []string {
 	}
 
 	switch {
+	case strings.HasPrefix(lower, "host.inventory."):
+		r.loadHost()
+		return one(r.host.Inventory[lower[len("host.inventory."):]])
+	case strings.HasPrefix(lower, "host.macro."):
+		r.loadHost()
+		if v, ok := r.host.Macros[macroName(field[len("host.macro."):])]; ok {
+			return []string{v}
+		}
+		return nil
+	case strings.HasPrefix(lower, "item:"):
+		key := strings.TrimSpace(strings.TrimSpace(field)[len("item:"):])
+		return r.cached("item:"+key, func() ([]string, error) {
+			if r.zx == nil {
+				return nil, nil
+			}
+			v, ok, err := r.zx.ItemLastValue(r.hostID(), key)
+			if err != nil || !ok {
+				return nil, err
+			}
+			return []string{v}, nil
+		})
+	case lower == "host.problems" || strings.HasPrefix(lower, "host.problems."):
+		min := 0
+		if lower != "host.problems" {
+			min = severityLevel(lower[len("host.problems."):])
+			if min < 0 {
+				return nil
+			}
+		}
+		return r.cached(fmt.Sprintf("host.problems.%d", min), func() ([]string, error) {
+			if r.zx == nil || r.hostID() == "" {
+				return nil, nil
+			}
+			n, err := r.zx.ProblemCount([]string{r.hostID()}, "", min)
+			if err != nil {
+				return nil, err
+			}
+			return []string{strconv.Itoa(n)}, nil
+		})
+	case strings.HasPrefix(lower, "group.problems."):
+		pattern := strings.TrimSpace(strings.TrimSpace(field)[len("group.problems."):])
+		return r.cached("group.problems."+pattern, func() ([]string, error) {
+			if r.zx == nil || pattern == "" {
+				return nil, nil
+			}
+			n, err := r.zx.ProblemCount(nil, pattern, 0)
+			if err != nil {
+				return nil, err
+			}
+			return []string{strconv.Itoa(n)}, nil
+		})
 	case strings.HasPrefix(lower, "host.tag."):
 		r.loadHost()
 		return tagValues(r.host.Tags, field[len("host.tag."):])

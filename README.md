@@ -152,6 +152,11 @@ Campos disponíveis nas condições e nos textos (`{campo}`):
 | `calendar.<nome>`, `now.weekday`, `now.hour`, `now.time`, `now.date` | horário |
 | `set.<campo>` | valor já definido antes no próprio fluxo |
 | `var.<nome>` | variável criada pelo bloco Transformar texto |
+| `host.inventory.<campo>` | inventário do host (`location`, `contact`, `os`, `site_city`...) |
+| `host.macro.<NOME>` | macro definida no próprio host (`host.macro.SITE` = `{$SITE}`) |
+| `item:<chave>` | último valor de outro item do mesmo host (ex: `item:ups.status`, `item:icmpping`) |
+| `host.problems`, `host.problems.<nível>` | quantos problemas ativos o host tem agora (todos, ou com severidade ≥ nível; o do próprio alerta conta) |
+| `group.problems.<grupo>` | quantos problemas ativos há nos hosts de um grupo (aceita `*`, ex: `group.problems.POWERPLANT/*`) |
 
 Operadores das regras: igual, diferente, contém, corresponde (`*`), está na lista, preenchido/vazio, maior/menor, verdadeiro/falso, **começa com**, **termina com**, **regex** (sem diferenciar maiúsculas; sintaxe RE2, sem lookahead) e **entre** (`30..60` para números; `22:00..06:00` para horário, atravessando a meia-noite quando o início é maior que o fim).
 
@@ -170,7 +175,7 @@ Regras do fluxo:
 - **Atualizar chamado** só vale quando o alerta volta e o chamado já existe. Na abertura, o bloco é ignorado.
 - **Texto no chamado** (ações) e **Ação no Zabbix** rodam na abertura e, quando o alerta volta, **uma vez por evento**, a não ser que o bloco esteja marcado para repetir. O texto na **descrição** só entra na abertura.
 - O ack feito pelo fluxo usa o usuário do goDesk e não conta como "reconhecido pelo atendimento" (`event.acked_by_user`).
-- Tags e grupos do host só são consultados no Zabbix se o fluxo chegar num bloco que use esses campos (1 `host.get` e/ou 1 `event.get` por alerta).
+- Os dados do Zabbix só são consultados se o fluxo chegar num bloco que use esses campos, e cada campo no máximo uma vez por alerta: 1 `host.get` (tags, grupos, inventário, macros), 1 `event.get`, 1 `item.get` por chave de item e 1 `problem.get` por contagem.
 - Se der erro (fluxo inexistente, arquivo inválido), a rule segue fixa, como se não tivesse fluxo. Isso conta em `flows_errors_total`. Outras métricas: `flows_evaluated_total`, `flows_skipped_total` e `flows_shadow_evaluated_total`.
 
 Os fluxos ficam em `/etc/zabbix/godesk/godesk-flows.yaml` (alterável com `GODESK_FLOWS_FILE`), gravado em JSON indentado (JSON é YAML válido). O arquivo é validado pelo próprio goDesk antes de salvar (`godesk-client flows-check`) e sincronizado por `godesk-client flows` → `POST /flows`.
