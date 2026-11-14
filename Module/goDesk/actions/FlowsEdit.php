@@ -160,6 +160,37 @@ class FlowsEdit extends CController {
 						$node['action'] = (self::str($n['action'] ?? '') === 'skip') ? 'skip' : 'open';
 						$node['comment'] = self::str($n['comment'] ?? '');
 						break;
+					case 'table':
+						$node['field'] = self::str($n['field'] ?? '');
+						$node['columns'] = array_values(array_map([self::class, 'str'], (array)($n['columns'] ?? [])));
+						$node['rows'] = [];
+						foreach ((array)($n['rows'] ?? []) as $row) {
+							if (is_array($row)) {
+								$node['rows'][] = [
+									'match' => self::str($row['match'] ?? ''),
+									'values' => array_values(array_map([self::class, 'str'], (array)($row['values'] ?? [])))
+								];
+							}
+						}
+						break;
+					case 'update':
+						$node['set'] = [];
+						foreach ((array)($n['set'] ?? []) as $a) {
+							if (is_array($a)) {
+								$node['set'][] = ['field' => self::str($a['field'] ?? ''), 'value' => self::str($a['value'] ?? '')];
+							}
+						}
+						$node['note'] = self::str($n['note'] ?? '');
+						$node['teams'] = !empty($n['teams']) && self::str($n['teams']) !== 'false';
+						$node['repeat'] = !empty($n['repeat']) && self::str($n['repeat']) !== 'false';
+						break;
+					case 'http':
+						$node['method'] = strtoupper(self::str($n['method'] ?? 'POST')) ?: 'POST';
+						$node['url'] = self::str($n['url'] ?? '');
+						$node['headers'] = array_values(array_filter(array_map([self::class, 'str'], (array)($n['headers'] ?? [])), 'strlen'));
+						$node['body'] = is_string($n['body'] ?? null) ? $n['body'] : self::str($n['body'] ?? '');
+						$node['timeout'] = (int)($n['timeout'] ?? 0);
+						break;
 				}
 				$nodes[] = $node;
 			}

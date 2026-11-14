@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -45,6 +46,18 @@ func main() {
 				os.Exit(1)
 			}
 			fmt.Println("ok")
+			return
+		case "flows-history":
+			// imprime o JSON do histórico (página Fluxos → Histórico);
+			// argumento opcional: query string (flow=..&rule=..&q=..&limit=..)
+			query := ""
+			if len(os.Args) > 2 {
+				query = os.Args[2]
+			}
+			if err := runFlowsHistory(query); err != nil {
+				fmt.Fprintln(os.Stderr, "godesk-client: "+err.Error())
+				os.Exit(1)
+			}
 			return
 		case "flows":
 			if err := runFlows(); err != nil {
@@ -212,6 +225,35 @@ func runFlows() error {
 
 	fmt.Printf("fluxos enviados com sucesso para %s (lidos de %s)\n", serverURL, path)
 	return nil
+}
+
+// runFlowsHistory busca GET /flows/history no servidor e imprime o JSON.
+func runFlowsHistory(query string) error {
+	_, serverURL, token, err := loadClientEnv()
+	if err != nil {
+		return err
+	}
+	if _, err := url.ParseQuery(query); err != nil {
+		return fmt.Errorf("filtro inválido: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodGet, serverURL+"/flows/history?"+query, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := (&http.Client{Timeout: 15 * time.Second}).Do(req)
+	if err != nil {
+		return fmt.Errorf("falha ao consultar %s: %w", serverURL, err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("servidor respondeu %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+	_, err = os.Stdout.Write(body)
+	return err
 }
 
 // readLocalConfig lê e valida o TOPDESK_CONFIG local — reaproveitado por

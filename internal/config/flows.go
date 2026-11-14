@@ -22,7 +22,10 @@ import (
 //	start  → next
 //	if     → true | false            (condições com E/OU)
 //	switch → <valor de cada caso> | default
+//	table  → found | not_found       (primeira linha que bater define várias colunas)
 //	set    → next                    (define campos: urgência, operador, instrução...)
+//	update → next                    (chamado já aberto: muda campos/nota — escalonamento)
+//	http   → next                    (chamada HTTP depois de tratar o chamado)
 //	end    → —                       (abrir chamado ou não abrir)
 //
 // Porta sem ligação = fim com "abrir" (o fluxo de sempre da rule, com o
@@ -51,6 +54,12 @@ import (
 
 const DefaultFlowsFile = "/etc/zabbix/godesk/godesk-flows.yaml"
 
+// Histórico das execuções e estado por evento (internal/flowlog).
+const (
+	DefaultFlowsHistoryFile = "/var/lib/godesk/godesk-flows-history.jsonl"
+	DefaultFlowsStateFile   = "/var/lib/godesk/godesk-flows-state.json"
+)
+
 // Modos do fluxo por rule (Policy.FlowMode).
 const (
 	FlowModeOn     = "on"
@@ -73,6 +82,9 @@ const (
 	NodeSwitch = "switch"
 	NodeSet    = "set"
 	NodeEnd    = "end"
+	NodeTable  = "table"
+	NodeUpdate = "update"
+	NodeHTTP   = "http"
 )
 
 // Ações do bloco end.
@@ -83,10 +95,12 @@ const (
 
 // Portas fixas.
 const (
-	PortNext    = "next"
-	PortTrue    = "true"
-	PortFalse   = "false"
-	PortDefault = "default"
+	PortNext     = "next"
+	PortTrue     = "true"
+	PortFalse    = "false"
+	PortDefault  = "default"
+	PortFound    = "found"
+	PortNotFound = "not_found"
 )
 
 // Operadores das condições.
@@ -110,16 +124,28 @@ var FlowSettableFields = []string{
 	"urgency", "impact", "priority",
 	"autoclose", "dependency", "dependency_version",
 	"custom_status", "status_open", "status_update",
-	"send_teams", "teams_webhook",
+	"send_teams", "teams_webhook", "teams_title", "teams_message",
 	"send_email", "email_to", "email_cc", "once_per_day",
 	"send_more_info", "more_info_text",
+	"repeat_update",
 }
+
+// FlowUpdateFields: campos que o bloco update (chamado já aberto) muda
+// no TopDesk.
+var FlowUpdateFields = []string{"urgency", "impact", "priority", "oper_group", "operator"}
+
+// Métodos aceitos pelo bloco http.
+var FlowHTTPMethods = []string{"POST", "GET", "PUT", "PATCH", "DELETE"}
+
+// Filtros de template: {campo|json} (escapa pra dentro de string JSON) e
+// {campo|url} (codifica pra URL).
+var FlowTemplateFilters = []string{"json", "url"}
 
 // FlowBoolFields: subconjunto booleano de FlowSettableFields.
 var FlowBoolFields = map[string]bool{
 	"autoclose": true, "dependency": true, "custom_status": true,
 	"send_teams": true, "send_email": true, "once_per_day": true,
-	"send_more_info": true,
+	"send_more_info": true, "repeat_update": true,
 }
 
 var weekdayNames = map[string]int{
@@ -157,6 +183,13 @@ type FlowCase struct {
 	Value string `yaml:"value"`
 }
 
+// FlowTableRow: Match aceita lista (vírgula) e curinga *; Values segue a
+// ordem de FlowNode.Columns (célula vazia = não define).
+type FlowTableRow struct {
+	Match  string   `yaml:"match"`
+	Values []string `yaml:"values"`
+}
+
 type FlowAssignment struct {
 	Field string `yaml:"field"`
 	// Value é um template: {host}, {severity}, {host.tag.Site}...
@@ -178,8 +211,25 @@ type FlowNode struct {
 	Field string     `yaml:"field,omitempty"`
 	Cases []FlowCase `yaml:"cases,omitempty"`
 
-	// set
+	// set (e update: campos de FlowUpdateFields)
 	Set []FlowAssignment `yaml:"set,omitempty"`
+
+	// table (usa Field como chave de busca)
+	Columns []string       `yaml:"columns,omitempty"`
+	Rows    []FlowTableRow `yaml:"rows,omitempty"`
+
+	// update: nota (ação invisível pro solicitante), aviso no Teams e
+	// repetir a cada reenvio (padrão: uma vez por evento)
+	Note   string `yaml:"note,omitempty"`
+	Teams  bool   `yaml:"teams,omitempty"`
+	Repeat bool   `yaml:"repeat,omitempty"`
+
+	// http
+	Method  string   `yaml:"method,omitempty"`
+	URL     string   `yaml:"url,omitempty"`
+	Headers []string `yaml:"headers,omitempty"` // "Nome: valor"
+	Body    string   `yaml:"body,omitempty"`
+	Timeout int      `yaml:"timeout,omitempty"` // segundos (padrão 10, máx 30)
 
 	// end
 	Action  string `yaml:"action,omitempty"`  // open (padrão) | skip
@@ -266,8 +316,10 @@ func linkPort(l FlowLink) string {
 // Ports devolve as portas de saída válidas do bloco.
 func (n FlowNode) Ports() []string {
 	switch n.Type {
-	case NodeStart, NodeSet:
+	case NodeStart, NodeSet, NodeUpdate, NodeHTTP:
 		return []string{PortNext}
+	case NodeTable:
+		return []string{PortFound, PortNotFound}
 	case NodeIf:
 		return []string{PortTrue, PortFalse}
 	case NodeSwitch:
@@ -439,8 +491,36 @@ func validateFlow(f FlowsFile, fl *Flow) error {
 				return fmt.Errorf("bloco %q, comentário: %w", n.ID, err)
 			}
 
+		case NodeTable:
+			if err := validateTable(f, n); err != nil {
+				return err
+			}
+
+		case NodeUpdate:
+			if len(n.Set) == 0 && strings.TrimSpace(n.Note) == "" && !n.Teams {
+				return fmt.Errorf("bloco %q: atualizar chamado sem nada pra fazer (campos, nota ou Teams)", n.ID)
+			}
+			for j := range n.Set {
+				a := &n.Set[j]
+				a.Field = strings.ToLower(strings.TrimSpace(a.Field))
+				if !inList(FlowUpdateFields, a.Field) {
+					return fmt.Errorf("bloco %q: campo %q não pode ser atualizado (válidos: %s)", n.ID, a.Field, strings.Join(FlowUpdateFields, ", "))
+				}
+				if err := validateTemplate(f, a.Value); err != nil {
+					return fmt.Errorf("bloco %q, campo %s: %w", n.ID, a.Field, err)
+				}
+			}
+			if err := validateTemplate(f, n.Note); err != nil {
+				return fmt.Errorf("bloco %q, nota: %w", n.ID, err)
+			}
+
+		case NodeHTTP:
+			if err := validateHTTP(f, n); err != nil {
+				return err
+			}
+
 		default:
-			return fmt.Errorf("bloco %q: tipo %q desconhecido (start, if, switch, set, end)", n.ID, n.Type)
+			return fmt.Errorf("bloco %q: tipo %q desconhecido (start, if, switch, table, set, update, http, end)", n.ID, n.Type)
 		}
 	}
 
@@ -559,19 +639,125 @@ func validateField(f FlowsFile, field string) error {
 
 var templateVarRe = regexp.MustCompile(`\{([^{}]+)\}`)
 
-// TemplateFields devolve os campos citados em {campo} no texto.
+// TemplateFields devolve os campos citados em {campo} no texto (sem o
+// filtro |json / |url).
 func TemplateFields(s string) []string {
 	var out []string
 	for _, m := range templateVarRe.FindAllStringSubmatch(s, -1) {
-		out = append(out, strings.TrimSpace(m[1]))
+		field, _ := SplitTemplateVar(m[1])
+		out = append(out, field)
 	}
 	return out
 }
 
+// SplitTemplateVar separa "campo|filtro" (filtro vazio = nenhum).
+func SplitTemplateVar(s string) (field, filter string) {
+	s = strings.TrimSpace(s)
+	if i := strings.LastIndex(s, "|"); i >= 0 {
+		return strings.TrimSpace(s[:i]), strings.ToLower(strings.TrimSpace(s[i+1:]))
+	}
+	return s, ""
+}
+
 func validateTemplate(f FlowsFile, s string) error {
-	for _, field := range TemplateFields(s) {
+	for _, m := range templateVarRe.FindAllStringSubmatch(s, -1) {
+		field, filter := SplitTemplateVar(m[1])
+		if filter != "" && !inList(FlowTemplateFilters, filter) {
+			return fmt.Errorf("filtro %q inválido em {%s} (use |json ou |url)", filter, m[1])
+		}
 		if err := validateField(f, field); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+func inList(list []string, v string) bool {
+	for _, x := range list {
+		if x == v {
+			return true
+		}
+	}
+	return false
+}
+
+func validateTable(f FlowsFile, n *FlowNode) error {
+	n.Field = strings.TrimSpace(n.Field)
+	if n.Field == "" {
+		return fmt.Errorf("bloco %q: tabela sem campo de busca", n.ID)
+	}
+	if err := validateField(f, n.Field); err != nil {
+		return fmt.Errorf("bloco %q: %w", n.ID, err)
+	}
+	if len(n.Columns) == 0 {
+		return fmt.Errorf("bloco %q: tabela sem colunas", n.ID)
+	}
+	seen := map[string]bool{}
+	for j := range n.Columns {
+		c := strings.ToLower(strings.TrimSpace(n.Columns[j]))
+		n.Columns[j] = c
+		if !isSettable(c) {
+			return fmt.Errorf("bloco %q: coluna %q não pode ser definida", n.ID, c)
+		}
+		if seen[c] {
+			return fmt.Errorf("bloco %q: coluna %q repetida", n.ID, c)
+		}
+		seen[c] = true
+	}
+	if len(n.Rows) == 0 {
+		return fmt.Errorf("bloco %q: tabela sem linhas", n.ID)
+	}
+	for j := range n.Rows {
+		row := &n.Rows[j]
+		row.Match = strings.TrimSpace(row.Match)
+		if row.Match == "" {
+			return fmt.Errorf("bloco %q: linha #%d sem valor de busca", n.ID, j+1)
+		}
+		if len(row.Values) > len(n.Columns) {
+			return fmt.Errorf("bloco %q: linha #%d tem mais valores que colunas", n.ID, j+1)
+		}
+		for k, v := range row.Values {
+			col := n.Columns[k]
+			if FlowBoolFields[col] && strings.TrimSpace(v) != "" {
+				if _, ok := ParseFlowBool(v); !ok {
+					return fmt.Errorf("bloco %q: linha #%d, %s espera true/false, veio %q", n.ID, j+1, col, v)
+				}
+			}
+			if err := validateTemplate(f, v); err != nil {
+				return fmt.Errorf("bloco %q, linha #%d: %w", n.ID, j+1, err)
+			}
+		}
+	}
+	return nil
+}
+
+func validateHTTP(f FlowsFile, n *FlowNode) error {
+	n.Method = strings.ToUpper(strings.TrimSpace(n.Method))
+	if n.Method == "" {
+		n.Method = "POST"
+	}
+	if !inList(FlowHTTPMethods, n.Method) {
+		return fmt.Errorf("bloco %q: método %q inválido (%s)", n.ID, n.Method, strings.Join(FlowHTTPMethods, ", "))
+	}
+	n.URL = strings.TrimSpace(n.URL)
+	lu := strings.ToLower(n.URL)
+	if !strings.HasPrefix(lu, "http://") && !strings.HasPrefix(lu, "https://") {
+		return fmt.Errorf("bloco %q: a URL precisa começar com http:// ou https://", n.ID)
+	}
+	if n.Timeout < 0 || n.Timeout > 30 {
+		return fmt.Errorf("bloco %q: timeout entre 1 e 30 segundos", n.ID)
+	}
+	for j, h := range n.Headers {
+		if i := strings.Index(h, ":"); i <= 0 || strings.TrimSpace(h[:i]) == "" {
+			return fmt.Errorf("bloco %q: cabeçalho #%d no formato \"Nome: valor\"", n.ID, j+1)
+		}
+		if err := validateTemplate(f, h); err != nil {
+			return fmt.Errorf("bloco %q, cabeçalho #%d: %w", n.ID, j+1, err)
+		}
+	}
+	for _, s := range []string{n.URL, n.Body} {
+		if err := validateTemplate(f, s); err != nil {
+			return fmt.Errorf("bloco %q: %w", n.ID, err)
 		}
 	}
 	return nil

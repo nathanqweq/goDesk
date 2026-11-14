@@ -257,3 +257,95 @@ func TestValidacao(t *testing.T) {
 		t.Errorf("porta não normalizada: %q", f.Flows[0].Links[1].Port)
 	}
 }
+
+func TestTabelaUpdateHTTPEFiltros(t *testing.T) {
+	y := `
+flows:
+  - name: f
+    nodes:
+      - {id: s, type: start}
+      - id: t
+        type: table
+        field: host.group
+        columns: [oper_group, send_teams, instrucao]
+        rows:
+          - {match: "ESCRITORIO/*", values: [G1]}
+          - {match: "Router, POWERPLANT/*", values: [G2, "sim", "Usina {host}"]}
+      - {id: u, type: update, set: [{field: urgency, value: Alta}], note: "nota {host}", teams: true}
+      - {id: h, type: http, url: "https://x/y?h={host|url}", headers: ["Authorization: Bearer abc"], body: '{"t":"{trigger|json}"}'}
+      - {id: nf, type: set, set: [{field: instrucao, value: "sem linha"}]}
+    links:
+      - {from: s, to: t}
+      - {from: t, port: found, to: u}
+      - {from: t, port: not_found, to: nf}
+      - {from: u, to: h}
+`
+	f, err := config.ParseFlows([]byte(y))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fl, _ := f.Find("f")
+	r, err := Run(f, fl, fakeEvent{"host.group": {"Switch/Core", "POWERPLANT/UHCC"}, "host": {"SW 1&2"}, "trigger": {"a \"b\" <c>"}}, at("2026-11-16 10:00"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want(t, r, "oper_group", "G2")
+	want(t, r, "send_teams", "sim")
+	want(t, r, "instrucao", "Usina SW 1&2")
+	if len(r.Updates) != 1 || r.Updates[0].Note != "nota SW 1&2" || !r.Updates[0].Teams || r.Updates[0].Fields[0].Value != "Alta" {
+		t.Errorf("update = %+v", r.Updates)
+	}
+	if len(r.HTTP) != 1 {
+		t.Fatalf("http = %+v", r.HTTP)
+	}
+	h := r.HTTP[0]
+	if h.Method != "POST" || h.URL != "https://x/y?h=SW+1%262" || h.Body != `{"t":"a \"b\" <c>"}` {
+		t.Errorf("http = %+v", h)
+	}
+
+	// nenhuma linha: not_found
+	r, _ = Run(f, fl, fakeEvent{"host.group": {"Outro"}}, at("2026-11-16 10:00"))
+	want(t, r, "instrucao", "sem linha")
+	if !strings.Contains(r.Path(), "t[not_found]") {
+		t.Errorf("caminho: %s", r.Path())
+	}
+}
+
+func TestValidacaoBlocosNovos(t *testing.T) {
+	head := "flows:\n  - name: f\n    nodes:\n      - {id: s, type: start}\n"
+	cases := map[string]string{
+		"tabela sem colunas":     "      - {id: t, type: table, field: host, rows: [{match: x}]}\n",
+		"tabela coluna inválida": "      - {id: t, type: table, field: host, columns: [senha], rows: [{match: x}]}\n",
+		"tabela valores demais":  "      - {id: t, type: table, field: host, columns: [urgency], rows: [{match: x, values: [a, b]}]}\n",
+		"tabela bool inválido":   "      - {id: t, type: table, field: host, columns: [send_teams], rows: [{match: x, values: [talvez]}]}\n",
+		"tabela sem linhas":      "      - {id: t, type: table, field: host, columns: [urgency]}\n",
+		"update vazio":           "      - {id: u, type: update}\n",
+		"update campo inválido":  "      - {id: u, type: update, set: [{field: contract, value: x}]}\n",
+		"http sem esquema":       "      - {id: h, type: http, url: \"x.com\"}\n",
+		"http método":            "      - {id: h, type: http, method: TRACE, url: \"https://x\"}\n",
+		"http cabeçalho":         "      - {id: h, type: http, url: \"https://x\", headers: [\"sem dois pontos\"]}\n",
+		"http timeout":           "      - {id: h, type: http, url: \"https://x\", timeout: 60}\n",
+		"filtro inválido":        "      - {id: a, type: set, set: [{field: instrucao, value: \"{host|base64}\"}]}\n",
+	}
+	for name, nodes := range cases {
+		if _, err := config.ParseFlows([]byte(head + nodes + "    links: []\n")); err == nil {
+			t.Errorf("%s: esperado erro de validação", name)
+		}
+	}
+	ok := head + "      - {id: h, type: http, url: \"https://x/{host|url}\", body: \"{trigger|json}\"}\n    links: [{from: s, to: h}]\n"
+	if _, err := config.ParseFlows([]byte(ok)); err != nil {
+		t.Errorf("válido recusado: %v", err)
+	}
+}
+
+func TestApplyFilter(t *testing.T) {
+	if got := ApplyFilter("a \"b\"\n<c>&é", "json"); got != `a \"b\"\n<c>&é` {
+		t.Errorf("json = %q", got)
+	}
+	if got := ApplyFilter("a b&c/é", "url"); got != "a+b%26c%2F%C3%A9" {
+		t.Errorf("url = %q", got)
+	}
+	if got := ApplyFilter("x", ""); got != "x" {
+		t.Errorf("sem filtro = %q", got)
+	}
+}

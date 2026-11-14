@@ -44,6 +44,14 @@
       "class": "FlowsEdit",
       "view": "godesk.flows"
     },
+    "godesk.flows.view": {
+      "class": "FlowsView",
+      "view": "godesk.flows.view"
+    },
+    "godesk.flows.history": {
+      "class": "FlowsHistory",
+      "view": "godesk.flows.history"
+    },
     "godesk.flows.data": {
       "class": "FlowsData",
       "view": "godesk.flows.data",

@@ -124,7 +124,10 @@ Em vez de criar uma rule nova para cada variação ("host crítico liga", "fora 
 1. Em **Alerts → goDesk → Fluxos**, crie um fluxo e monte os blocos:
    - **Condição** (sim/não), com regras E/OU sobre o evento.
    - **Switch**, com um caminho por valor. Exemplo: `host.tag.Criticidade` = `Critico`, `Alta,Media` ou outro.
-   - **Definir campos**: urgência, impacto, grupo operador, operador, contrato, Teams, e-mail etc. e a **instrução** pro atendimento (ex: *"LIGAR para o cliente ({host})"*).
+   - **Tabela**: a primeira linha que bater com um campo (ex: `host.group` = `POWERPLANT/*`) define várias colunas de uma vez (grupo operador, contrato, webhook do Teams...). Saídas *achou* / *não achou*.
+   - **Definir campos**: urgência, impacto, grupo operador, operador, contrato, Teams (`teams_webhook` aceita vários, separados por vírgula; `teams_title` e `teams_message` personalizam o card), e-mail etc. e a **instrução** pro atendimento (ex: *"LIGAR para o cliente ({host})"*).
+   - **Atualizar chamado** (escalonamento): veja abaixo.
+   - **HTTP**: chama outro sistema depois de tratar o chamado (método, URL, cabeçalhos e corpo com variáveis; `{ticket.number}` é o número do chamado). Só no modo ativo, e o resultado aparece no Histórico.
    - **Fim**: abrir chamado, ou **não abrir** (só comenta no evento). Uma saída sem ligação também abre o chamado com o que já foi definido.
 2. Em **Calendários**, cadastre por exemplo `comercial` (seg a sex, 08:00–18:00, feriados). Nas condições, use `calendar.comercial` "é falso" para pegar o que está fora do horário.
 3. Use **🧪 Testar** com um problema real (ou valores digitados): a tela mostra o caminho, os campos definidos e se abre ou não. É a mesma decisão do goDesk.
@@ -140,14 +143,24 @@ Campos disponíveis nas condições e nos textos (`{campo}`):
 | `host.group` | grupos do host (vários valores) |
 | `host.tag.<nome>`, `event.tag.<nome>` | tags do host e do evento |
 | `trigger`, `severity`, `severity.level` (0–5), `value`, `status`, `event.kind` (`problem`/`recovery`) | dados do evento |
-| `rule`, `cliente`, `equipe`, `ticket.exists`, `ticket.status` | contexto do goDesk |
+| `event.age` (minutos desde o início), `event.resends` (quantas vezes o alerta já chegou antes; 0 = primeira), `event.acked_by_user` (reconhecido por alguém do atendimento), `event.acknowledged` (por qualquer um, inclusive o goDesk) | escalonamento |
+| `rule`, `cliente`, `equipe`, `ticket.exists`, `ticket.status`, `ticket.number` | contexto do goDesk |
 | `calendar.<nome>`, `now.weekday`, `now.hour`, `now.time`, `now.date` | horário |
 | `set.<campo>` | valor já definido antes no próprio fluxo |
+
+Nos textos, `{campo|json}` escapa o valor para dentro de uma string JSON (corpo do bloco HTTP) e `{campo|url}` codifica para URL. As tags do host (`host.tag.*`) incluem as herdadas dos templates.
+
+**Escalonamento** (bloco **Atualizar chamado**): configure na action do Zabbix passos que **reenviam** o alerta a cada X minutos. A cada reenvio com o chamado já aberto, o fluxo roda de novo e o bloco pode mudar urgência, impacto, prioridade, grupo operador ou operador, registrar uma nota (invisível para o solicitante) e avisar no Teams. Por padrão, cada bloco roda **uma vez por evento**; marque *repetir* para rodar a cada reenvio. Exemplo: Condição `event.age ≥ 30` E `event.acked_by_user` é falso → Atualizar chamado (urgência Crítica, grupo N2, Teams). Com `repeat_update` = não (bloco Definir campos), o goDesk para de registrar *"Recebemos novamente o alerta..."* no chamado a cada reenvio. O `event.acked_by_user` ignora o ack que o próprio goDesk faz ao abrir o chamado (identificado pelas mensagens "Chamado ...").
+
+**Histórico**: **Alerts → goDesk → Fluxos — histórico** mostra cada alerta que passou por um fluxo (ativo, shadow ou com erro): caminho, campos definidos, escalonamento, HTTP e o que o goDesk fez. Os dados ficam no servidor goDesk (`/var/lib/godesk/godesk-flows-history.jsonl`, últimas ~5000 execuções, alterável com `GODESK_FLOWS_HISTORY_FILE`) e chegam no módulo por `godesk-client flows-history` → `GET /flows/history`. Só Super admin. O estado por evento (reenvios e escalonamentos já feitos) fica em `/var/lib/godesk/godesk-flows-state.json` (`GODESK_FLOWS_STATE_FILE`) e é limpo depois de 7 dias.
+
+**Para o atendimento**: **Alerts → goDesk → Fluxos (visualizar)** mostra os fluxos em modo somente leitura, com o 🧪 Testar. Funciona para qualquer usuário cujo role tenha o módulo goDesk liberado, e o teste usa as permissões de host desse usuário.
 
 Regras do fluxo:
 - O que o fluxo define **sobrescreve** a rule, inclusive o que vier por tag do Zabbix. Um texto que resolve vazio não apaga o valor da rule.
 - A **instrução** é gravada no chamado como ação **invisível pro solicitante** e aparece em destaque no card do Teams. **Não** vai no e-mail do cliente.
 - **Não abrir** só vale na abertura. A atualização e a normalização de um chamado já aberto seguem normais.
+- **Atualizar chamado** só vale quando o alerta volta e o chamado já existe. Na abertura, o bloco é ignorado.
 - Tags e grupos do host só são consultados no Zabbix se o fluxo chegar num bloco que use esses campos (1 `host.get` e/ou 1 `event.get` por alerta).
 - Se der erro (fluxo inexistente, arquivo inválido), a rule segue fixa, como se não tivesse fluxo. Isso conta em `flows_errors_total`. Outras métricas: `flows_evaluated_total`, `flows_skipped_total` e `flows_shadow_evaluated_total`.
 

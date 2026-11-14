@@ -26,9 +26,13 @@ type RuntimeConfig struct {
 	DependenciesV2File string
 	// FlowsFile é o godesk-flows.yaml (fluxos de decisão das rules, ver
 	// flows.go).
-	FlowsFile   string
-	MetricsFile string
-	TimeoutSec  int
+	FlowsFile string
+	// FlowsHistoryFile / FlowsStateFile: histórico das execuções e estado
+	// por evento dos fluxos (ver internal/flowlog).
+	FlowsHistoryFile string
+	FlowsStateFile   string
+	MetricsFile      string
+	TimeoutSec       int
 
 	SMTPHost string
 	SMTPPort string
@@ -80,6 +84,8 @@ func FromValues(svc ServiceConfig, ticketName, rawData string) RuntimeConfig {
 		DependenciesFile:   svc.DependenciesFile,
 		DependenciesV2File: svc.DependenciesV2File,
 		FlowsFile:          svc.FlowsFile,
+		FlowsHistoryFile:   svc.FlowsHistoryFile,
+		FlowsStateFile:     svc.FlowsStateFile,
 		MetricsFile:        MetricsFileFromEnv(),
 		TimeoutSec:         atoiDefault(getenv("TOPDESK_TIMEOUT_SEC", "15"), 15),
 		SMTPHost:           smtp.Host,
@@ -140,6 +146,10 @@ type ServiceConfig struct {
 
 	// FlowsFile é o godesk-flows.yaml (fluxos de decisão das rules).
 	FlowsFile string
+	// FlowsHistoryFile / FlowsStateFile: histórico e estado por evento dos
+	// fluxos (internal/flowlog).
+	FlowsHistoryFile string
+	FlowsStateFile   string
 
 	// TopDesk padrão do serviço — não vem mais de alerta nenhum, é sempre
 	// daqui (usado tanto pra criar/atualizar chamados quanto pelo
@@ -174,6 +184,8 @@ func ServiceConfigFromEnv() ServiceConfig {
 		DependenciesFile:   get("GODESK_DEPENDENCIES_FILE", DefaultDependenciesFile),
 		DependenciesV2File: get("GODESK_DEPENDENCIES_V2_FILE", DefaultDependenciesV2File),
 		FlowsFile:          get("GODESK_FLOWS_FILE", DefaultFlowsFile),
+		FlowsHistoryFile:   get("GODESK_FLOWS_HISTORY_FILE", DefaultFlowsHistoryFile),
+		FlowsStateFile:     get("GODESK_FLOWS_STATE_FILE", DefaultFlowsStateFile),
 
 		TopdeskDomain: get("GODESK_TOPDESK_DOMAIN", ""),
 		TopdeskUser:   get("GODESK_TOPDESK_USER", ""),

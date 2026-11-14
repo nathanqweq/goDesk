@@ -31,8 +31,10 @@ class FlowsData extends CController {
 		]);
 	}
 
+	// também usado pela visualização somente leitura (godesk.flows.view):
+	// qualquer usuário logado, com as permissões de host dele no Zabbix
 	protected function checkPermissions(): bool {
-		return ($this->getUserType() == USER_TYPE_SUPER_ADMIN);
+		return ($this->getUserType() >= USER_TYPE_ZABBIX_USER);
 	}
 
 	protected function doAction(): void {
@@ -85,15 +87,61 @@ class FlowsData extends CController {
 		$host_tags = [];
 		$groups = [];
 		if ($h['hostid'] !== '') {
-			$hosts = \API::Host()->get([
+			$params = [
 				'output' => ['hostid'],
 				'hostids' => [$h['hostid']],
 				'selectTags' => ['tag', 'value'],
-				'selectHostGroups' => ['name']
-			]);
+				'selectHostGroups' => ['name'],
+				// tags herdadas dos templates (o goDesk também considera)
+				'selectInheritedTags' => ['tag', 'value']
+			];
+			try {
+				$hosts = \API::Host()->get($params);
+			}
+			catch (\Throwable $ex) {
+				$hosts = false;
+			}
+			if ($hosts === false) {
+				unset($params['selectInheritedTags']);
+				$hosts = \API::Host()->get($params);
+			}
 			if ($hosts) {
-				$host_tags = $hosts[0]['tags'] ?? [];
+				$seen = [];
+				foreach (array_merge($hosts[0]['tags'] ?? [], $hosts[0]['inheritedTags'] ?? []) as $t) {
+					$k = mb_strtolower($t['tag'])."\0".$t['value'];
+					if (!isset($seen[$k])) {
+						$seen[$k] = true;
+						$host_tags[] = ['tag' => $t['tag'], 'value' => $t['value']];
+					}
+				}
 				$groups = array_column($hosts[0]['hostgroups'] ?? [], 'name');
+			}
+		}
+
+		// reconhecido pelo atendimento: ack de alguém além do usuário do
+		// goDesk (identificado pelas mensagens "Chamado ..." que ele grava)
+		$acks = \API::Event()->get([
+			'output' => ['eventid', 'acknowledged'],
+			'eventids' => [$eventid],
+			'select_acknowledges' => ['userid', 'action', 'message']
+		]);
+		$acked = $acked_user = false;
+		if ($acks) {
+			$acked = ((string)$acks[0]['acknowledged'] === '1');
+			$godesk = [];
+			foreach ($acks[0]['acknowledges'] ?? [] as $a) {
+				$m = mb_strtolower(trim((string)$a['message']));
+				foreach (['chamado ', 'normalização recebida', 'normalizacao recebida', 'godesk'] as $p) {
+					if (strpos($m, $p) === 0) {
+						$godesk[$a['userid']] = true;
+					}
+				}
+			}
+			foreach ($acks[0]['acknowledges'] ?? [] as $a) {
+				if (((int)$a['action'] & 2) && !isset($godesk[$a['userid']])) {
+					$acked_user = $acked;
+					break;
+				}
 			}
 		}
 
@@ -111,6 +159,9 @@ class FlowsData extends CController {
 				'severity' => self::SEVERITIES[$sev] ?? (string)$sev,
 				'event.id' => $e['eventid'],
 				'event.kind' => ((string)$e['value'] === '1') ? 'problem' : 'recovery',
+				'event.age' => (string)max(0, (int)floor((time() - (int)$e['clock']) / 60)),
+				'event.acknowledged' => $acked ? 'true' : 'false',
+				'event.acked_by_user' => $acked_user ? 'true' : 'false',
 				'clock' => date('Y-m-d\TH:i', (int)$e['clock'])
 			]
 		];

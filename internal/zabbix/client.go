@@ -10,6 +10,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -174,17 +175,25 @@ func (c Client) HostInfo(hostID, host string) (HostInfo, error) {
 		return HostInfo{}, nil
 	}
 
+	// tags herdadas dos templates também contam como tag do host; Zabbix
+	// que não conhece selectInheritedTags recusa o parâmetro → tenta sem
+	params["selectInheritedTags"] = []string{"tag", "value"}
 	raw, err := c.call("host.get", params)
+	if err != nil {
+		delete(params, "selectInheritedTags")
+		raw, err = c.call("host.get", params)
+	}
 	if err != nil {
 		return HostInfo{}, err
 	}
 
 	var hosts []struct {
-		HostID     string `json:"hostid"`
-		Host       string `json:"host"`
-		Name       string `json:"name"`
-		Tags       []Tag  `json:"tags"`
-		HostGroups []struct {
+		HostID        string `json:"hostid"`
+		Host          string `json:"host"`
+		Name          string `json:"name"`
+		Tags          []Tag  `json:"tags"`
+		InheritedTags []Tag  `json:"inheritedTags"`
+		HostGroups    []struct {
 			Name string `json:"name"`
 		} `json:"hostgroups"`
 	}
@@ -196,38 +205,103 @@ func (c Client) HostInfo(hostID, host string) (HostInfo, error) {
 	}
 
 	h := hosts[0]
-	info := HostInfo{HostID: h.HostID, Host: h.Host, Name: h.Name, Tags: h.Tags}
+	info := HostInfo{HostID: h.HostID, Host: h.Host, Name: h.Name, Tags: mergeTags(h.Tags, h.InheritedTags)}
 	for _, g := range h.HostGroups {
 		info.Groups = append(info.Groups, g.Name)
 	}
 	return info, nil
 }
 
-// EventTags devolve as tags do evento (as do trigger, item e host que o
-// Zabbix copia pro evento, mais as de ações). Evento inexistente = nil.
-func (c Client) EventTags(eventID string) ([]Tag, error) {
+// mergeTags junta as tags do host com as herdadas, sem repetir tag=valor
+// (as do host primeiro).
+func mergeTags(own, inherited []Tag) []Tag {
+	out := append([]Tag(nil), own...)
+	seen := map[string]bool{}
+	for _, t := range own {
+		seen[strings.ToLower(t.Tag)+"\x00"+t.Value] = true
+	}
+	for _, t := range inherited {
+		k := strings.ToLower(t.Tag) + "\x00" + t.Value
+		if !seen[k] {
+			seen[k] = true
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// EventInfo é o contexto do evento usado pelos fluxos (event.tag.X,
+// event.age, event.acknowledged, event.acked_by_user).
+type EventInfo struct {
+	Found        bool
+	Tags         []Tag
+	Clock        time.Time // início do problema
+	Acknowledged bool      // reconhecido por qualquer um (inclusive o goDesk)
+	AckedByUser  bool      // reconhecido por alguém além do goDesk
+}
+
+// mensagens que o próprio goDesk grava ao dar ack — identificam o usuário
+// do token pra separar o ack do goDesk do ack do atendimento
+var godeskAckPrefixes = []string{"chamado ", "normalização recebida", "normalizacao recebida", "godesk"}
+
+// EventInfo busca tags, início, status de ack e quem reconheceu o evento.
+// Uma chamada event.get. Evento inexistente = EventInfo{Found: false}.
+func (c Client) EventInfo(eventID string) (EventInfo, error) {
 	if strings.TrimSpace(eventID) == "" {
-		return nil, nil
+		return EventInfo{}, nil
 	}
 	raw, err := c.call("event.get", map[string]any{
-		"output":     []string{"eventid"},
-		"eventids":   []string{eventID},
-		"selectTags": []string{"tag", "value"},
+		"output":              []string{"eventid", "clock", "acknowledged"},
+		"eventids":            []string{eventID},
+		"selectTags":          []string{"tag", "value"},
+		"select_acknowledges": []string{"userid", "action", "message"},
 	})
 	if err != nil {
-		return nil, err
+		return EventInfo{}, err
 	}
 
 	var events []struct {
-		Tags []Tag `json:"tags"`
+		Clock        string `json:"clock"`
+		Acknowledged string `json:"acknowledged"`
+		Tags         []Tag  `json:"tags"`
+		Acks         []struct {
+			UserID  string `json:"userid"`
+			Action  string `json:"action"`
+			Message string `json:"message"`
+		} `json:"acknowledges"`
 	}
 	if err := json.Unmarshal(raw, &events); err != nil {
-		return nil, fmt.Errorf("event.get: %w", err)
+		return EventInfo{}, fmt.Errorf("event.get: %w", err)
 	}
 	if len(events) == 0 {
-		return nil, nil
+		return EventInfo{}, nil
 	}
-	return events[0].Tags, nil
+
+	e := events[0]
+	info := EventInfo{Found: true, Tags: e.Tags, Acknowledged: e.Acknowledged == "1"}
+	if sec, err := strconv.ParseInt(e.Clock, 10, 64); err == nil && sec > 0 {
+		info.Clock = time.Unix(sec, 0)
+	}
+
+	// usuários que gravaram mensagens do goDesk = o próprio goDesk
+	godesk := map[string]bool{}
+	for _, a := range e.Acks {
+		msg := strings.ToLower(strings.TrimSpace(a.Message))
+		for _, p := range godeskAckPrefixes {
+			if strings.HasPrefix(msg, p) {
+				godesk[a.UserID] = true
+				break
+			}
+		}
+	}
+	for _, a := range e.Acks {
+		action, _ := strconv.Atoi(a.Action)
+		if action&2 != 0 && !godesk[a.UserID] {
+			info.AckedByUser = info.Acknowledged
+			break
+		}
+	}
+	return info, nil
 }
 
 // Problem é um problema ativo (problem.get).

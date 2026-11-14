@@ -672,3 +672,41 @@
 [theme='dark-theme'] .godesk-module .gd-flow-test { background: #1c2430; border-color: #35506f; }
 [theme='dark-theme'] .godesk-module .gd-flow-var { background: #24303f; border-color: #35506f; color: #e8e8e8; }
 [theme='dark-theme'] .godesk-module .gd-flow-cal { border-bottom-color: #333; }
+
+/* fluxos: blocos tabela / atualizar chamado / http, histórico */
+.godesk-module .gd-flow-t-table .gd-flow-head { fill: #d8eef3; }
+.godesk-module .gd-flow-t-update .gd-flow-head { fill: #fde2cf; }
+.godesk-module .gd-flow-t-http .gd-flow-head { fill: #e2e4fb; }
+.godesk-module .gd-flow-table { overflow-x: auto; margin-top: 6px; }
+.godesk-module .gd-flow-table table { border-collapse: collapse; width: 100%; font-size: 11px; }
+.godesk-module .gd-flow-table th { text-align: left; font-weight: 600; padding: 2px 3px; white-space: nowrap; }
+.godesk-module .gd-flow-table td { padding: 2px 3px; }
+.godesk-module .gd-flow-table input,
+.godesk-module .gd-flow-table select { width: 100%; min-width: 70px; box-sizing: border-box; }
+.godesk-module .gd-flow-code { display: block; white-space: pre-wrap; word-break: break-all; font-size: 11px; opacity: .85; }
+.godesk-module .gd-warn-pill { background: #fbe3c8; color: #8a4a00; }
+
+.godesk-module .gd-flow-hist-item { border: 1px solid #e1e4e8; border-radius: 8px; margin-bottom: 6px; }
+.godesk-module .gd-flow-hist-item summary {
+  display: grid;
+  grid-template-columns: 110px 1.4fr 1fr 150px;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  cursor: pointer;
+  list-style: none;
+}
+.godesk-module .gd-flow-hist-item summary::-webkit-details-marker { display: none; }
+.godesk-module .gd-flow-hist-item[open] summary { border-bottom: 1px dashed #e1e4e8; }
+.godesk-module .gd-flow-hist-time { font-family: monospace; font-size: 12px; }
+.godesk-module .gd-flow-hist-body { padding: 8px 12px 12px; font-size: 12px; }
+@media (max-width: 900px) {
+  .godesk-module .gd-flow-hist-item summary { grid-template-columns: 1fr; }
+}
+
+[theme='dark-theme'] .godesk-module .gd-flow-t-table .gd-flow-head { fill: #1f4c56; }
+[theme='dark-theme'] .godesk-module .gd-flow-t-update .gd-flow-head { fill: #6a3b1c; }
+[theme='dark-theme'] .godesk-module .gd-flow-t-http .gd-flow-head { fill: #33376a; }
+[theme='dark-theme'] .godesk-module .gd-flow-hist-item,
+[theme='dark-theme'] .godesk-module .gd-flow-hist-item[open] summary { border-color: #333; }
+[theme='dark-theme'] .godesk-module .gd-warn-pill { background: #5a3a10; color: #f5d2a0; }

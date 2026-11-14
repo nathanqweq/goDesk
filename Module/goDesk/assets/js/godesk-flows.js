@@ -27,6 +27,9 @@
     if: { icon: "◇", name: "Condição" },
     switch: { icon: "⑂", name: "Switch" },
     set: { icon: "✎", name: "Definir campos" },
+    table: { icon: "▦", name: "Tabela" },
+    update: { icon: "⤴", name: "Atualizar chamado" },
+    http: { icon: "⇄", name: "HTTP" },
     end: { icon: "■", name: "Fim" },
   };
 
@@ -50,15 +53,21 @@
     ["contract", "Contrato"], ["main_caller", "Solicitante principal"], ["secundary_caller", "Solicitante secundário"],
     ["sla", "SLA (ID)"], ["category", "Categoria"], ["sub_category", "Subcategoria"], ["call_type", "Tipo de chamado"],
     ["equipe", "Equipe"], ["cliente", "Cliente (exibição)"],
-    ["send_teams", "Enviar Teams"], ["teams_webhook", "Webhook do Teams"],
+    ["send_teams", "Enviar Teams"], ["teams_webhook", "Webhook(s) do Teams (vírgula separa)"],
+    ["teams_title", "Título do card do Teams"], ["teams_message", "Texto extra no card do Teams"],
+    ["repeat_update", "Registrar \"Recebemos novamente\" no reenvio"],
     ["send_email", "Enviar e-mail"], ["email_to", "E-mail para"], ["email_cc", "E-mail cópia"], ["once_per_day", "E-mail 1x por dia"],
     ["send_more_info", "Enviar mais informações"], ["more_info_text", "Texto de mais informações"],
     ["autoclose", "Autoclose"], ["dependency", "Dependência"], ["dependency_version", "Versão da dependência (v1/v2/shadow)"],
     ["custom_status", "Custom status"], ["status_open", "Status abertura (ID)"], ["status_update", "Status atualização (ID)"],
   ];
   const SETTABLE_LABEL = Object.fromEntries(SETTABLE);
-  const BOOL_FIELDS = new Set(["autoclose", "dependency", "custom_status", "send_teams", "send_email", "once_per_day", "send_more_info"]);
-  const LONG_FIELDS = new Set(["instrucao", "more_info_text"]);
+  const BOOL_FIELDS = new Set(["autoclose", "dependency", "custom_status", "send_teams", "send_email", "once_per_day", "send_more_info", "repeat_update"]);
+  const LONG_FIELDS = new Set(["instrucao", "more_info_text", "teams_message"]);
+  // mesma lista do config.FlowUpdateFields
+  const UPDATE_FIELDS = [["urgency", "Urgência"], ["impact", "Impacto"], ["priority", "Prioridade"], ["oper_group", "Grupo operador (ID)"], ["operator", "Operador (ID)"]];
+  const HTTP_METHODS = ["POST", "GET", "PUT", "PATCH", "DELETE"];
+  const PORT_LABEL = { true: "sim", false: "não", default: "outro", found: "achou", not_found: "não achou", next: "" };
 
   // mesmos campos do eventResolver (internal/app/flow.go) + os do motor
   const FIELDS = [
@@ -67,11 +76,13 @@
     ["trigger", "nome do trigger/problema"], ["severity", "severidade (nome)"], ["severity.level", "severidade 0 a 5"],
     ["event.kind", "problem / recovery"], ["status", "status (PROBLEM/RESOLVED)"], ["value", "valor do item"],
     ["rule", "rule"], ["cliente", "cliente"], ["equipe", "equipe"],
-    ["ticket.exists", "chamado já existe (true/false)"], ["ticket.status", "status do chamado"],
+    ["ticket.exists", "chamado já existe (true/false)"], ["ticket.status", "status do chamado"], ["ticket.number", "número do chamado (HTTP)"],
+    ["event.age", "minutos desde o início do problema"], ["event.resends", "quantas vezes o alerta já chegou antes (0 = primeira)"],
+    ["event.acked_by_user", "reconhecido pelo atendimento (true/false)"], ["event.acknowledged", "reconhecido por qualquer um, inclusive o goDesk"],
     ["now.weekday", "dia da semana (dom..sab)"], ["now.hour", "hora (00-23)"], ["now.time", "hora HH:MM"], ["now.date", "data AAAA-MM-DD"],
     ["set.", "campo já definido no fluxo — set.<campo>"],
   ];
-  const VARS = ["host", "host.name", "trigger", "severity", "value", "host.tag.", "event.tag.", "cliente", "now.time"];
+  const VARS = ["host", "host.name", "trigger", "severity", "value", "host.tag.", "event.tag.", "cliente", "now.time", "event.age", "ticket.number"];
 
   const DAYS = ["dom", "seg", "ter", "qua", "qui", "sex", "sab"];
   const WEEKDAY = { dom: 0, seg: 1, ter: 2, qua: 3, qui: 4, sex: 5, sab: 6, "sáb": 6, sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
@@ -174,8 +185,29 @@
     return hm >= c.start && hm < c.end;
   }
 
+  // "campo|filtro" → [campo, filtro] (igual ao config.SplitTemplateVar)
+  function splitVar(s) {
+    s = String(s).trim();
+    const i = s.lastIndexOf("|");
+    return i >= 0 ? [s.slice(0, i).trim(), s.slice(i + 1).trim().toLowerCase()] : [s, ""];
+  }
+
+  // igual ao url.QueryEscape do Go (espaço vira +; !'()* codificados)
+  function queryEscape(s) {
+    let out;
+    try { out = encodeURIComponent(s); } catch (e) { out = encodeURIComponent(String(s).replace(/[\uD800-\uDFFF]/g, "�")); }
+    return out.replace(/%20/g, "+").replace(/[!'()*]/g, (c) => "%" + c.charCodeAt(0).toString(16).toUpperCase());
+  }
+
+  // igual ao flow.ApplyFilter do Go
+  function applyFilter(v, filter) {
+    if (filter === "json") { const bs = String.fromCharCode(92); return JSON.stringify(String(v)).slice(1, -1).split(String.fromCharCode(0x2028)).join(bs + "u2028").split(String.fromCharCode(0x2029)).join(bs + "u2029"); }
+    if (filter === "url") return queryEscape(String(v));
+    return v;
+  }
+
   function runFlow(data, fl, resolve, now) {
-    const r = { flow: fl.name, action: "open", comment: "", set: [], trace: [], error: "" };
+    const r = { flow: fl.name, action: "open", comment: "", set: [], updates: [], http: [], trace: [], error: "" };
     const valueOf = (field) => { for (let i = r.set.length - 1; i >= 0; i--) if (r.set[i].field === field) return r.set[i].value; return null; };
 
     const values = (field) => {
@@ -195,7 +227,10 @@
     const render = (tpl) => {
       tpl = String(tpl == null ? "" : tpl);
       if (tpl.indexOf("{") < 0) return tpl;
-      return tpl.replace(/\{([^{}]+)\}/g, (m, f) => nonEmpty(values(f)).join(", "));
+      return tpl.replace(/\{([^{}]+)\}/g, (m, inner) => {
+        const [f, filter] = splitVar(inner);
+        return applyFilter(nonEmpty(values(f)).join(", "), filter);
+      });
     };
 
     let cur = fl.nodes.find((n) => n.type === "start");
@@ -241,6 +276,45 @@
         step.detail = done.join("; ");
         port = "next";
       }
+      else if (cur.type === "table") {
+        const vals = values(cur.field);
+        port = "not_found";
+        step.detail = `${cur.field} = ${showValues(vals)} → nenhuma linha`;
+        for (const row of cur.rows || []) {
+          if (!evalCondition(vals, "in", row.match)) continue;
+          port = "found";
+          const done = [];
+          (cur.columns || []).forEach((col, k) => {
+            const raw = (row.values || [])[k];
+            if (raw == null || String(raw).trim() === "") return;
+            const v = render(raw);
+            r.set.push({ field: col, value: v });
+            done.push(col + "=" + v);
+          });
+          step.detail = `${cur.field} = ${showValues(vals)} → linha "${row.match}": ${done.join("; ")}`;
+          break;
+        }
+      }
+      else if (cur.type === "update") {
+        const u = { node: cur.id, fields: [], note: render(cur.note || ""), teams: !!cur.teams, repeat: !!cur.repeat };
+        const done = [];
+        (cur.set || []).forEach((a) => {
+          const v = render(a.value);
+          u.fields.push({ field: a.field, value: v });
+          done.push(a.field + "=" + v);
+        });
+        if (u.note !== "") done.push("nota");
+        if (u.teams) done.push("Teams");
+        r.updates.push(u);
+        step.detail = "atualizar chamado: " + done.join("; ");
+        port = "next";
+      }
+      else if (cur.type === "http") {
+        const call = { node: cur.id, method: cur.method || "POST", url: render(cur.url || ""), headers: (cur.headers || []).map(render), body: render(cur.body || ""), timeout: cur.timeout || 0 };
+        r.http.push(call);
+        step.detail = call.method + " " + call.url;
+        port = "next";
+      }
       else if (cur.type === "end") {
         r.action = cur.action || "open";
         r.comment = render(cur.comment || "");
@@ -278,8 +352,9 @@
 
   function ports(n) {
     switch (n.type) {
-      case "start": case "set": return [{ port: "next", label: "" }];
+      case "start": case "set": case "update": case "http": return [{ port: "next", label: "" }];
       case "if": return [{ port: "true", label: "sim" }, { port: "false", label: "não" }];
+      case "table": return [{ port: "found", label: "achou" }, { port: "not_found", label: "não achou" }];
       case "switch": return (n.cases || []).map((c) => ({ port: c.value, label: c.value })).concat([{ port: "default", label: "outro" }]);
       default: return [];
     }
@@ -297,6 +372,9 @@
     if (type === "switch") { n.field = "host.tag.Criticidade"; n.cases = [{ value: "Critico" }]; }
     if (type === "set") { n.set = [{ field: "instrucao", value: "" }]; }
     if (type === "end") { n.action = "open"; n.comment = ""; }
+    if (type === "table") { n.field = "host.group"; n.columns = ["oper_group"]; n.rows = [{ match: "GRUPO/*", values: [""] }]; }
+    if (type === "update") { n.set = [{ field: "urgency", value: "" }]; n.note = ""; n.teams = false; n.repeat = false; }
+    if (type === "http") { n.method = "POST"; n.url = "https://"; n.headers = []; n.body = ""; n.timeout = 10; }
     return n;
   }
 
@@ -318,6 +396,19 @@
         if (node.type === "switch") { node.field = String(n.field || ""); node.cases = (n.cases || []).map((c) => ({ value: String(c.value == null ? "" : c.value) })); }
         if (node.type === "set") { node.set = (n.set || []).map((a) => ({ field: String(a.field || ""), value: String(a.value == null ? "" : a.value) })); }
         if (node.type === "end") { node.action = n.action === "skip" ? "skip" : "open"; node.comment = String(n.comment || ""); }
+        if (node.type === "table") {
+          node.field = String(n.field || "");
+          node.columns = (n.columns || []).map(String);
+          node.rows = (n.rows || []).map((row) => ({ match: String(row.match == null ? "" : row.match), values: (row.values || []).map((v) => String(v == null ? "" : v)) }));
+        }
+        if (node.type === "update") {
+          node.set = (n.set || []).map((a) => ({ field: String(a.field || ""), value: String(a.value == null ? "" : a.value) }));
+          node.note = String(n.note || ""); node.teams = !!n.teams; node.repeat = !!n.repeat;
+        }
+        if (node.type === "http") {
+          node.method = String(n.method || "POST").toUpperCase(); node.url = String(n.url || "");
+          node.headers = (n.headers || []).map(String); node.body = String(n.body || ""); node.timeout = +n.timeout || 0;
+        }
         fl.nodes.push(node);
       });
       fl.links = (f.links || []).map((l) => {
@@ -344,6 +435,19 @@
           if (n.type === "switch") { o.field = n.field.trim(); o.cases = n.cases.map((c) => ({ value: c.value.trim() })); }
           if (n.type === "set") { o.set = n.set.map((a) => ({ field: a.field, value: a.value })); }
           if (n.type === "end") { o.action = n.action; o.comment = n.action === "skip" ? n.comment : ""; }
+          if (n.type === "table") {
+            o.field = n.field.trim(); o.columns = n.columns.slice();
+            o.rows = n.rows.map((row) => {
+              const values = n.columns.map((c, k) => row.values[k] == null ? "" : row.values[k]);
+              while (values.length && values[values.length - 1] === "") values.pop();
+              return { match: row.match.trim(), values };
+            });
+          }
+          if (n.type === "update") { o.set = n.set.map((a) => ({ field: a.field, value: a.value })); o.note = n.note; o.teams = n.teams; o.repeat = n.repeat; }
+          if (n.type === "http") {
+            o.method = n.method; o.url = n.url.trim(); o.headers = n.headers.map((h) => h.trim()).filter(Boolean);
+            o.body = n.body; o.timeout = Math.max(0, Math.min(30, +n.timeout || 0));
+          }
           return o;
         }),
         links: f.links.map((l) => (l.port ? { from: l.from, port: l.port, to: l.to } : { from: l.from, to: l.to })),
@@ -365,7 +469,11 @@
       if (lc(field).startsWith("calendar.") && !findCalendar(S.data.calendars, field.trim().slice(9))) return `calendário ${field.trim().slice(9)} não cadastrado`;
       return "";
     };
-    const tplRefs = (s) => (String(s).match(/\{([^{}]+)\}/g) || []).map((m) => calRef(m.slice(1, -1))).filter(Boolean);
+    const tplRefs = (s) => (String(s).match(/\{([^{}]+)\}/g) || []).map((m) => {
+      const [f, filter] = splitVar(m.slice(1, -1));
+      if (filter && filter !== "json" && filter !== "url") return `filtro |${filter} inválido (use |json ou |url)`;
+      return calRef(f);
+    }).filter(Boolean);
 
     S.data.flows.forEach((f, fi) => {
       const fname = f.name.trim() || `#${fi + 1}`;
@@ -401,6 +509,35 @@
           });
         }
         if (n.type === "end") tplRefs(n.comment).forEach((e2) => errs.push(`${who}: ${e2}.`));
+        if (n.type === "table") {
+          if (!n.field.trim()) errs.push(`${who}: informe o campo de busca.`);
+          const e = calRef(n.field); if (e) errs.push(`${who}: ${e}.`);
+          if (!n.columns.length) errs.push(`${who}: adicione pelo menos uma coluna.`);
+          if (new Set(n.columns).size !== n.columns.length) errs.push(`${who}: coluna repetida.`);
+          if (!n.rows.length) errs.push(`${who}: adicione pelo menos uma linha.`);
+          n.rows.forEach((row, i) => {
+            if (!row.match.trim()) errs.push(`${who}: linha #${i + 1} sem valor de busca.`);
+            n.columns.forEach((c, k) => {
+              const v = row.values[k] == null ? "" : row.values[k];
+              if (BOOL_FIELDS.has(c) && v.trim() !== "" && !parseBool(v)[1]) errs.push(`${who}: linha #${i + 1}, ${c} precisa ser sim/não.`);
+              tplRefs(v).forEach((e2) => errs.push(`${who}: ${e2}.`));
+            });
+          });
+        }
+        if (n.type === "update") {
+          if (!n.set.length && !n.note.trim() && !n.teams) errs.push(`${who}: defina um campo, uma nota ou o Teams.`);
+          n.set.forEach((a) => { tplRefs(a.value).forEach((e2) => errs.push(`${who}: ${e2}.`)); });
+          tplRefs(n.note).forEach((e2) => errs.push(`${who}: ${e2}.`));
+        }
+        if (n.type === "http") {
+          if (!/^https?:\/\//i.test(n.url.trim())) errs.push(`${who}: a URL precisa começar com http:// ou https://.`);
+          if (+n.timeout < 0 || +n.timeout > 30) errs.push(`${who}: timeout entre 1 e 30 segundos.`);
+          n.headers.filter((h) => h.trim()).forEach((h, i) => {
+            const k = h.indexOf(":");
+            if (k <= 0 || !h.slice(0, k).trim()) errs.push(`${who}: cabeçalho #${i + 1} no formato "Nome: valor".`);
+          });
+          [n.url, n.body].concat(n.headers).forEach((s) => tplRefs(s).forEach((e2) => errs.push(`${who}: ${e2}.`)));
+        }
       });
     });
     return errs;
@@ -429,6 +566,20 @@
         return lines.length ? lines : ["(nenhum campo)"];
       }
       case "end": return [n.action === "skip" ? "Não abrir chamado" : "Abrir chamado"].concat(n.action === "skip" && n.comment ? [trunc(n.comment, w)] : []);
+      case "table": {
+        const lines = [trunc(`${n.field || "?"} → ${n.columns.join(", ")}`, w)];
+        n.rows.slice(0, 2).forEach((row) => lines.push(trunc(`${row.match}: ${row.values.filter((v) => v !== "").join(", ")}`, w)));
+        if (n.rows.length > 2) lines.push(`+${n.rows.length - 2} linha(s)`);
+        return lines;
+      }
+      case "update": {
+        const lines = n.set.slice(0, 2).map((a) => trunc(`${a.field} = ${a.value}`, w));
+        if (n.note) lines.push(trunc("nota: " + n.note, w));
+        const flags = [n.teams ? "Teams" : "", n.repeat ? "a cada reenvio" : "1x por evento"].filter(Boolean).join(" · ");
+        lines.push(flags);
+        return lines;
+      }
+      case "http": return [trunc(`${n.method} ${n.url}`, w)];
     }
     return [];
   }
@@ -536,7 +687,10 @@
   }
 
   function renderRules() {
+    const desc = $("gd-flow-desc");
+    if (desc) { const f = flow(); desc.textContent = f ? f.description || "—" : ""; }
     const box = $("gd-flow-rules");
+    if (!box) return;
     const fl = flow();
     const list = fl ? S.rulesByFlow[lc(fl.name)] || [] : [];
     box.innerHTML = list.length
@@ -554,7 +708,9 @@
     const box = $("gd-flow-cal-list");
     const keys = Object.keys(S.data.calendars);
     if (!keys.length) {
-      box.innerHTML = '<div class="gd-muted">Nenhum calendário. Crie um (ex: <b>comercial</b>, seg a sex 08:00–18:00) para usar “fora do horário comercial” nas condições.</div>';
+      box.innerHTML = S.readonly
+        ? '<div class="gd-muted">Nenhum calendário cadastrado.</div>'
+        : '<div class="gd-muted">Nenhum calendário. Crie um (ex: <b>comercial</b>, seg a sex 08:00–18:00) para usar “fora do horário comercial” nas condições.</div>';
       return;
     }
     if (box.contains(document.activeElement)) return; // não atrapalhar quem está digitando
@@ -570,6 +726,7 @@
         <div class="gd-field gd-field-tight" style="min-width:auto;"><label>&nbsp;</label><button type="button" class="gd-btn gd-btn-danger" data-gd-cal-remove="${escapeHtml(k)}">✕</button></div>
       </div>`;
     }).join("");
+    if (S.readonly) lockSide(box);
   }
 
   function testPath() {
@@ -687,10 +844,17 @@
       box.innerHTML = `<div class="gd-small-title">Ligação</div>
         <div><b>${escapeHtml(a ? a.label || a.id : l.from)}</b>${lab ? ` [${escapeHtml(lab)}]` : ""} → <b>${escapeHtml(b ? b.label || b.id : l.to)}</b></div>
         <div class="gd-actions"><button type="button" class="gd-btn gd-btn-danger" data-gd-flow="link-remove">Remover ligação</button></div>`;
+      if (S.readonly) lockSide(box);
       return;
     }
 
     const n = S.sel && S.sel.type === "node" ? nodeOf(fl, S.sel.id) : null;
+    if (!n && S.readonly) {
+      box.innerHTML = `<div class="gd-small-title">${escapeHtml(fl.name)}</div>
+        ${fl.description ? `<div style="white-space:pre-wrap">${escapeHtml(fl.description)}</div>` : '<div class="gd-muted">Sem descrição.</div>'}
+        <div class="gd-muted" style="margin-top:10px;">Clique num bloco para ver os detalhes. Com o 🧪 Testar aberto, o caminho do alerta fica destacado em verde.</div>`;
+      return;
+    }
     if (!n) {
       const errs = validate().filter((e) => e.indexOf(`Fluxo ${fl.name.trim() || "#"}`) === 0 || e.indexOf("Calendário") === 0);
       box.innerHTML = `<div class="gd-small-title">Fluxo</div>
@@ -770,13 +934,94 @@
       }
     }
 
+    if (n.type === "table") {
+      html += `<div class="gd-field" style="margin-top:8px;"><label>Buscar pelo campo</label><input type="text" list="gd-flow-fields" autocomplete="off" data-gd-node-prop="field" value="${escapeHtml(n.field)}" placeholder="host.group"></div>`;
+      html += '<div class="gd-small-title" style="margin-top:10px;">Colunas <span class="gd-muted">(o que cada linha define)</span></div>';
+      n.columns.forEach((c, k) => {
+        html += `<div class="gd-flow-rule"><select data-gd-tcol="${k}">${settableOptions(c)}</select>
+          <button type="button" class="gd-btn gd-btn-danger gd-btn-xs" data-gd-tcol-remove="${k}">✕</button></div>`;
+      });
+      html += '<div class="gd-actions"><button type="button" class="gd-btn" data-gd-flow="tcol-add">+ Coluna</button></div>';
+      html += '<div class="gd-small-title" style="margin-top:10px;">Linhas <span class="gd-muted">(a primeira que bater vale)</span></div>';
+      html += '<div class="gd-flow-table"><table><thead><tr><th>valor</th>' + n.columns.map((c) => `<th>${escapeHtml(trunc(SETTABLE_LABEL[c] || c, 18))}</th>`).join("") + '<th></th></tr></thead><tbody>';
+      n.rows.forEach((row, i) => {
+        html += `<tr><td><input type="text" data-gd-trow="${i}" data-k="match" value="${escapeHtml(row.match)}" placeholder="ex: POWERPLANT/*"></td>`;
+        n.columns.forEach((c, k) => {
+          const v = row.values[k] == null ? "" : row.values[k];
+          html += BOOL_FIELDS.has(c)
+            ? `<td><select data-gd-trow="${i}" data-col="${k}"><option value=""${v === "" ? " selected" : ""}>—</option><option value="true"${v !== "" && parseBool(v)[0] ? " selected" : ""}>sim</option><option value="false"${v !== "" && !parseBool(v)[0] ? " selected" : ""}>não</option></select></td>`
+            : `<td><input type="text" data-gd-trow="${i}" data-col="${k}" value="${escapeHtml(v)}"></td>`;
+        });
+        html += `<td><button type="button" class="gd-btn gd-btn-danger gd-btn-xs" data-gd-trow-remove="${i}">✕</button></td></tr>`;
+      });
+      html += '</tbody></table></div>';
+      html += '<div class="gd-actions"><button type="button" class="gd-btn" data-gd-flow="trow-add">+ Linha</button></div>';
+      html += varChips();
+      html += '<div class="gd-muted">Valor da linha: lista separada por vírgula, aceita <code>*</code>, sem diferenciar maiúsculas. Célula vazia não define nada. Saída <b>achou</b> / <b>não achou</b>.</div>';
+    }
+
+    if (n.type === "update") {
+      html += '<div class="gd-banner gd-warn" style="margin-top:8px;">Só age quando o alerta <b>volta</b> (reenvio do escalonamento da action) e o chamado <b>já existe</b>. Na abertura, este bloco é ignorado.</div>';
+      html += '<div class="gd-small-title" style="margin-top:10px;">Mudar no chamado</div>';
+      n.set.forEach((a, i) => {
+        html += `<div class="gd-flow-rule gd-flow-setrow"><select data-gd-upd="${i}" data-k="field">${UPDATE_FIELDS.map(([v, l]) => `<option value="${v}"${v === a.field ? " selected" : ""}>${escapeHtml(l)}</option>`).join("")}</select>
+          <input type="text" data-gd-upd="${i}" data-k="value" value="${escapeHtml(a.value)}">
+          <button type="button" class="gd-btn gd-btn-danger gd-btn-xs" data-gd-upd-remove="${i}">✕</button></div>`;
+      });
+      html += '<div class="gd-actions"><button type="button" class="gd-btn" data-gd-flow="upd-add">+ Campo</button></div>';
+      html += `<div class="gd-field" style="margin-top:8px;"><label>Nota no chamado <span class="gd-muted">(invisível pro solicitante)</span></label><textarea rows="2" data-gd-node-prop="note" placeholder="ex: Sem reconhecimento há {event.age} min — escalado para N2">${escapeHtml(n.note)}</textarea></div>`;
+      html += `<label class="gd-check" style="margin-top:8px;"><input type="checkbox" data-gd-node-check="teams"${n.teams ? " checked" : ""}> <span>Avisar no Teams (webhook da rule/fluxo)</span></label>`;
+      html += `<label class="gd-check" style="margin-top:4px;"><input type="checkbox" data-gd-node-check="repeat"${n.repeat ? " checked" : ""}> <span>Repetir a cada reenvio <span class="gd-muted">(padrão: uma vez por evento)</span></span></label>`;
+      html += varChips();
+      html += '<div class="gd-muted">Exemplo: Condição <code>event.age ≥ 30</code> E <code>event.acked_by_user é falso</code> → Atualizar chamado (urgência Crítica, grupo N2, Teams). Na action do Zabbix, configure passos que reenviam a cada X minutos.</div>';
+    }
+
+    if (n.type === "http") {
+      html += `<div class="gd-row" style="margin-top:8px;"><div class="gd-field gd-field-tight" style="min-width:90px;"><label>Método</label><select data-gd-node-prop="method">${HTTP_METHODS.map((m) => `<option${m === n.method ? " selected" : ""}>${m}</option>`).join("")}</select></div>
+        <div class="gd-field gd-field-tight" style="min-width:80px;"><label>Timeout (s)</label><input type="number" min="1" max="30" data-gd-node-prop="timeout" value="${escapeHtml(n.timeout || 10)}"></div></div>`;
+      html += `<div class="gd-field" style="margin-top:8px;"><label>URL</label><input type="text" data-gd-node-prop="url" value="${escapeHtml(n.url)}" placeholder="https://api.exemplo/hook?host={host|url}"></div>`;
+      html += `<div class="gd-field" style="margin-top:8px;"><label>Cabeçalhos <span class="gd-muted">(Nome: valor, um por linha)</span></label><textarea rows="2" data-gd-node-lines="headers" placeholder="Authorization: Bearer ...">${escapeHtml(n.headers.join("\n"))}</textarea></div>`;
+      html += `<div class="gd-field" style="margin-top:8px;"><label>Corpo</label><textarea rows="4" data-gd-node-prop="body" placeholder='{"chamado": "{ticket.number}", "host": "{host|json}"}'>${escapeHtml(n.body)}</textarea></div>`;
+      html += varChips();
+      html += '<div class="gd-muted">Executa <b>depois</b> que o goDesk trata o chamado (só no modo ativo, não em shadow) e não muda o caminho do fluxo. <code>{ticket.number}</code> vira o número do chamado. Use <code>{campo|json}</code> dentro de JSON e <code>{campo|url}</code> na URL. Com corpo e sem Content-Type, vai <code>application/json</code>. O resultado aparece no Histórico.</div>';
+    }
+
     if (n.type !== "start") {
-      html += '<div class="gd-actions"><button type="button" class="gd-btn gd-btn-danger" data-gd-flow="node-remove">Remover bloco</button></div>';
+      html += '<div class="gd-actions gd-flow-edit-only"><button type="button" class="gd-btn gd-btn-danger" data-gd-flow="node-remove">Remover bloco</button></div>';
     }
     box.innerHTML = html;
+    if (S.readonly) lockSide(box);
+  }
+
+  // somente leitura: o painel mostra os detalhes, mas nada é editável
+  function lockSide(box) {
+    box.querySelectorAll("input, select, textarea").forEach((e) => { e.disabled = true; });
+    box.querySelectorAll("button").forEach((b) => b.remove());
+    box.querySelectorAll(".gd-flow-vars, .gd-flow-edit-only").forEach((e) => e.remove());
   }
 
   // ---------- teste ----------
+
+  function updatesHtml(r) {
+    if (!r.updates || !r.updates.length) return "";
+    const kind = testInput("event.kind") ? testInput("event.kind").value || "problem" : "problem";
+    const exists = testInput("ticket.exists") && testInput("ticket.exists").value === "true" && kind === "problem";
+    const items = r.updates.map((u) => {
+      const parts = u.fields.filter((a) => a.value !== "").map((a) => `${(UPDATE_FIELDS.find(([k]) => k === a.field) || [a.field, a.field])[1]} = ${a.value}`);
+      if (u.note) parts.push("nota: " + u.note);
+      if (u.teams) parts.push("Teams");
+      return `<li>${escapeHtml(parts.join(" · ") || "(nada)")} <span class="gd-muted">(${u.repeat ? "a cada reenvio" : "uma vez por evento"})</span></li>`;
+    }).join("");
+    return `<div class="gd-small-title" style="margin-top:10px;">Atualizar chamado</div>
+      ${exists ? "" : '<div class="gd-muted">Só aconteceria num <b>reenvio</b> com o chamado já aberto (marque “Chamado já existe? = sim”).</div>'}
+      <ul class="gd-flow-res">${items}</ul>`;
+  }
+
+  function httpHtml(r) {
+    if (!r.http || !r.http.length) return "";
+    return `<div class="gd-small-title" style="margin-top:10px;">HTTP <span class="gd-muted">(depois de tratar o chamado; não é chamado no teste)</span></div>
+      <ul class="gd-flow-res">${r.http.map((c) => `<li><b>${escapeHtml(c.method)}</b> ${escapeHtml(c.url)}${c.body ? `<br><code class="gd-flow-code">${escapeHtml(trunc(c.body, 300))}</code>` : ""}</li>`).join("")}</ul>`;
+  }
 
   function parseKV(text) {
     const out = [];
@@ -795,7 +1040,8 @@
     const v = (k) => (testInput(k) ? testInput(k).value : "");
     const map = {};
     const add = (k, val) => { k = lc(k); (map[k] = map[k] || []).push(val); };
-    ["host", "host.name", "trigger", "severity", "event.kind", "ticket.exists", "rule"].forEach((k) => { if (String(v(k)).trim() !== "") add(k, v(k)); });
+    ["host", "host.name", "trigger", "severity", "event.kind", "ticket.exists", "rule",
+      "event.age", "event.resends", "event.acked_by_user", "event.acknowledged"].forEach((k) => { if (String(v(k)).trim() !== "") add(k, v(k)); });
     const sev = ["not classified", "information", "warning", "average", "high", "disaster"].indexOf(lc(v("severity")));
     if (sev >= 0) add("severity.level", String(sev));
     v("host.group").split(/\r?\n/).map((s) => s.trim()).filter(Boolean).forEach((g) => add("host.group", g));
@@ -805,6 +1051,8 @@
     return (field) => {
       const k = lc(field);
       if (k === "host.groups") return map["host.group"] || [];
+      // como no goDesk: sem chamado ainda, o número fica pra depois
+      if (k === "ticket.number" && !map[k]) return ["{ticket.number}"];
       return map[k] || [];
     };
   }
@@ -844,7 +1092,8 @@
         <div><div class="gd-small-title">Resultado</div>${actionHtml}
           ${r.error ? `<div class="gd-banner gd-err">${escapeHtml(r.error)} — no goDesk, a rule seguiria fixa.</div>` : ""}
           ${r.action === "skip" ? `<div class="gd-muted" style="margin-top:6px;">Comentário: ${escapeHtml(r.comment || "goDesk (fluxo " + r.flow + "): chamado não aberto — caminho: …")}</div>` : ""}
-          <div class="gd-small-title" style="margin-top:10px;">Campos definidos pelo fluxo</div>${sets}</div>
+          <div class="gd-small-title" style="margin-top:10px;">Campos definidos pelo fluxo</div>${sets}
+          ${updatesHtml(r)}${httpHtml(r)}</div>
         <div><div class="gd-small-title">Caminho percorrido</div>${trace}</div>
       </div>`;
   }
@@ -863,7 +1112,7 @@
   function onPointerDown(e) {
     const fl = flow();
     if (!fl) return;
-    const port = e.target.closest(".gd-flow-port-out");
+    const port = S.readonly ? null : e.target.closest(".gd-flow-port-out");
     if (port) {
       const n = nodeOf(fl, port.getAttribute("data-node"));
       const p = portPos(fl, n, port.getAttribute("data-port"));
@@ -900,7 +1149,7 @@
       if (t) t.setAttribute("d", curve(S.linking.x1, S.linking.y1, p.x, p.y));
       return;
     }
-    if (!S.drag) return;
+    if (!S.drag || S.readonly) return;
     const fl = flow();
     const n = nodeOf(fl, S.drag.id);
     if (!n) return;
@@ -956,7 +1205,7 @@
 
   function deleteSelection() {
     const fl = flow();
-    if (!fl || !S.sel) return;
+    if (!fl || !S.sel || S.readonly) return;
     if (S.sel.type === "node") {
       const n = nodeOf(fl, S.sel.id);
       if (!n || n.type === "start") return;
@@ -972,6 +1221,7 @@
   }
 
   function addBlock(type) {
+    if (S.readonly) return;
     const fl = flow();
     if (!fl) { alert("Crie um fluxo antes."); return; }
     let pos = freeSpot(fl);
@@ -997,7 +1247,9 @@
   function renameCase(fl, n, i, value) {
     const old = n.cases[i].value;
     n.cases[i].value = value;
-    fl.links.forEach((l) => { if (l.from === n.id && l.port && lc(l.port) === lc(old)) l.port = value; });
+    // switch não tem saída "next": ligação sem porta só pode ser de um caso
+    // que ficou vazio enquanto era editado — ela acompanha o caso também
+    fl.links.forEach((l) => { if (l.from === n.id && lc(l.port || "") === lc(old)) l.port = value; });
   }
 
   function renameCalendar(oldName, newName) {
@@ -1065,6 +1317,9 @@
         if (sev && ![...sev.options].some((o) => o.value === ev.severity)) sev.add(new Option(ev.severity, ev.severity));
         set("severity", ev.severity);
         set("event.kind", ev["event.kind"]);
+        set("event.age", ev["event.age"] || "0");
+        set("event.acked_by_user", ev["event.acked_by_user"] || "false");
+        set("event.acknowledged", ev["event.acknowledged"] || "false");
         set("now", ev.clock);
         set("host.group", (ev["host.group"] || []).join("\n"));
         set("host_tags", (ev.host_tags || []).map((t) => t.tag + "=" + t.value).join("\n"));
@@ -1129,7 +1384,13 @@
       testResult: null,
       recentLoaded: false,
       lastVarTarget: null,
+      readonly: !!payload.readonly,
     };
+    if (S.readonly) {
+      S.testOpen = true;
+      const nowIn = testInput("now");
+      if (nowIn && !nowIn.value) nowIn.value = fmtDate(new Date()) + "T" + fmtTime(new Date());
+    }
 
     const last = storageGet("gd-flow-cur");
     const idx = S.data.flows.findIndex((f) => f.name === last);
@@ -1174,8 +1435,15 @@
 
       const fl = flow();
       const n = fl && S.sel && S.sel.type === "node" ? nodeOf(fl, S.sel.id) : null;
-      const rm = e.target.closest("[data-gd-cond-remove],[data-gd-case-remove],[data-gd-set-remove]");
+      const rm = e.target.closest("[data-gd-cond-remove],[data-gd-case-remove],[data-gd-set-remove],[data-gd-tcol-remove],[data-gd-trow-remove],[data-gd-upd-remove]");
       if (rm && n) {
+        if (rm.dataset.gdTcolRemove !== undefined) {
+          const k = +rm.dataset.gdTcolRemove;
+          n.columns.splice(k, 1);
+          n.rows.forEach((row) => row.values.splice(k, 1));
+        }
+        if (rm.dataset.gdTrowRemove !== undefined) n.rows.splice(+rm.dataset.gdTrowRemove, 1);
+        if (rm.dataset.gdUpdRemove !== undefined) n.set.splice(+rm.dataset.gdUpdRemove, 1);
         if (rm.dataset.gdCondRemove !== undefined) n.conditions.splice(+rm.dataset.gdCondRemove, 1);
         if (rm.dataset.gdCaseRemove !== undefined) {
           const c = n.cases[+rm.dataset.gdCaseRemove];
@@ -1229,6 +1497,17 @@
         while (n.cases.some((c) => lc(c.value) === lc(v))) v = "valor" + i++;
         n.cases.push({ value: v }); dirty(); renderCanvas(); renderSide();
       }
+      else if (a === "tcol-add" && n) {
+        const used = new Set(n.columns);
+        const c = (SETTABLE.find(([k]) => !used.has(k)) || [null])[0];
+        if (c) { n.columns.push(c); n.rows.forEach((row) => { while (row.values.length < n.columns.length) row.values.push(""); }); dirty(); renderCanvas(); renderSide(); }
+      }
+      else if (a === "trow-add" && n) { n.rows.push({ match: "", values: n.columns.map(() => "") }); dirty(); renderCanvas(); renderSide(); }
+      else if (a === "upd-add" && n) {
+        const used = new Set(n.set.map((x) => x.field));
+        const f = (UPDATE_FIELDS.find(([k]) => !used.has(k)) || ["urgency"])[0];
+        n.set.push({ field: f, value: "" }); dirty(); renderCanvas(); renderSide();
+      }
       else if (a === "set-add" && n) {
         const used = new Set(n.set.map((x) => x.field));
         const f = (SETTABLE.find(([k]) => !used.has(k)) || ["instrucao"])[0];
@@ -1270,6 +1549,22 @@
         n.set[+t.dataset.gdSet][t.dataset.k] = t.value; dirty(); renderCanvas(); renderTest();
         return;
       }
+      if (t.dataset.gdUpd !== undefined && n && t.tagName !== "SELECT") {
+        n.set[+t.dataset.gdUpd][t.dataset.k] = t.value; dirty(); renderCanvas(); renderTest();
+        return;
+      }
+      if (t.dataset.gdTrow !== undefined && n && t.tagName !== "SELECT") {
+        const row = n.rows[+t.dataset.gdTrow];
+        if (t.dataset.k === "match") row.match = t.value;
+        else { while (row.values.length < n.columns.length) row.values.push(""); row.values[+t.dataset.col] = t.value; }
+        dirty(); renderCanvas(); renderTest();
+        return;
+      }
+      if (t.dataset.gdNodeLines && n) {
+        n[t.dataset.gdNodeLines] = t.value.split(/\r?\n/);
+        dirty(); renderCanvas(); renderTest();
+        return;
+      }
       if (t.dataset.gdCalField) {
         const c = S.data.calendars[t.dataset.cal];
         if (!c) return;
@@ -1300,6 +1595,27 @@
       }
       if (t.dataset.gdCond !== undefined && n && t.tagName === "SELECT") {
         n.conditions[+t.dataset.gdCond][t.dataset.k] = t.value; dirty(); renderCanvas(); renderSide(); renderTest();
+        return;
+      }
+      if (S.readonly && t.dataset.gdTest === undefined) return;
+      if (t.dataset.gdNodeCheck && n) {
+        n[t.dataset.gdNodeCheck] = t.checked; dirty(); renderCanvas(); renderTest();
+        return;
+      }
+      if (t.dataset.gdTcol !== undefined && n) {
+        const k = +t.dataset.gdTcol;
+        if (n.columns.some((c, i) => c === t.value && i !== k)) { alert("Essa coluna já existe na tabela."); t.value = n.columns[k]; return; }
+        n.columns[k] = t.value; dirty(); renderCanvas(); renderSide(); renderTest();
+        return;
+      }
+      if (t.dataset.gdTrow !== undefined && n && t.tagName === "SELECT") {
+        const row = n.rows[+t.dataset.gdTrow];
+        while (row.values.length < n.columns.length) row.values.push("");
+        row.values[+t.dataset.col] = t.value; dirty(); renderCanvas(); renderTest();
+        return;
+      }
+      if (t.dataset.gdUpd !== undefined && n && t.tagName === "SELECT") {
+        n.set[+t.dataset.gdUpd][t.dataset.k] = t.value; dirty(); renderCanvas(); renderSide(); renderTest();
         return;
       }
       if (t.dataset.gdSet !== undefined && n && t.tagName === "SELECT") {
@@ -1336,10 +1652,13 @@
       if (S.sel) { e.preventDefault(); deleteSelection(); }
     });
 
-    document.querySelector("[data-gd-flow-export]").addEventListener("click", exportFile);
-    document.querySelector("[data-gd-flow-import]").addEventListener("click", () => $("gd-flow-import-file").click());
+    const exp = document.querySelector("[data-gd-flow-export]");
+    if (exp) exp.addEventListener("click", exportFile);
+    const imp = document.querySelector("[data-gd-flow-import]");
+    if (imp) imp.addEventListener("click", () => $("gd-flow-import-file").click());
 
-    $("gd-flow-form").addEventListener("submit", (e) => {
+    const form = $("gd-flow-form");
+    if (form) form.addEventListener("submit", (e) => {
       const errs = validate();
       if (errs.length) {
         e.preventDefault();

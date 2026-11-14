@@ -38,6 +38,9 @@ echo '<div class="gd-muted">';
 echo 'Em vez de uma rule para cada variação, a rule aponta para um <b>fluxo</b> (campo <i>Fluxo</i> em <a href="zabbix.php?action=godesk.config.edit">Config (editar)</a>) e o fluxo decide na hora do alerta.<br>';
 echo '<b>Condição</b> (sim/não) e <b>Switch</b> (um caminho por valor) olham os dados do evento: severidade, grupos e tags do host, tags do evento, horário (calendários), se o chamado já existe...<br>';
 echo '<b>Definir campos</b> sobrescreve o que a rule definiria (urgência, grupo operador, Teams...) e a <b>instrução</b> pro atendimento — vai no chamado (invisível pro solicitante) e no Teams. Textos aceitam variáveis: <code>{host}</code>, <code>{host.name}</code>, <code>{trigger}</code>, <code>{severity}</code>, <code>{host.tag.Site}</code>...<br>';
+echo '<b>Tabela</b>: a primeira linha que bater com o campo (ex: grupo do host) define várias colunas de uma vez (grupo operador, contrato, canal do Teams...).<br>';
+echo '<b>Atualizar chamado</b> (escalonamento): quando o alerta é <b>reenviado</b> pelo escalonamento da action e o chamado já existe — muda urgência/grupo, registra nota e avisa no Teams, <b>uma vez por evento</b>. Use com <code>event.age</code> (minutos), <code>event.resends</code> e <code>event.acked_by_user</code>.<br>';
+echo '<b>HTTP</b>: chama outro sistema depois de tratar o chamado (<code>{ticket.number}</code> disponível; use <code>{campo|json}</code> dentro de JSON e <code>{campo|url}</code> na URL).<br>';
 echo '<b>Fim</b>: abrir chamado (padrão — saída sem ligação também abre) ou <b>não abrir</b> (só comenta no evento).<br>';
 echo 'Use <b>🧪 Testar</b> com um evento real antes de ativar. Na rule, o modo <b>shadow</b> roda o fluxo só no log (<code>[flow-shadow]</code>) sem mudar nada.';
 echo '</div>';
@@ -77,7 +80,10 @@ echo '<div class="gd-row gd-flow-toolbar">';
 echo '<span class="gd-muted">Adicionar:</span>';
 echo '<button class="gd-btn gd-flow-add-if" type="button" data-gd-flow-add="if">◇ Condição</button>';
 echo '<button class="gd-btn gd-flow-add-switch" type="button" data-gd-flow-add="switch">⑂ Switch</button>';
+echo '<button class="gd-btn gd-flow-add-table" type="button" data-gd-flow-add="table">▦ Tabela</button>';
 echo '<button class="gd-btn gd-flow-add-set" type="button" data-gd-flow-add="set">✎ Definir campos</button>';
+echo '<button class="gd-btn gd-flow-add-update" type="button" data-gd-flow-add="update">⤴ Atualizar chamado</button>';
+echo '<button class="gd-btn gd-flow-add-http" type="button" data-gd-flow-add="http">⇄ HTTP</button>';
 echo '<button class="gd-btn gd-flow-add-end" type="button" data-gd-flow-add="end">■ Fim</button>';
 echo '<span class="gd-flow-sep"></span>';
 echo '<button class="gd-btn" type="button" data-gd-flow="layout">🪄 Organizar</button>';
@@ -90,37 +96,7 @@ echo '<div class="gd-flow-side" id="gd-flow-side"></div>';
 echo '</div>';
 
 // ===== teste =====
-echo '<div class="gd-flow-test" id="gd-flow-test" style="display:none">';
-echo '<div class="gd-small-title">🧪 Testar o fluxo <span class="gd-muted">(não altera nada — mesma decisão do goDesk na hora do alerta)</span></div>';
-echo '<div class="gd-row">';
-echo '<div class="gd-field"><label>Carregar de um problema recente</label><select id="gd-flow-test-recent"><option value="">— clique para carregar a lista —</option></select></div>';
-echo '<div class="gd-field gd-field-tight"><label>ou Event ID</label><input type="text" id="gd-flow-test-eventid" placeholder="123456"></div>';
-echo '<div class="gd-field gd-field-tight" style="min-width:auto;"><button class="gd-btn" type="button" data-gd-flow="test-load">📡 Carregar</button></div>';
-echo '</div>';
-echo '<div class="gd-row">';
-echo '<div class="gd-field"><label>host</label><input type="text" data-gd-test="host"></div>';
-echo '<div class="gd-field"><label>host.name</label><input type="text" data-gd-test="host.name"></div>';
-echo '<div class="gd-field"><label>trigger</label><input type="text" data-gd-test="trigger"></div>';
-echo '<div class="gd-field gd-field-tight"><label>severity</label><select data-gd-test="severity">';
-foreach (['Not classified', 'Information', 'Warning', 'Average', 'High', 'Disaster'] as $sv) {
-	echo '<option value="'.$sv.'"'.($sv === 'High' ? ' selected' : '').'>'.$sv.'</option>';
-}
-echo '</select></div>';
-echo '</div>';
-echo '<div class="gd-row">';
-echo '<div class="gd-field gd-field-tight"><label>Tipo</label><select data-gd-test="event.kind"><option value="problem">problema</option><option value="recovery">normalização</option></select></div>';
-echo '<div class="gd-field gd-field-tight"><label>Chamado já existe?</label><select data-gd-test="ticket.exists"><option value="false">não</option><option value="true">sim</option></select></div>';
-echo '<div class="gd-field gd-field-tight"><label>Data/hora do alerta</label><input type="datetime-local" data-gd-test="now"></div>';
-echo '<div class="gd-field"><label>rule</label><input type="text" data-gd-test="rule"></div>';
-echo '</div>';
-echo '<div class="gd-row">';
-echo '<div class="gd-field"><label>Grupos do host <span class="gd-muted">(um por linha)</span></label><textarea rows="3" data-gd-test="host.group"></textarea></div>';
-echo '<div class="gd-field"><label>Tags do host <span class="gd-muted">(Tag=Valor, uma por linha)</span></label><textarea rows="3" data-gd-test="host_tags"></textarea></div>';
-echo '<div class="gd-field"><label>Tags do evento <span class="gd-muted">(Tag=Valor)</span></label><textarea rows="3" data-gd-test="event_tags"></textarea></div>';
-echo '<div class="gd-field"><label>Outros campos <span class="gd-muted">(campo=valor)</span></label><textarea rows="3" data-gd-test="extra" placeholder="cliente=UHCC&#10;value=0"></textarea></div>';
-echo '</div>';
-echo '<div class="gd-flow-test-result" id="gd-flow-test-result"></div>';
-echo '</div>';
+require __DIR__.'/inc.flows.test.php';
 
 echo '</div>';
 
@@ -137,6 +113,7 @@ echo '<textarea name="flows_json" id="gd-flow-json" style="display:none"></texta
 echo '<div class="gd-actions">';
 echo '<button class="gd-btn gd-btn-primary" type="submit">💾 Salvar</button>';
 echo '<a class="gd-btn" href="zabbix.php?action=godesk.flows.edit">↩ Recarregar</a>';
+echo '<a class="gd-btn" href="zabbix.php?action=godesk.flows.history">🕘 Histórico</a>';
 echo '<a class="gd-btn" href="zabbix.php?action=godesk.config.edit">⚙️ Config (rules)</a>';
 echo '</div>';
 echo '</form>';

@@ -6,7 +6,10 @@
 package flow
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -42,11 +45,35 @@ type Assignment struct {
 	Value string `json:"value"`
 }
 
+// Update é um bloco "atualizar chamado" percorrido: só vale quando o
+// chamado já existe (alerta reenviado — escalonamento). Repeat=false = uma
+// vez por evento (o app controla).
+type Update struct {
+	Node   string       `json:"node"`
+	Fields []Assignment `json:"fields,omitempty"`
+	Note   string       `json:"note,omitempty"`
+	Teams  bool         `json:"teams,omitempty"`
+	Repeat bool         `json:"repeat,omitempty"`
+}
+
+// HTTPCall é um bloco http percorrido, já com os templates resolvidos. O
+// app executa depois de tratar o chamado ({ticket.number} é trocado lá).
+type HTTPCall struct {
+	Node    string   `json:"node"`
+	Method  string   `json:"method"`
+	URL     string   `json:"url"`
+	Headers []string `json:"headers,omitempty"`
+	Body    string   `json:"body,omitempty"`
+	Timeout int      `json:"timeout,omitempty"`
+}
+
 type Result struct {
 	Flow    string       `json:"flow"`
 	Action  string       `json:"action"`  // open | skip
 	Comment string       `json:"comment"` // comentário no evento (skip)
 	Set     []Assignment `json:"set"`
+	Updates []Update     `json:"updates,omitempty"`
+	HTTP    []HTTPCall   `json:"http,omitempty"`
 	Trace   []Step       `json:"trace"`
 }
 
@@ -128,6 +155,58 @@ func Run(f config.FlowsFile, fl config.Flow, res Resolver, now time.Time) (Resul
 			step.Detail = strings.Join(done, "; ")
 			port = config.PortNext
 
+		case config.NodeTable:
+			vals := ev.values(cur.Field)
+			port = config.PortNotFound
+			step.Detail = fmt.Sprintf("%s = %s → nenhuma linha", cur.Field, showValues(vals))
+			for _, row := range cur.Rows {
+				if !matchCase(vals, row.Match) {
+					continue
+				}
+				port = config.PortFound
+				done := []string{}
+				for k, col := range cur.Columns {
+					if k >= len(row.Values) || strings.TrimSpace(row.Values[k]) == "" {
+						continue
+					}
+					v := ev.render(row.Values[k])
+					r.Set = append(r.Set, Assignment{Field: col, Value: v})
+					done = append(done, col+"="+v)
+				}
+				step.Detail = fmt.Sprintf("%s = %s → linha %q: %s", cur.Field, showValues(vals), row.Match, strings.Join(done, "; "))
+				break
+			}
+
+		case config.NodeUpdate:
+			u := Update{Node: cur.ID, Note: ev.render(cur.Note), Teams: cur.Teams, Repeat: cur.Repeat}
+			done := []string{}
+			for _, a := range cur.Set {
+				v := ev.render(a.Value)
+				u.Fields = append(u.Fields, Assignment{Field: a.Field, Value: v})
+				done = append(done, a.Field+"="+v)
+			}
+			if u.Note != "" {
+				done = append(done, "nota")
+			}
+			if u.Teams {
+				done = append(done, "Teams")
+			}
+			r.Updates = append(r.Updates, u)
+			step.Detail = "atualizar chamado: " + strings.Join(done, "; ")
+			port = config.PortNext
+
+		case config.NodeHTTP:
+			call := HTTPCall{Node: cur.ID, Method: cur.Method, URL: ev.render(cur.URL), Body: ev.render(cur.Body), Timeout: cur.Timeout}
+			if call.Method == "" {
+				call.Method = "POST"
+			}
+			for _, h := range cur.Headers {
+				call.Headers = append(call.Headers, ev.render(h))
+			}
+			r.HTTP = append(r.HTTP, call)
+			step.Detail = call.Method + " " + call.URL
+			port = config.PortNext
+
 		case config.NodeEnd:
 			r.Action = cur.Action
 			if r.Action == "" {
@@ -204,14 +283,32 @@ func (e evaluator) values(field string) []string {
 }
 
 // render troca {campo} pelo valor (vários valores separados por ", ").
+// Filtros: {campo|json} escapa pra dentro de uma string JSON (sem as
+// aspas) e {campo|url} codifica pra URL.
 func (e evaluator) render(tpl string) string {
 	if !strings.Contains(tpl, "{") {
 		return tpl
 	}
 	return templateRe.ReplaceAllStringFunc(tpl, func(m string) string {
-		vals := e.values(m[1 : len(m)-1])
-		return strings.Join(nonEmpty(vals), ", ")
+		field, filter := config.SplitTemplateVar(m[1 : len(m)-1])
+		return ApplyFilter(strings.Join(nonEmpty(e.values(field)), ", "), filter)
 	})
+}
+
+// ApplyFilter aplica o filtro de template (json, url ou nenhum).
+func ApplyFilter(v, filter string) string {
+	switch filter {
+	case "json":
+		var b bytes.Buffer
+		enc := json.NewEncoder(&b)
+		enc.SetEscapeHTML(false)
+		_ = enc.Encode(v)
+		s := strings.TrimSuffix(b.String(), "\n")
+		return s[1 : len(s)-1]
+	case "url":
+		return url.QueryEscape(v)
+	}
+	return v
 }
 
 func (e evaluator) evalIf(n config.FlowNode) (bool, string) {

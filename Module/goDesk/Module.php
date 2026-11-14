@@ -20,11 +20,13 @@ class Module extends CModule {
 
 		$items = [
 			(new CMenuItem(_('Config (visualizar)')))->setAction('godesk.config.view'),
-			(new CMenuItem(_('Arquitetura (visualizar)')))->setAction('godesk.topology.view')
+			(new CMenuItem(_('Arquitetura (visualizar)')))->setAction('godesk.topology.view'),
+			(new CMenuItem(_('Fluxos (visualizar)')))->setAction('godesk.flows.view')
 		];
 		if ($admin) {
 			$items[] = (new CMenuItem(_('Config (editar)')))->setAction('godesk.config.edit');
 			$items[] = (new CMenuItem(_('Fluxos')))->setAction('godesk.flows.edit');
+			$items[] = (new CMenuItem(_('Fluxos — histórico')))->setAction('godesk.flows.history');
 			$items[] = (new CMenuItem(_('Dependências')))->setAction('godesk.dependencies.edit');
 			$items[] = (new CMenuItem(_('Dependências v2 (arquitetura)')))->setAction('godesk.topology.edit');
 		}

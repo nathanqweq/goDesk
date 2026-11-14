@@ -34,6 +34,11 @@ type Payload struct {
 	// evento. Vazia = linha omitida no chamado, no Teams e no e-mail.
 	Instrucao string `json:"instrucao"`
 
+	// TeamsTitle / TeamsMessage: personalização do card do Teams definida
+	// pelo fluxo (campos teams_title / teams_message). Nunca vêm do Zabbix.
+	TeamsTitle   string `json:"-"`
+	TeamsMessage string `json:"-"`
+
 	// ===== TAGS / TOPDESK =====
 	Contract        string `json:"contract"`
 	OperGroup       string `json:"oper_group"`

@@ -8,12 +8,14 @@ import (
 	"log"
 	"net/http"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
 	"godesk/internal/app"
 	"godesk/internal/config"
+	"godesk/internal/flowlog"
 )
 
 // runFn permite substituir app.Run em testes.
@@ -38,6 +40,7 @@ func Run(opts config.ServiceConfig) error {
 	mux.HandleFunc("POST /dependencies", handleDependencies(opts.Token, opts.DependenciesFile))
 	mux.HandleFunc("POST /dependencies-v2", handleDependenciesV2(opts.Token, opts.DependenciesV2File))
 	mux.HandleFunc("POST /flows", handleFlows(opts.Token, opts.FlowsFile))
+	mux.HandleFunc("GET /flows/history", handleFlowsHistory(opts.Token, opts.FlowsHistoryFile))
 	mux.HandleFunc("POST /validate-client", handleValidateClient(opts))
 	mux.HandleFunc("GET /once-per-day", handleOncePerDayList(opts.Token))
 
@@ -142,6 +145,28 @@ func handleFlows(token, path string) http.HandlerFunc {
 		_, err := config.ParseFlows(b)
 		return err
 	})
+}
+
+// handleFlowsHistory devolve o histórico das execuções de fluxo (mais
+// recentes primeiro) — godesk-client flows-history, página Fluxos →
+// Histórico. Filtros: flow, rule, event, q (texto), limit.
+func handleFlowsHistory(token, path string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !authorized(r, token) {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		q := r.URL.Query()
+		limit, _ := strconv.Atoi(q.Get("limit"))
+		list, err := flowlog.List(path, flowlog.Filter{
+			Flow: q.Get("flow"), Rule: q.Get("rule"), EventID: q.Get("event"), Text: q.Get("q"), Limit: limit,
+		})
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"entries": list})
+	}
 }
 
 // handleYAMLFile valida o YAML recebido com parse e grava em path

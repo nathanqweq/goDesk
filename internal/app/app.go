@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"godesk/internal/config"
+	"godesk/internal/flow"
+	"godesk/internal/flowlog"
 	"godesk/internal/mailer"
 	"godesk/internal/metrics"
 	"godesk/internal/rawdata"
@@ -111,11 +113,25 @@ func Run(cfg config.RuntimeConfig) (err error) {
 		return err
 	}
 
-	// fluxo da rule (godesk-flows.yaml): sobrescreve campos resolvidos e
-	// pode decidir não abrir — ver flow.go
-	flowRes := runFlow(cfg, zx, p, pol, exists, status, flowNow())
-	if flowRes != nil {
-		applyFlow(*flowRes, &pol, &p, map[string]*string{
+	// fluxo da rule (godesk-flows.yaml): sobrescreve campos resolvidos,
+	// pode decidir não abrir, escalar chamado aberto e chamar HTTP — ver
+	// flow.go. No fim do alerta (qualquer retorno) roda os blocos http e
+	// grava o histórico.
+	fr := runFlow(cfg, zx, p, pol, exists, status, ticketID, flowNow())
+	ticketRef := ticketID
+	if fr != nil {
+		defer func() {
+			if fr.applied && len(fr.res.HTTP) > 0 {
+				runHTTPCalls(fr, ticketRef)
+			}
+			fr.record(cfg, ticketRef)
+		}()
+	}
+	var flowRes *flow.Result
+	extras := flowExtras{repeatUpdate: true}
+	if fr != nil && fr.applied {
+		flowRes = &fr.res
+		extras = applyFlow(*flowRes, &pol, &p, map[string]*string{
 			"contract":         &contract,
 			"operator":         &operator,
 			"oper_group":       &operGrp,
@@ -131,12 +147,17 @@ func Run(cfg config.RuntimeConfig) (err error) {
 		})
 		if flowRes.Action == config.FlowActionSkip && !(eventKind == "ProblemStart" && !exists) {
 			log.Printf("[flow] ação \"não abrir\" ignorada: só vale pra abertura (kind=%s, chamado existe=%v)\n", eventKind, exists)
+			fr.note("\"não abrir\" ignorado: só vale na abertura")
+		}
+		if len(flowRes.Updates) > 0 && !(eventKind == "ProblemStart" && exists) {
+			fr.note("atualizar chamado ignorado: só vale quando o alerta volta e o chamado já existe")
 		}
 	}
 
 	switch {
 	case !exists && eventKind == "ProblemStart":
 		if flowRes != nil && flowRes.Action == config.FlowActionSkip {
+			fr.note("chamado não aberto (fluxo)")
 			recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.FlowsSkipped++ })
 			// só comentário, sem ack — igual à dependência
 			if err := zx.AddMessage(p.EventID, flowSkipComment(*flowRes)); err != nil {
@@ -155,6 +176,9 @@ func Run(cfg config.RuntimeConfig) (err error) {
 				if err := zx.AddMessage(p.EventID, msg); err != nil {
 					recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.ZabbixAckErrors++ })
 					log.Printf("[zabbix] ACK ERROR: %v\n", err)
+				}
+				if fr != nil {
+					fr.note("chamado segurado pela dependência")
 				}
 				return nil
 			}
@@ -187,6 +211,7 @@ func Run(cfg config.RuntimeConfig) (err error) {
 			return err
 		}
 		recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.TicketsCreated++ })
+		ticketRef = created
 
 		// instrução (normalmente do fluxo): ação interna, invisível pro
 		// solicitante — é orientação pro atendimento, não pro cliente
@@ -267,12 +292,45 @@ func Run(cfg config.RuntimeConfig) (err error) {
 		}
 
 	case exists && eventKind == "ProblemStart":
-		action := "Recebemos novamente o alerta " + p.Trigger + " em nosso Zabbix."
-		if err := td.PatchTicket(ticketID, buildUpdatePayload(action, status, pol)); err != nil {
-			recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.TicketsUpdateErrors++ })
-			log.Printf("[topdesk] WARN: falha ao atualizar chamado %s: %v\n", ticketID, err)
-		} else {
-			recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.TicketsUpdated++ })
+		// repeat_update=false (fluxo): não registra "Recebemos novamente..."
+		// a cada reenvio — útil com escalonamento de passos curtos
+		if extras.repeatUpdate {
+			action := "Recebemos novamente o alerta " + p.Trigger + " em nosso Zabbix."
+			if err := td.PatchTicket(ticketID, buildUpdatePayload(action, status, pol)); err != nil {
+				recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.TicketsUpdateErrors++ })
+				log.Printf("[topdesk] WARN: falha ao atualizar chamado %s: %v\n", ticketID, err)
+			} else {
+				recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.TicketsUpdated++ })
+			}
+		}
+
+		// blocos "atualizar chamado" (escalonamento): uma vez por evento,
+		// a menos que o bloco peça pra repetir
+		if flowRes != nil {
+			for _, u := range flowRes.Updates {
+				if !u.Repeat && fr.done[u.Node] {
+					fr.note("atualizar chamado %s: já aplicado neste evento", u.Node)
+					continue
+				}
+				if patch := updatePatch(u); len(patch) > 0 {
+					if err := td.PatchTicket(ticketID, patch); err != nil {
+						recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.TicketsUpdateErrors++ })
+						log.Printf("[topdesk] WARN: falha ao escalar chamado %s (bloco %s): %v\n", ticketID, u.Node, err)
+						fr.note("atualizar chamado %s: falhou no TopDesk: %v", u.Node, err)
+						continue
+					}
+					recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.TicketsUpdated++ })
+				}
+				if u.Teams {
+					sendTeamsCard(cfg, httpClient, pol, p, ticketID, escalationTeamsMessage(p, ticketID, u.Note))
+				}
+				if err := flowlog.MarkDone(cfg.FlowsStateFile, p.EventID, u.Node, flowNow()); err != nil {
+					log.Printf("[flow] WARN: falha ao gravar estado do evento: %v\n", err)
+				}
+				fr.done[u.Node] = true
+				fr.note("atualizar chamado %s: aplicado", u.Node)
+				log.Printf("[flow] chamado %s escalado pelo bloco %s\n", ticketID, u.Node)
+			}
 		}
 		if err := zx.Acknowledge(p.EventID, "Chamado já existe: "+ticketID); err != nil {
 			recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.ZabbixAckErrors++ })
