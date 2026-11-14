@@ -127,6 +127,9 @@ func Run(cfg config.RuntimeConfig) (err error) {
 			if fr.applied && len(fr.res.Zabbix) > 0 {
 				fr.runZabbixOps(cfg, zx, p.EventID)
 			}
+			if fr.applied && len(fr.res.Emails) > 0 {
+				fr.sendFlowEmails(cfg, p.EventID)
+			}
 			fr.record(cfg, ticketRef)
 		}()
 	}

@@ -81,6 +81,17 @@ flows:
       - {from: s, to: c}
       - {from: c, port: "true", to: a}
 
+  - name: limite
+    nodes:
+      - {id: s, type: start}
+      - {id: lim, type: limit, key: "{host}", max: 1, window_hours: 1}
+      - {id: nao, type: end, action: skip, comment: "goDesk: limite de {host}"}
+      - {id: mail, type: email, to: "noc@x.com", subject: "alerta {host}", body: "corpo"}
+    links:
+      - {from: s, to: lim}
+      - {from: lim, port: over, to: nao}
+      - {from: lim, port: ok, to: mail}
+
   - name: tabela
     nodes:
       - {id: s, type: start}
@@ -231,6 +242,7 @@ func itoa(n int64) string {
 
 type alertOpts struct {
 	flow, mode, severity, now string
+	eventID                   string
 	hostTags                  []map[string]string
 	fb                        *fakeBackend
 	dir                       string
@@ -273,10 +285,14 @@ func runFlowAlert(t *testing.T, o alertOpts) *fakeBackend {
 	if sev == "" {
 		sev = "High"
 	}
+	eventID := o.eventID
+	if eventID == "" {
+		eventID = "1"
+	}
 	raw, _ := json.Marshal(map[string]string{
 		"status": "PROBLEM", "host": "SW_CORE_UHCC_1", "host_id": "10500",
 		"trigger": `Unavailable "by" ICMP ping`, "severity": sev,
-		"event_id": "1", "trigger_id": "2", "event_value": "1", "rule_name": "infra",
+		"event_id": eventID, "trigger_id": "2", "event_value": "1", "rule_name": "infra",
 		"date": "2026.11.16", "hour": "10:00:00",
 	})
 
@@ -574,5 +590,39 @@ func TestMacroName(t *testing.T) {
 		if got := macroName(in); got != want {
 			t.Errorf("macroName(%q) = %q, esperado %q", in, got, want)
 		}
+	}
+}
+
+func TestRunLimiteDeRepeticao(t *testing.T) {
+	dir := t.TempDir()
+	fb := &fakeBackend{}
+	runFlowAlert(t, alertOpts{flow: "limite", now: "2026-11-16 10:00", eventID: "100", fb: fb, dir: dir})
+	if len(fb.created) != 1 {
+		t.Fatalf("1º evento devia abrir: %d", len(fb.created))
+	}
+	// 2º evento do mesmo host na janela: não abre, só comenta
+	runFlowAlert(t, alertOpts{flow: "limite", now: "2026-11-16 10:20", eventID: "101", fb: fb, dir: dir})
+	if len(fb.created) != 1 {
+		t.Fatalf("2º evento passou do limite e não devia abrir: %d", len(fb.created))
+	}
+	found := false
+	for _, a := range fb.acks {
+		if strings.Contains(a, "limite de SW_CORE_UHCC_1") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("comentário do limite não foi pro evento: %v", fb.acks)
+	}
+	// depois da janela, um novo evento abre de novo
+	runFlowAlert(t, alertOpts{flow: "limite", now: "2026-11-16 11:30", eventID: "102", fb: fb, dir: dir})
+	if len(fb.created) != 2 {
+		t.Errorf("fora da janela devia abrir: %d", len(fb.created))
+	}
+
+	// e-mail com SMTP inexistente: falha registrada, alerta segue
+	h, _ := flowlog.List(filepath.Join(dir, "history.jsonl"), flowlog.Filter{EventID: "100"})
+	if len(h) != 1 || !strings.Contains(strings.Join(h[0].Notes, ";"), "e-mail mail") || len(h[0].Emails) != 1 {
+		t.Errorf("histórico do e-mail: %+v", h)
 	}
 }

@@ -168,6 +168,24 @@ class FlowsEdit extends CController {
 							}
 						}
 						break;
+					case 'limit':
+						$node['key'] = self::str($n['key'] ?? '');
+						$node['max'] = (int)($n['max'] ?? 1);
+						$node['window_hours'] = (int)($n['window_hours'] ?? 1);
+						break;
+					case 'subflow':
+						$node['flow'] = self::str($n['flow'] ?? '');
+						break;
+					case 'comment':
+						$node['text'] = is_string($n['text'] ?? null) ? $n['text'] : self::str($n['text'] ?? '');
+						break;
+					case 'email':
+						$node['to'] = self::str($n['to'] ?? '');
+						$node['cc'] = self::str($n['cc'] ?? '');
+						$node['subject'] = self::str($n['subject'] ?? '');
+						$node['body'] = is_string($n['body'] ?? null) ? $n['body'] : self::str($n['body'] ?? '');
+						$node['repeat'] = !empty($n['repeat']) && self::str($n['repeat']) !== 'false';
+						break;
 					case 'zabbix':
 						$node['message'] = self::str($n['message'] ?? '');
 						$node['ack'] = !empty($n['ack']) && self::str($n['ack']) !== 'false';

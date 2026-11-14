@@ -13,6 +13,7 @@ import (
 	"godesk/internal/config"
 	"godesk/internal/flow"
 	"godesk/internal/flowlog"
+	"godesk/internal/mailer"
 	"godesk/internal/metrics"
 	"godesk/internal/rawdata"
 	"godesk/internal/zabbix"
@@ -60,6 +61,10 @@ type eventResolver struct {
 	ticketID     string
 	resends      int
 
+	// bloco "limitar repetição": estado em disco; record=false em shadow
+	statePath   string
+	recordLimit bool
+
 	hostLoaded bool
 	host       zabbix.HostInfo
 	evLoaded   bool
@@ -94,6 +99,17 @@ func (r *eventResolver) hostID() string {
 	}
 	r.loadHost()
 	return r.host.HostID
+}
+
+// Allow implementa flow.Limiter (bloco "limitar repetição"). Falha no
+// estado = deixa passar (fail-open, como o resto do fluxo).
+func (r *eventResolver) Allow(key string, max int, window time.Duration) (bool, int) {
+	ok, n, err := flowlog.LimitAllow(r.statePath, key, r.p.EventID, max, window, r.now, r.recordLimit)
+	if err != nil {
+		log.Printf("[flow] WARN: falha no estado do limite (deixando passar): %v\n", err)
+		return true, n
+	}
+	return ok, n
 }
 
 // macroName: "SITE", "$SITE" ou "{$SITE}" → "{$SITE}".
@@ -384,7 +400,8 @@ func runFlow(cfg config.RuntimeConfig, zx flowZabbix, p rawdata.Payload, pol con
 		fr.done[d] = true
 	}
 
-	res := &eventResolver{p: p, zx: zx, now: now, ticketExists: ticketExists, ticketStatus: ticketStatus, ticketID: ticketID, resends: prevRuns}
+	res := &eventResolver{p: p, zx: zx, now: now, ticketExists: ticketExists, ticketStatus: ticketStatus, ticketID: ticketID, resends: prevRuns,
+		statePath: cfg.FlowsStateFile, recordLimit: mode != config.FlowModeShadow}
 	r, err := flow.Run(f, fl, res, now)
 	fr.res = r
 	fr.entry.Trace, fr.entry.Path = r.Trace, r.Path()
@@ -392,7 +409,7 @@ func runFlow(cfg config.RuntimeConfig, zx flowZabbix, p rawdata.Payload, pol con
 		return fail("fluxo %q: %v (caminho até o erro: %s)", name, err, r.Path())
 	}
 	fr.entry.Action, fr.entry.Set, fr.entry.Updates, fr.entry.HTTP, fr.entry.Vars = r.Action, r.Set, r.Updates, r.HTTP, r.Vars
-	fr.entry.Zabbix, fr.entry.TicketNotes = r.Zabbix, r.Notes
+	fr.entry.Zabbix, fr.entry.TicketNotes, fr.entry.Emails = r.Zabbix, r.Notes, r.Emails
 
 	sets := make([]string, 0, len(r.Set))
 	for _, a := range r.Set {
@@ -663,6 +680,36 @@ func (fr *flowRun) runZabbixOps(cfg config.RuntimeConfig, zx eventActioner, even
 		}
 		fr.done[op.Node] = true
 		fr.note("ação no Zabbix %s: aplicada", op.Node)
+	}
+}
+
+// sendFlowEmails envia os blocos e-mail (fim do alerta, só modo ativo):
+// uma vez por evento, a menos que o bloco peça pra repetir.
+func (fr *flowRun) sendFlowEmails(cfg config.RuntimeConfig, eventID string) {
+	for _, m := range fr.res.Emails {
+		if !m.Repeat && fr.done[m.Node] {
+			fr.note("e-mail %s: já enviado neste evento", m.Node)
+			continue
+		}
+		to := mailer.ParseRecipients(m.To)
+		cc := mailer.ParseRecipients(m.Cc)
+		if len(to) == 0 {
+			fr.note("e-mail %s: sem destinatário (o template ficou vazio)", m.Node)
+			continue
+		}
+		body := "<html><body style=\"font-family:Calibri,Arial,sans-serif;font-size:11pt\">" + noteHTML(m.Body) + "</body></html>"
+		err := mailer.SendHTML(mailer.Config{Host: cfg.SMTPHost, Port: cfg.SMTPPort, User: cfg.SMTPUser, Pass: cfg.SMTPPass, From: cfg.SMTPFrom}, to, cc, m.Subject, body)
+		if err != nil {
+			recordMetric(cfg.MetricsFile, func(ms *metrics.Snapshot) { ms.EmailSendErrors++ })
+			log.Printf("[flow] e-mail %s FALHOU: %v\n", m.Node, err)
+			fr.note("e-mail %s: falhou: %v", m.Node, err)
+			continue
+		}
+		if err := flowlog.MarkDone(cfg.FlowsStateFile, eventID, m.Node, flowNow()); err != nil {
+			log.Printf("[flow] WARN: falha ao gravar estado do evento: %v\n", err)
+		}
+		fr.done[m.Node] = true
+		fr.note("e-mail %s: enviado para %s", m.Node, strings.Join(to, ", "))
 	}
 }
 

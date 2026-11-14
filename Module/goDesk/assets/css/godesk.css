@@ -744,3 +744,16 @@
 .godesk-module .gd-flow-t-zabbix .gd-flow-head { fill: #f9d6d0; }
 [theme='dark-theme'] .godesk-module .gd-flow-t-note .gd-flow-head { fill: #5a2f55; }
 [theme='dark-theme'] .godesk-module .gd-flow-t-zabbix .gd-flow-head { fill: #5e2a22; }
+
+/* fluxos: limitar, subfluxo, e-mail, nota no desenho */
+.godesk-module .gd-flow-t-limit .gd-flow-head { fill: #dfe8f7; }
+.godesk-module .gd-flow-t-subflow .gd-flow-head { fill: #d9f0ee; }
+.godesk-module .gd-flow-t-email .gd-flow-head { fill: #f0e3d6; }
+.godesk-module .gd-flow-t-comment .gd-flow-box { fill: #fff8c4; stroke: #e2cf6a; stroke-dasharray: 4 3; }
+.godesk-module .gd-flow-t-comment .gd-flow-head { fill: #fbeea0; }
+.godesk-module .gd-flow-t-comment .gd-flow-line { font-style: italic; }
+[theme='dark-theme'] .godesk-module .gd-flow-t-limit .gd-flow-head { fill: #2c3e5c; }
+[theme='dark-theme'] .godesk-module .gd-flow-t-subflow .gd-flow-head { fill: #1f4a46; }
+[theme='dark-theme'] .godesk-module .gd-flow-t-email .gd-flow-head { fill: #4e3a26; }
+[theme='dark-theme'] .godesk-module .gd-flow-t-comment .gd-flow-box { fill: #4a4520; stroke: #8a7d2c; }
+[theme='dark-theme'] .godesk-module .gd-flow-t-comment .gd-flow-head { fill: #5c5524; }

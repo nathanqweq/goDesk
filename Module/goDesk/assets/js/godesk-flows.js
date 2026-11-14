@@ -32,6 +32,10 @@
     table: { icon: "▦", name: "Tabela" },
     update: { icon: "⤴", name: "Atualizar chamado" },
     note: { icon: "✉", name: "Texto no chamado" },
+    limit: { icon: "⏱", name: "Limitar repetição" },
+    subflow: { icon: "↪", name: "Subfluxo" },
+    email: { icon: "@", name: "E-mail" },
+    comment: { icon: "🗒", name: "Nota" },
     zabbix: { icon: "⚑", name: "Ação no Zabbix" },
     http: { icon: "⇄", name: "HTTP" },
     end: { icon: "■", name: "Fim" },
@@ -78,7 +82,7 @@
   // mesma lista do config.FlowUpdateFields
   const UPDATE_FIELDS = [["urgency", "Urgência"], ["impact", "Impacto"], ["priority", "Prioridade"], ["oper_group", "Grupo operador (ID)"], ["operator", "Operador (ID)"]];
   const HTTP_METHODS = ["POST", "GET", "PUT", "PATCH", "DELETE"];
-  const PORT_LABEL = { true: "sim", false: "não", default: "outro", found: "achou", not_found: "não achou", else: "senão", next: "" };
+  const PORT_LABEL = { true: "sim", false: "não", default: "outro", found: "achou", not_found: "não achou", else: "senão", ok: "dentro", over: "passou", next: "" };
   const MAX_COND_DEPTH = 3;
   const SEVERITIES = [["", "não muda"], ["0", "Não classificada"], ["1", "Informação"], ["2", "Atenção"], ["3", "Média"], ["4", "Alta"], ["5", "Desastre"]];
   const NOTE_TARGETS = [["internal", "Ação interna (invisível ao solicitante)"], ["public", "Ação visível ao solicitante"], ["description", "Descrição do chamado (na abertura)"]];
@@ -255,6 +259,12 @@
     return hm >= c.start && hm < c.end;
   }
 
+  const MAX_SUBFLOW_DEPTH = 5;
+
+  function pathOf(steps) {
+    return steps.map((st) => (st.label || st.node) + (st.port && st.port !== "next" ? "[" + st.port + "]" : "")).join(" → ");
+  }
+
   // "campo|filtro" → [campo, filtro] (igual ao config.SplitTemplateVar)
   function splitVar(s) {
     s = String(s).trim();
@@ -276,8 +286,8 @@
     return v;
   }
 
-  function runFlow(data, fl, resolve, now) {
-    const r = { flow: fl.name, action: "open", comment: "", set: [], updates: [], http: [], zabbix: [], notes: [], vars: {}, trace: [], error: "" };
+  function runFlow(data, fl, resolve, now, limiter) {
+    const r = { flow: fl.name, action: "open", comment: "", set: [], updates: [], http: [], zabbix: [], notes: [], emails: [], vars: {}, trace: [], error: "" };
     const valueOf = (field) => { for (let i = r.set.length - 1; i >= 0; i--) if (r.set[i].field === field) return r.set[i].value; return null; };
 
     const values = (field) => {
@@ -348,8 +358,11 @@
       return src;
     }
 
+    // igual ao walk do Go: depth > 0 = subfluxo (o "fim" volta pro fluxo
+    // que chamou, exceto "não abrir"); devolve true = encerrar tudo
+    function walk(fl, depth) {
     let cur = fl.nodes.find((n) => n.type === "start");
-    if (!cur) { r.error = "fluxo sem bloco de início"; return r; }
+    if (!cur) { r.error = "fluxo sem bloco de início"; return true; }
 
     for (let i = 0; i < MAX_STEPS; i++) {
       const step = { node: cur.id, type: cur.type, label: cur.label || "", port: "", detail: "" };
@@ -457,27 +470,57 @@
         step.detail = call.method + " " + call.url;
         port = "next";
       }
+      else if (cur.type === "limit") {
+        const key = render(cur.key && String(cur.key).trim() ? cur.key : "{host}|{trigger}");
+        let allowed = true, count = 0;
+        if (typeof limiter === "function") [allowed, count] = limiter(key, +cur.max || 1, +cur.window_hours || 1);
+        port = allowed ? "ok" : "over";
+        step.detail = `"${key}": ${count} evento(s) em ${cur.window_hours}h, limite ${cur.max} → ${allowed ? "dentro" : "passou"}`;
+      }
+      else if (cur.type === "subflow") {
+        const sub = data.flows.find((x) => lc(x.name) === lc(cur.flow));
+        if (!sub) { r.error = `bloco ${cur.id}: subfluxo ${cur.flow} não existe`; return true; }
+        if (depth >= MAX_SUBFLOW_DEPTH) { r.error = `bloco ${cur.id}: subfluxos encadeados demais`; return true; }
+        const before = r.trace.length;
+        const subStop = walk(sub, depth + 1);
+        const inner = r.trace.splice(before);
+        step.detail = "fluxo " + sub.name + ": " + pathOf(inner);
+        if (r.error || subStop) { r.trace.push(step); return true; }
+        port = "next";
+      }
+      else if (cur.type === "email") {
+        const m = { node: cur.id, to: render(cur.to || ""), cc: render(cur.cc || ""), subject: render(cur.subject || ""), body: render(cur.body || ""), repeat: !!cur.repeat };
+        r.emails.push(m);
+        step.detail = "e-mail para " + m.to + ": " + m.subject;
+        port = "next";
+      }
       else if (cur.type === "end") {
-        r.action = cur.action || "open";
-        r.comment = render(cur.comment || "");
-        step.detail = r.action;
+        const action = cur.action || "open";
+        step.detail = action;
         r.trace.push(step);
-        return r;
+        if (depth > 0 && action !== "skip") return false;
+        r.action = action;
+        r.comment = render(cur.comment || "");
+        return true;
       }
       else {
         r.error = `bloco ${cur.id}: tipo ${cur.type} desconhecido`;
-        return r;
+        return true;
       }
 
       step.port = port;
       r.trace.push(step);
       const link = linkFrom(fl, cur.id, port);
-      if (!link) return r;
+      if (!link) return false;
       const next = fl.nodes.find((n) => n.id === link.to);
-      if (!next) { r.error = `bloco ${cur.id} liga em ${link.to}, que não existe`; return r; }
+      if (!next) { r.error = `bloco ${cur.id} liga em ${link.to}, que não existe`; return true; }
       cur = next;
     }
     r.error = `passou de ${MAX_STEPS} passos (ciclo?)`;
+    return true;
+    }
+
+    walk(fl, 0);
     return r;
   }
 
@@ -494,7 +537,8 @@
 
   function ports(n) {
     switch (n.type) {
-      case "start": case "set": case "update": case "http": case "transform": case "zabbix": case "note": return [{ port: "next", label: "" }];
+      case "start": case "set": case "update": case "http": case "transform": case "zabbix": case "note": case "subflow": case "email": return [{ port: "next", label: "" }];
+      case "limit": return [{ port: "ok", label: "dentro" }, { port: "over", label: "passou" }];
       case "branch": return (n.branches || []).map((b) => ({ port: b.id, label: b.label || b.id })).concat([{ port: "else", label: "senão" }]);
       case "if": return [{ port: "true", label: "sim" }, { port: "false", label: "não" }];
       case "table": return [{ port: "found", label: "achou" }, { port: "not_found", label: "não achou" }];
@@ -521,6 +565,10 @@
         { id: "r2", label: "Médio", match: "all", conditions: [{ field: "severity.level", op: "eq", value: "3" }] },
       ];
     }
+    if (type === "limit") { n.key = ""; n.max = 1; n.window_hours = 4; }
+    if (type === "subflow") { const other = S.data.flows.find((x) => x !== fl); n.flow = other ? other.name : ""; }
+    if (type === "email") { n.to = ""; n.cc = ""; n.subject = "[goDesk] {trigger} — {host}"; n.body = "Alerta {trigger} no host {host} ({severity})."; n.repeat = false; }
+    if (type === "comment") { n.text = "Escreva aqui uma explicação deste trecho do fluxo."; }
     if (type === "zabbix") { n.message = "goDesk: {trigger} — tratado pelo fluxo"; n.ack = false; n.severity = ""; n.suppress_hours = 0; n.repeat = false; }
     if (type === "note") { n.text = ""; n.target = "internal"; n.repeat = false; }
     if (type === "transform") { n.transforms = [{ var: "interface", from: "{trigger}", op: "extract", arg: "interface (\\S+)", arg2: "" }]; }
@@ -563,6 +611,13 @@
         if (node.type === "branch") {
           node.branches = (n.branches || []).map((b) => ({ id: String(b.id || ""), label: String(b.label || ""), match: b.match === "any" ? "any" : "all", conditions: prepConds(b.conditions) }));
         }
+        if (node.type === "limit") { node.key = String(n.key || ""); node.max = +n.max || 1; node.window_hours = +n.window_hours || 1; }
+        if (node.type === "subflow") { node.flow = String(n.flow || ""); }
+        if (node.type === "email") {
+          node.to = String(n.to || ""); node.cc = String(n.cc || ""); node.subject = String(n.subject || "");
+          node.body = String(n.body || ""); node.repeat = !!n.repeat;
+        }
+        if (node.type === "comment") { node.text = String(n.text || ""); }
         if (node.type === "zabbix") {
           node.message = String(n.message || ""); node.ack = !!n.ack; node.severity = n.severity == null ? "" : String(n.severity);
           node.suppress_hours = +n.suppress_hours || 0; node.repeat = !!n.repeat;
@@ -611,6 +666,10 @@
           const o = { id: n.id, type: n.type, label: n.label.trim(), x: Math.round(n.x), y: Math.round(n.y) };
           if (n.type === "if") { o.match = n.match; o.conditions = cleanConds(n.conditions); }
           if (n.type === "branch") { o.branches = n.branches.map((b) => ({ id: b.id, label: b.label.trim(), match: b.match, conditions: cleanConds(b.conditions) })); }
+          if (n.type === "limit") { o.key = n.key.trim(); o.max = Math.max(1, +n.max || 1); o.window_hours = Math.max(1, Math.min(168, +n.window_hours || 1)); }
+          if (n.type === "subflow") { o.flow = n.flow; }
+          if (n.type === "email") { o.to = n.to; o.cc = n.cc; o.subject = n.subject; o.body = n.body; o.repeat = n.repeat; }
+          if (n.type === "comment") { o.text = n.text; }
           if (n.type === "zabbix") { o.message = n.message; o.ack = n.ack; o.severity = n.severity; o.suppress_hours = Math.max(0, Math.min(720, +n.suppress_hours || 0)); o.repeat = n.repeat; }
           if (n.type === "note") { o.text = n.text; o.target = n.target; o.repeat = n.repeat; }
           if (n.type === "transform") { o.transforms = n.transforms.map((t) => ({ var: t.var.trim(), from: t.from, op: t.op, arg: t.arg, arg2: t.arg2 })); }
@@ -691,6 +750,20 @@
             checkConds(`${who}, ramo ${b.label || b.id}`, b.conditions, 1);
           });
         }
+        if (n.type === "limit") {
+          if (!(+n.max >= 1)) errs.push(`${who}: limite precisa ser pelo menos 1.`);
+          if (!(+n.window_hours >= 1 && +n.window_hours <= 168)) errs.push(`${who}: janela entre 1 e 168 horas.`);
+          tplRefs(n.key).forEach((e2) => errs.push(`${who}: ${e2}.`));
+        }
+        if (n.type === "subflow") {
+          if (!n.flow) errs.push(`${who}: escolha o fluxo.`);
+          else if (!S.data.flows.some((x) => lc(x.name) === lc(n.flow))) errs.push(`${who}: subfluxo ${n.flow} não existe.`);
+        }
+        if (n.type === "email") {
+          if (!n.to.trim()) errs.push(`${who}: informe o destinatário.`);
+          if (!n.subject.trim()) errs.push(`${who}: informe o assunto.`);
+          [n.to, n.cc, n.subject, n.body].forEach((x) => tplRefs(x).forEach((e2) => errs.push(`${who}: ${e2}.`)));
+        }
         if (n.type === "zabbix") {
           if (!n.message.trim() && !n.ack && !n.severity && !(+n.suppress_hours)) errs.push(`${who}: escolha pelo menos uma ação (comentário, ack, severidade ou suprimir).`);
           if (+n.suppress_hours < 0 || +n.suppress_hours > 720) errs.push(`${who}: suprimir entre 1 e 720 horas.`);
@@ -759,6 +832,24 @@
         }
       });
     });
+    // subfluxos: sem ciclo (A chama B que chama A)
+    const calls = {};
+    S.data.flows.forEach((fl) => fl.nodes.forEach((n) => {
+      if (n.type === "subflow" && n.flow) (calls[lc(fl.name)] = calls[lc(fl.name)] || []).push(lc(n.flow));
+    }));
+    const state = {};
+    const visit = (name, path) => {
+      if (state[name] === 1) return path.concat(name);
+      if (state[name] === 2) return null;
+      state[name] = 1;
+      for (const c of calls[name] || []) { const cyc = visit(c, path.concat(name)); if (cyc) return cyc; }
+      state[name] = 2;
+      return null;
+    };
+    for (const fl of S.data.flows) {
+      const cyc = visit(lc(fl.name), []);
+      if (cyc) { errs.push(`Subfluxos formam um ciclo: ${cyc.join(" → ")}.`); break; }
+    }
     return errs;
   }
 
@@ -791,6 +882,10 @@
         lines.push(n.repeat ? "a cada reenvio" : "1x por evento");
         return lines;
       }
+      case "limit": return [trunc(`até ${n.max} em ${n.window_hours}h`, w), trunc("chave: " + (n.key || "{host}|{trigger}"), w)];
+      case "subflow": return [trunc("executa: " + (n.flow || "?"), w)];
+      case "email": return [trunc("para: " + (n.to || "?"), w), trunc(n.subject, w)];
+      case "comment": return String(n.text || "").split("\n").slice(0, 5).map((l) => trunc(l, w));
       case "note": {
         const where = { internal: "interna", public: "visível", description: "descrição" }[n.target] || n.target;
         return [trunc(`[${where}] ${n.text || "(vazio)"}`, w)];
@@ -873,7 +968,7 @@
         });
       }
     }
-    fl.nodes.forEach((n) => { if (!order.includes(n.id)) order.push(n.id); });
+    fl.nodes.forEach((n) => { if (!order.includes(n.id) && n.type !== "comment") order.push(n.id); });
     order.forEach((id) => {
       const l = level[id] === undefined ? maxL + 1 : level[id];
       (rows[l] = rows[l] || []).push(nodeOf(fl, id));
@@ -1044,7 +1139,7 @@
       summary(fl, n).forEach((line, i) => {
         el("text", { x: -w / 2 + 10, y: HEAD_H + 15 + i * LINE_H, class: "gd-flow-line" }, g).textContent = line;
       });
-      if (n.type !== "start") el("circle", { cx: 0, cy: 0, r: 5, class: "gd-flow-port-in" }, g);
+      if (n.type !== "start" && n.type !== "comment") el("circle", { cx: 0, cy: 0, r: 5, class: "gd-flow-port-in" }, g);
 
       const ps = ports(n);
       ps.forEach((p, i) => {
@@ -1201,6 +1296,38 @@
       html += '<div class="gd-flow-branch gd-flow-branch-else"><b>senão</b> <span class="gd-muted">— nenhum ramo valeu (saída “senão”)</span></div>';
       html += '<div class="gd-actions"><button type="button" class="gd-btn" data-gd-flow="br-add">+ Ramo (senão se)</button></div>';
       html += condsHelp();
+    }
+
+    if (n.type === "comment") {
+      html += `<div class="gd-field" style="margin-top:8px;"><label>Texto da nota</label><textarea rows="6" data-gd-node-prop="text">${escapeHtml(n.text)}</textarea></div>`;
+      html += '<div class="gd-muted">Só documentação: a nota não se liga a nada e não muda a decisão. O “Organizar” não mexe nela.</div>';
+    }
+
+    if (n.type === "limit") {
+      html += `<div class="gd-row" style="margin-top:8px;"><div class="gd-field gd-field-tight" style="min-width:90px;"><label>No máximo</label><input type="number" min="1" data-gd-node-prop="max" value="${escapeHtml(n.max)}"></div>
+        <div class="gd-field gd-field-tight" style="min-width:110px;"><label>Em (horas)</label><input type="number" min="1" max="168" data-gd-node-prop="window_hours" value="${escapeHtml(n.window_hours)}"></div></div>`;
+      html += `<div class="gd-field" style="margin-top:8px;"><label>Chave <span class="gd-muted">(vazio = {host}|{trigger})</span></label><input type="text" data-gd-node-prop="key" value="${escapeHtml(n.key)}" placeholder="{host}|{trigger}"></div>`;
+      html += varChips();
+      html += '<div class="gd-muted">Conta <b>eventos distintos</b> com a mesma chave na janela: os N primeiros saem por <b>dentro</b>, os demais por <b>passou</b> (ligue, por exemplo, num Fim “não abrir”). Reenvio do mesmo evento mantém a decisão. Em shadow só consulta, sem contar. Ex: chave <code>{host}</code> = no máximo N chamados por host; <code>{host.group}</code> = por grupo.</div>';
+    }
+
+    if (n.type === "subflow") {
+      const others = S.data.flows.filter((x) => x !== fl);
+      html += `<div class="gd-field" style="margin-top:8px;"><label>Executar o fluxo</label><select data-gd-node-prop="flow"><option value="">— escolha —</option>${others.map((x) => `<option value="${escapeHtml(x.name)}"${lc(x.name) === lc(n.flow) ? " selected" : ""}>${escapeHtml(x.name)}</option>`).join("")}</select></div>`;
+      if (n.flow && others.some((x) => lc(x.name) === lc(n.flow))) {
+        html += '<div class="gd-actions"><button type="button" class="gd-btn gd-btn-xs" data-gd-flow="sub-open">Abrir esse fluxo ↗</button></div>';
+      }
+      html += '<div class="gd-muted">Roda o outro fluxo aqui dentro: campos, textos, escalonamentos etc. que ele definir valem pra este. Se ele terminar em “não abrir”, encerra tudo; qualquer outro fim volta e continua pela saída deste bloco. Bom pra reaproveitar trechos (ex: “escalonamento padrão”) em vários fluxos.</div>';
+    }
+
+    if (n.type === "email") {
+      html += `<div class="gd-field" style="margin-top:8px;"><label>Para <span class="gd-muted">(vírgula separa)</span></label><input type="text" data-gd-node-prop="to" value="${escapeHtml(n.to)}" placeholder="noc@empresa.com, {host.tag.Dono}"></div>`;
+      html += `<div class="gd-field" style="margin-top:8px;"><label>Cópia</label><input type="text" data-gd-node-prop="cc" value="${escapeHtml(n.cc)}"></div>`;
+      html += `<div class="gd-field" style="margin-top:8px;"><label>Assunto</label><input type="text" data-gd-node-prop="subject" value="${escapeHtml(n.subject)}"></div>`;
+      html += `<div class="gd-field" style="margin-top:8px;"><label>Corpo</label><textarea rows="5" data-gd-node-prop="body">${escapeHtml(n.body)}</textarea></div>`;
+      html += `<label class="gd-check" style="margin-top:6px;"><input type="checkbox" data-gd-node-check="repeat"${n.repeat ? " checked" : ""}> <span>Repetir a cada reenvio <span class="gd-muted">(padrão: uma vez por evento)</span></span></label>`;
+      html += varChips();
+      html += '<div class="gd-muted">Enviado no fim do alerta pelo SMTP do goDesk (godesk-smtp-config.env), só no modo ativo. Independente do e-mail da rule.</div>';
     }
 
     if (n.type === "zabbix") {
@@ -1362,6 +1489,12 @@
       <ul class="gd-flow-res">${items}</ul>`;
   }
 
+  function emailsHtml(r) {
+    if (!r.emails || !r.emails.length) return "";
+    return `<div class="gd-small-title" style="margin-top:10px;">E-mail <span class="gd-muted">(no fim do alerta; não é enviado no teste)</span></div>
+      <ul class="gd-flow-res">${r.emails.map((m) => `<li><b>${escapeHtml(m.subject)}</b> → ${escapeHtml(m.to)}${m.cc ? ` <span class="gd-muted">(cc ${escapeHtml(m.cc)})</span>` : ""}<br><span class="gd-muted" style="white-space:pre-wrap">${escapeHtml(trunc(m.body, 300))}</span></li>`).join("")}</ul>`;
+  }
+
   function notesHtml(r) {
     if (!r.notes || !r.notes.length) return "";
     const where = { internal: "ação interna", public: "ação visível", description: "descrição" };
@@ -1437,7 +1570,9 @@
 
   function runTest() {
     const fl = flow();
-    S.testResult = fl ? runFlow(S.data, fl, testResolver(), testNow()) : null;
+    const over = testInput("limit.over") && testInput("limit.over").value === "true";
+    const limiter = (key, max) => (over ? [false, max + 1] : [true, 1]);
+    S.testResult = fl ? runFlow(S.data, fl, testResolver(), testNow(), limiter) : null;
   }
 
   function renderTest() {
@@ -1465,7 +1600,7 @@
           ${r.error ? `<div class="gd-banner gd-err">${escapeHtml(r.error)} — no goDesk, a rule seguiria fixa.</div>` : ""}
           ${r.action === "skip" ? `<div class="gd-muted" style="margin-top:6px;">Comentário: ${escapeHtml(r.comment || "goDesk (fluxo " + r.flow + "): chamado não aberto — caminho: …")}</div>` : ""}
           <div class="gd-small-title" style="margin-top:10px;">Campos definidos pelo fluxo</div>${sets}
-          ${updatesHtml(r)}${notesHtml(r)}${zabbixHtml(r)}${httpHtml(r)}${varsHtml(r)}</div>
+          ${updatesHtml(r)}${emailsHtml(r)}${notesHtml(r)}${zabbixHtml(r)}${httpHtml(r)}${varsHtml(r)}</div>
         <div><div class="gd-small-title">Caminho percorrido</div>${trace}</div>
       </div>`;
   }
@@ -1547,7 +1682,7 @@
       if (g && fl) {
         const to = g.getAttribute("data-node");
         const target = nodeOf(fl, to);
-        if (to !== L.from && target && target.type !== "start") {
+        if (to !== L.from && target && target.type !== "start" && target.type !== "comment") {
           setLink(fl, L.from, L.port, to);
         }
       }
@@ -1599,7 +1734,7 @@
     let pos = freeSpot(fl);
     let from = null;
     const sel = S.sel && S.sel.type === "node" ? nodeOf(fl, S.sel.id) : null;
-    if (sel) {
+    if (sel && type !== "comment") {
       const free = ports(sel).find((p) => !linkFrom(fl, sel.id, p.port));
       if (free) {
         from = { id: sel.id, port: free.port };
@@ -1896,6 +2031,10 @@
         let v = "valor"; let i = 2;
         while (n.cases.some((c) => lc(c.value) === lc(v))) v = "valor" + i++;
         n.cases.push({ value: v }); dirty(); renderCanvas(); renderSide();
+      }
+      else if (a === "sub-open" && n) {
+        const i = S.data.flows.findIndex((x) => lc(x.name) === lc(n.flow));
+        if (i >= 0) { S.cur = i; S.sel = null; storageSet("gd-flow-cur", S.data.flows[i].name); renderAll(); }
       }
       else if (a === "br-add" && n) {
         n.branches.push({ id: newBranchId(n), label: "", match: "all", conditions: [{ field: "", op: "eq", value: "" }] });

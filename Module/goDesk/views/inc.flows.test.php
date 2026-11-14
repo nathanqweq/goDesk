@@ -36,6 +36,7 @@ echo '<div class="gd-field gd-field-tight"><label>Minutos desde o início <span 
 echo '<div class="gd-field gd-field-tight"><label>Reenvios <span class="gd-muted">(event.resends)</span></label><input type="number" min="0" data-gd-test="event.resends" value="0"></div>';
 echo '<div class="gd-field gd-field-tight"><label>Reconhecido pelo atendimento? <span class="gd-muted">(event.acked_by_user)</span></label><select data-gd-test="event.acked_by_user"><option value="false">não</option><option value="true">sim</option></select></div>';
 echo '<div class="gd-field gd-field-tight"><label>Reconhecido (qualquer um)? <span class="gd-muted">(event.acknowledged)</span></label><select data-gd-test="event.acknowledged"><option value="false">não</option><option value="true">sim</option></select></div>';
+echo '<div class="gd-field gd-field-tight"><label>Limite já estourado? <span class="gd-muted">(bloco limitar repetição)</span></label><select data-gd-test="limit.over"><option value="false">não</option><option value="true">sim</option></select></div>';
 echo '</div>';
 echo '<div class="gd-row">';
 echo '<div class="gd-field"><label>Grupos do host <span class="gd-muted">(um por linha)</span></label><textarea rows="3" data-gd-test="host.group"></textarea></div>';

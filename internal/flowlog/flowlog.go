@@ -53,6 +53,7 @@ type Entry struct {
 	Vars        map[string]string `json:"vars,omitempty"`
 	Zabbix      []flow.ZabbixOp   `json:"zabbix,omitempty"`
 	TicketNotes []flow.TicketNote `json:"ticket_notes,omitempty"`
+	Emails      []flow.EmailMsg   `json:"emails,omitempty"`
 	Path        string            `json:"path"`
 	Error       string            `json:"error,omitempty"`
 	Notes       []string          `json:"notes,omitempty"` // o que o app fez/pulou (ex: update já aplicado)
@@ -198,6 +199,53 @@ type eventState struct {
 
 type stateFile struct {
 	Events map[string]*eventState `json:"events"`
+	// Limits: eventos que passaram por cada chave do bloco "limitar
+	// repetição" (só os últimos 7 dias ficam)
+	Limits map[string][]limitHit `json:"limits,omitempty"`
+}
+
+type limitHit struct {
+	Event string    `json:"e"`
+	Time  time.Time `json:"t"`
+}
+
+// LimitAllow decide o bloco "limitar repetição": entre os eventos
+// distintos com essa chave na janela, o evento passa se estiver entre os
+// max primeiros. O mesmo evento (reenvio) mantém a decisão. record=false
+// (modo shadow) só consulta, sem gravar. Devolve também quantos eventos
+// há na janela (contando este).
+func LimitAllow(path, key, eventID string, max int, window time.Duration, now time.Time, record bool) (allowed bool, count int, err error) {
+	if path == "" {
+		return true, 0, nil
+	}
+	err = withLock(path, func() error {
+		st := loadState(path)
+		var inWin []limitHit
+		for _, h := range st.Limits[key] {
+			if now.Sub(h.Time) < window {
+				inWin = append(inWin, h)
+			}
+		}
+		for i, h := range inWin {
+			if h.Event == eventID && eventID != "" {
+				allowed, count = i < max, len(inWin)
+				return nil
+			}
+		}
+		allowed, count = len(inWin) < max, len(inWin)+1
+		if !record {
+			return nil
+		}
+		if st.Limits == nil {
+			st.Limits = map[string][]limitHit{}
+		}
+		st.Limits[key] = append(st.Limits[key], limitHit{Event: eventID, Time: now})
+		return saveState(path, st, now)
+	})
+	if err != nil {
+		return true, 0, err
+	}
+	return allowed, count, nil
 }
 
 func loadState(path string) stateFile {
@@ -215,6 +263,19 @@ func saveState(path string, st stateFile, now time.Time) error {
 	for k, e := range st.Events {
 		if now.Sub(e.Last) > stateTTL {
 			delete(st.Events, k)
+		}
+	}
+	for k, hits := range st.Limits {
+		kept := hits[:0]
+		for _, h := range hits {
+			if now.Sub(h.Time) <= stateTTL {
+				kept = append(kept, h)
+			}
+		}
+		if len(kept) == 0 {
+			delete(st.Limits, k)
+		} else {
+			st.Limits[k] = kept
 		}
 	}
 	b, err := json.Marshal(st)

@@ -86,6 +86,16 @@ type TicketNote struct {
 	Repeat bool   `json:"repeat,omitempty"`
 }
 
+// EmailMsg é um bloco e-mail percorrido (o app envia no fim do alerta).
+type EmailMsg struct {
+	Node    string `json:"node"`
+	To      string `json:"to"`
+	Cc      string `json:"cc,omitempty"`
+	Subject string `json:"subject"`
+	Body    string `json:"body,omitempty"`
+	Repeat  bool   `json:"repeat,omitempty"`
+}
+
 type Result struct {
 	Vars    map[string]string `json:"vars,omitempty"` // variáveis do bloco transform ({var.nome})
 	Flow    string            `json:"flow"`
@@ -96,6 +106,7 @@ type Result struct {
 	HTTP    []HTTPCall        `json:"http,omitempty"`
 	Zabbix  []ZabbixOp        `json:"zabbix,omitempty"`
 	Notes   []TicketNote      `json:"notes,omitempty"`
+	Emails  []EmailMsg        `json:"emails,omitempty"`
 	Trace   []Step            `json:"trace"`
 }
 
@@ -110,9 +121,32 @@ func (r Result) Value(field string) (string, bool) {
 }
 
 // Path resume o caminho: "inicio → crit[Critico] → ligar → fim(open)".
-func (r Result) Path() string {
-	parts := make([]string, 0, len(r.Trace))
-	for _, s := range r.Trace {
+func (r Result) Path() string { return pathOf(r.Trace) }
+
+const maxSteps = 200
+
+var templateRe = regexp.MustCompile(`\{[^{}]+\}`)
+
+// Limiter decide o bloco "limitar repetição": quantos eventos distintos
+// com a mesma chave já passaram na janela. O resolvedor do app implementa
+// (com estado em disco); sem Limiter (simulador/testes), é sempre "dentro".
+type Limiter interface {
+	Allow(key string, max int, window time.Duration) (allowed bool, count int)
+}
+
+// Run executa o fluxo a partir do bloco de início. Porta sem ligação
+// termina com "open" (segue a rule com o que já foi definido).
+func Run(f config.FlowsFile, fl config.Flow, res Resolver, now time.Time) (Result, error) {
+	r := Result{Flow: fl.Name, Action: config.FlowActionOpen, Vars: map[string]string{}}
+	ev := evaluator{file: f, res: res, now: now, result: &r}
+	_, err := ev.walk(fl, 0)
+	return r, err
+}
+
+// pathOf resume passos como em Result.Path.
+func pathOf(steps []Step) string {
+	parts := make([]string, 0, len(steps))
+	for _, s := range steps {
 		name := s.Node
 		if s.Label != "" {
 			name = s.Label
@@ -125,19 +159,14 @@ func (r Result) Path() string {
 	return strings.Join(parts, " → ")
 }
 
-const maxSteps = 200
-
-var templateRe = regexp.MustCompile(`\{[^{}]+\}`)
-
-// Run executa o fluxo a partir do bloco de início. Porta sem ligação
-// termina com "open" (segue a rule com o que já foi definido).
-func Run(f config.FlowsFile, fl config.Flow, res Resolver, now time.Time) (Result, error) {
-	r := Result{Flow: fl.Name, Action: config.FlowActionOpen, Vars: map[string]string{}}
-	ev := evaluator{file: f, res: res, now: now, result: &r}
-
+// walk percorre o fluxo. depth > 0 = subfluxo: o "fim" volta pro fluxo
+// que chamou (continua pela saída do bloco), exceto "não abrir", que
+// encerra tudo. stop=true = encerrar tudo.
+func (ev evaluator) walk(fl config.Flow, depth int) (stop bool, err error) {
+	r := ev.result
 	cur, ok := fl.Start()
 	if !ok {
-		return r, fmt.Errorf("fluxo %q sem bloco de início", fl.Name)
+		return true, fmt.Errorf("fluxo %q sem bloco de início", fl.Name)
 	}
 
 	for i := 0; i < maxSteps; i++ {
@@ -291,18 +320,70 @@ func Run(f config.FlowsFile, fl config.Flow, res Resolver, now time.Time) (Resul
 			step.Detail = call.Method + " " + call.URL
 			port = config.PortNext
 
-		case config.NodeEnd:
-			r.Action = cur.Action
-			if r.Action == "" {
-				r.Action = config.FlowActionOpen
+		case config.NodeEmail:
+			m := EmailMsg{Node: cur.ID, To: ev.render(cur.To), Cc: ev.render(cur.Cc), Subject: ev.render(cur.Subject), Body: ev.render(cur.Body), Repeat: cur.Repeat}
+			r.Emails = append(r.Emails, m)
+			step.Detail = "e-mail para " + m.To + ": " + m.Subject
+			port = config.PortNext
+
+		case config.NodeLimit:
+			key := cur.Key
+			if strings.TrimSpace(key) == "" {
+				key = config.DefaultLimitKey
 			}
-			r.Comment = ev.render(cur.Comment)
-			step.Detail = r.Action
+			key = ev.render(key)
+			allowed, count := true, 0
+			if lim, ok := ev.res.(Limiter); ok {
+				allowed, count = lim.Allow(key, cur.Max, time.Duration(cur.WindowHours)*time.Hour)
+			}
+			port = config.PortWithin
+			state := "dentro"
+			if !allowed {
+				port = config.PortOver
+				state = "passou"
+			}
+			step.Detail = fmt.Sprintf("%q: %d evento(s) em %dh, limite %d → %s", key, count, cur.WindowHours, cur.Max, state)
+
+		case config.NodeSubflow:
+			sub, ok := ev.file.Find(cur.SubFlow)
+			if !ok {
+				return true, fmt.Errorf("bloco %q: subfluxo %q não existe", cur.ID, cur.SubFlow)
+			}
+			if depth >= config.MaxSubflowDepth {
+				return true, fmt.Errorf("bloco %q: subfluxos encadeados demais", cur.ID)
+			}
+			before := len(r.Trace)
+			subStop, err := ev.walk(sub, depth+1)
+			inner := append([]Step(nil), r.Trace[before:]...)
+			r.Trace = r.Trace[:before]
+			step.Detail = "fluxo " + sub.Name + ": " + pathOf(inner)
+			if err != nil {
+				r.Trace = append(r.Trace, step)
+				return true, err
+			}
+			if subStop {
+				r.Trace = append(r.Trace, step)
+				return true, nil
+			}
+			port = config.PortNext
+
+		case config.NodeEnd:
+			action := cur.Action
+			if action == "" {
+				action = config.FlowActionOpen
+			}
+			step.Detail = action
 			r.Trace = append(r.Trace, step)
-			return r, nil
+			// subfluxo: "abrir" só volta pro fluxo que chamou
+			if depth > 0 && action != config.FlowActionSkip {
+				return false, nil
+			}
+			r.Action = action
+			r.Comment = ev.render(cur.Comment)
+			return true, nil
 
 		default:
-			return r, fmt.Errorf("bloco %q: tipo %q desconhecido", cur.ID, cur.Type)
+			return true, fmt.Errorf("bloco %q: tipo %q desconhecido", cur.ID, cur.Type)
 		}
 
 		step.Port = port
@@ -310,17 +391,17 @@ func Run(f config.FlowsFile, fl config.Flow, res Resolver, now time.Time) (Resul
 
 		nextID := fl.Next(cur.ID, port)
 		if nextID == "" {
-			// fim implícito: segue a rule
-			return r, nil
+			// fim implícito: segue a rule (ou volta pro fluxo que chamou)
+			return false, nil
 		}
 		next, ok := fl.Node(nextID)
 		if !ok {
-			return r, fmt.Errorf("bloco %q liga em %q, que não existe", cur.ID, nextID)
+			return true, fmt.Errorf("bloco %q liga em %q, que não existe", cur.ID, nextID)
 		}
 		cur = next
 	}
 
-	return r, fmt.Errorf("fluxo %q passou de %d passos (ciclo?)", fl.Name, maxSteps)
+	return true, fmt.Errorf("fluxo %q passou de %d passos (ciclo?)", fl.Name, maxSteps)
 }
 
 type evaluator struct {

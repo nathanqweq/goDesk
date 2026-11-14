@@ -89,7 +89,23 @@ const (
 	NodeTransform = "transform" // cria variáveis {var.nome}
 	NodeZabbix    = "zabbix"    // comentário/ack/severidade/supressão no evento
 	NodeNote      = "note"      // texto na descrição ou ação no chamado
+	NodeLimit     = "limit"     // no máximo N eventos por chave numa janela
+	NodeSubflow   = "subflow"   // executa outro fluxo como um bloco
+	NodeComment   = "comment"   // nota no desenho (sem efeito)
+	NodeEmail     = "email"     // e-mail personalizado
 )
+
+// Saídas do bloco limit.
+const (
+	PortWithin = "ok"
+	PortOver   = "over"
+)
+
+// DefaultLimitKey: chave padrão do bloco limit (mesmo host e trigger).
+const DefaultLimitKey = "{host}|{trigger}"
+
+// maxSubflowDepth: subfluxo dentro de subfluxo (ciclos já são recusados).
+const MaxSubflowDepth = 5
 
 // Destinos do bloco note.
 const (
@@ -323,7 +339,23 @@ type FlowNode struct {
 	Severity      string `yaml:"severity,omitempty"`
 	SuppressHours int    `yaml:"suppress_hours,omitempty"`
 
-	// note (texto no chamado): Text (template) e Target (description |
+	// limit: Key (template; vazio = {host}|{trigger}), Max eventos em
+	// WindowHours horas
+	Key         string `yaml:"key,omitempty"`
+	Max         int    `yaml:"max,omitempty"`
+	WindowHours int    `yaml:"window_hours,omitempty"`
+
+	// subflow: nome do fluxo executado
+	SubFlow string `yaml:"flow,omitempty"`
+
+	// email (To/Cc separados por vírgula; tudo template; o corpo usa o
+	// campo Body do http). Repeat vale aqui.
+	To      string `yaml:"to,omitempty"`
+	Cc      string `yaml:"cc,omitempty"`
+	Subject string `yaml:"subject,omitempty"`
+
+	// note (texto no chamado) e comment (nota no desenho): Text. note
+	// também usa Target (description |
 	// internal | public). Repeat vale pras ações no reenvio.
 	Text   string `yaml:"text,omitempty"`
 	Target string `yaml:"target,omitempty"`
@@ -420,7 +452,9 @@ func linkPort(l FlowLink) string {
 // Ports devolve as portas de saída válidas do bloco.
 func (n FlowNode) Ports() []string {
 	switch n.Type {
-	case NodeStart, NodeSet, NodeUpdate, NodeHTTP, NodeTransform, NodeZabbix, NodeNote:
+	case NodeLimit:
+		return []string{PortWithin, PortOver}
+	case NodeStart, NodeSet, NodeUpdate, NodeHTTP, NodeTransform, NodeZabbix, NodeNote, NodeSubflow, NodeEmail:
 		return []string{PortNext}
 	case NodeBranch:
 		out := make([]string, 0, len(n.Branches)+1)
@@ -503,6 +537,10 @@ func ParseFlows(data []byte) (FlowsFile, error) {
 		if err := validateFlow(f, fl); err != nil {
 			return FlowsFile{}, fmt.Errorf("fluxo %q: %w", fl.Name, err)
 		}
+	}
+
+	if err := validateSubflows(f); err != nil {
+		return FlowsFile{}, err
 	}
 
 	return f, nil
@@ -649,6 +687,40 @@ func validateFlow(f FlowsFile, fl *Flow) error {
 				return fmt.Errorf("bloco %q, comentário: %w", n.ID, err)
 			}
 
+		case NodeLimit:
+			if n.Max < 1 {
+				return fmt.Errorf("bloco %q: limite precisa de no mínimo 1", n.ID)
+			}
+			if n.WindowHours < 1 || n.WindowHours > 168 {
+				return fmt.Errorf("bloco %q: janela entre 1 e 168 horas", n.ID)
+			}
+			if err := validateTemplate(f, n.Key); err != nil {
+				return fmt.Errorf("bloco %q, chave: %w", n.ID, err)
+			}
+
+		case NodeSubflow:
+			n.SubFlow = strings.TrimSpace(n.SubFlow)
+			if n.SubFlow == "" {
+				return fmt.Errorf("bloco %q: escolha o fluxo", n.ID)
+			}
+			// existência e ciclos: ParseFlows confere depois de ler todos
+
+		case NodeComment:
+			// nota no desenho: nada a validar (as ligações são recusadas abaixo)
+
+		case NodeEmail:
+			if strings.TrimSpace(n.To) == "" {
+				return fmt.Errorf("bloco %q: e-mail sem destinatário", n.ID)
+			}
+			if strings.TrimSpace(n.Subject) == "" {
+				return fmt.Errorf("bloco %q: e-mail sem assunto", n.ID)
+			}
+			for _, s := range []string{n.To, n.Cc, n.Subject, n.Body} {
+				if err := validateTemplate(f, s); err != nil {
+					return fmt.Errorf("bloco %q: %w", n.ID, err)
+				}
+			}
+
 		case NodeNote:
 			n.Target = strings.ToLower(strings.TrimSpace(n.Target))
 			if n.Target == "" {
@@ -720,6 +792,9 @@ func validateFlow(f FlowsFile, fl *Flow) error {
 		if to.Type == NodeStart {
 			return fmt.Errorf("ligação #%d chega no início", i+1)
 		}
+		if to.Type == NodeComment || from.Type == NodeComment {
+			return fmt.Errorf("ligação #%d: nota no desenho não se liga a nada", i+1)
+		}
 		if l.From == l.To {
 			return fmt.Errorf("ligação #%d liga %q nele mesmo", i+1, l.From)
 		}
@@ -774,6 +849,51 @@ func validateFlow(f FlowsFile, fl *Flow) error {
 		}
 	}
 
+	return nil
+}
+
+// validateSubflows: todo subfluxo existe e não há ciclo (A chama B que
+// chama A), nem fundo demais.
+func validateSubflows(f FlowsFile) error {
+	calls := map[string][]string{} // fluxo (lower) → fluxos chamados (lower)
+	for _, fl := range f.Flows {
+		for _, n := range fl.Nodes {
+			if n.Type != NodeSubflow {
+				continue
+			}
+			sub, ok := f.Find(n.SubFlow)
+			if !ok {
+				return fmt.Errorf("fluxo %q, bloco %q: subfluxo %q não existe", fl.Name, n.ID, n.SubFlow)
+			}
+			calls[strings.ToLower(fl.Name)] = append(calls[strings.ToLower(fl.Name)], strings.ToLower(sub.Name))
+		}
+	}
+	state := map[string]int{}
+	var visit func(name string, depth int) error
+	visit = func(name string, depth int) error {
+		if depth > MaxSubflowDepth {
+			return fmt.Errorf("subfluxos encadeados demais a partir de %q (máx %d)", name, MaxSubflowDepth)
+		}
+		switch state[name] {
+		case 1:
+			return fmt.Errorf("subfluxos formam um ciclo passando por %q", name)
+		case 2:
+			return nil
+		}
+		state[name] = 1
+		for _, c := range calls[name] {
+			if err := visit(c, depth+1); err != nil {
+				return err
+			}
+		}
+		state[name] = 2
+		return nil
+	}
+	for _, fl := range f.Flows {
+		if err := visit(strings.ToLower(fl.Name), 0); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

@@ -131,6 +131,10 @@ Em vez de criar uma rule nova para cada variação ("host crítico liga", "fora 
    - **Atualizar chamado** (escalonamento): veja abaixo.
    - **Texto no chamado**: escreve um texto (com variáveis) na **descrição** do chamado, visível ao solicitante, ou como **ação** interna ou visível. Exemplo: um procedimento padrão para aquele tipo de alerta.
    - **Ação no Zabbix**: comenta no evento, reconhece (ack), muda a severidade e/ou suprime o problema por X horas (Zabbix 6.2+). Roda no fim do alerta, só no modo ativo.
+   - **Limitar repetição**: no máximo N eventos distintos com a mesma chave (padrão `{host}|{trigger}`) numa janela de X horas. Os primeiros saem por *dentro* e o excesso por *passou* (ligue, por exemplo, num Fim "não abrir"). O reenvio do mesmo evento mantém a decisão; em shadow o bloco só consulta, sem contar.
+   - **Subfluxo**: executa outro fluxo como um bloco, para reaproveitar trechos (ex: "escalonamento padrão"). O que ele define vale para o fluxo que chamou. "Não abrir" dentro do subfluxo encerra tudo; qualquer outro fim volta e continua pela saída do bloco. Ciclos entre fluxos são recusados.
+   - **E-mail**: para, cópia, assunto e corpo com variáveis, enviado no fim do alerta pelo SMTP do goDesk. Roda uma vez por evento (ou a cada reenvio, se marcado) e é independente do e-mail da rule.
+   - **Nota**: caixa de texto no desenho para documentar o fluxo. Não se liga a nada e não muda a decisão.
    - **HTTP**: chama outro sistema depois de tratar o chamado (método, URL, cabeçalhos e corpo com variáveis; `{ticket.number}` é o número do chamado). Só no modo ativo, e o resultado aparece no Histórico.
    - **Fim**: abrir chamado, ou **não abrir** (só comenta no evento). Uma saída sem ligação também abre o chamado com o que já foi definido.
 2. Em **Calendários**, cadastre por exemplo `comercial` (seg a sex, 08:00–18:00, feriados). Nas condições, use `calendar.comercial` "é falso" para pegar o que está fora do horário.

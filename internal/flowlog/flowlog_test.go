@@ -106,3 +106,31 @@ func TestStateTouchAndDone(t *testing.T) {
 		t.Errorf("evento 1 devia ter expirado: runs=%d", runs)
 	}
 }
+
+func TestLimitAllow(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "s.json")
+	now := time.Date(2026, 11, 14, 10, 0, 0, 0, time.Local)
+	w := 2 * time.Hour
+	check := func(ev string, at time.Time, record, wantOK bool, wantCount int) {
+		t.Helper()
+		ok, n, err := LimitAllow(p, "SW1|Ping", ev, 2, w, at, record)
+		if err != nil || ok != wantOK || n != wantCount {
+			t.Errorf("evento %s às %s: ok=%v n=%d err=%v, esperado ok=%v n=%d", ev, at.Format("15:04"), ok, n, err, wantOK, wantCount)
+		}
+	}
+	check("1", now, true, true, 1)
+	check("2", now.Add(10*time.Minute), true, true, 2)
+	check("3", now.Add(20*time.Minute), true, false, 3) // passou
+	check("2", now.Add(30*time.Minute), true, true, 3)  // reenvio do 2 mantém
+	check("3", now.Add(40*time.Minute), true, false, 3) // reenvio do 3 mantém
+	// shadow não grava
+	check("4", now.Add(50*time.Minute), false, false, 4)
+	check("4", now.Add(51*time.Minute), false, false, 4)
+	// depois da janela os antigos saem: 3 vira o 1º da janela
+	check("3", now.Add(2*time.Hour+15*time.Minute), true, true, 1)
+	// outra chave é independente
+	ok, _, _ := LimitAllow(p, "SW2|Ping", "9", 1, w, now, true)
+	if !ok {
+		t.Error("outra chave devia passar")
+	}
+}

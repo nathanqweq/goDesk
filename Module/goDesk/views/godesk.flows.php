@@ -87,6 +87,10 @@ echo '<button class="gd-btn gd-flow-add-set" type="button" data-gd-flow-add="set
 echo '<button class="gd-btn gd-flow-add-update" type="button" data-gd-flow-add="update">⤴ Atualizar chamado</button>';
 echo '<button class="gd-btn gd-flow-add-note" type="button" data-gd-flow-add="note">✉ Texto no chamado</button>';
 echo '<button class="gd-btn gd-flow-add-zabbix" type="button" data-gd-flow-add="zabbix">⚑ Ação no Zabbix</button>';
+echo '<button class="gd-btn gd-flow-add-email" type="button" data-gd-flow-add="email">@ E-mail</button>';
+echo '<button class="gd-btn gd-flow-add-limit" type="button" data-gd-flow-add="limit">⏱ Limitar repetição</button>';
+echo '<button class="gd-btn gd-flow-add-subflow" type="button" data-gd-flow-add="subflow">↪ Subfluxo</button>';
+echo '<button class="gd-btn gd-flow-add-comment" type="button" data-gd-flow-add="comment">🗒 Nota</button>';
 echo '<button class="gd-btn gd-flow-add-http" type="button" data-gd-flow-add="http">⇄ HTTP</button>';
 echo '<button class="gd-btn gd-flow-add-end" type="button" data-gd-flow-add="end">■ Fim</button>';
 echo '<span class="gd-flow-sep"></span>';

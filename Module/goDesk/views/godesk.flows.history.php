@@ -10,7 +10,7 @@ function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 
 $f = $data['filters'] ?? [];
 $entries = $data['entries'] ?? [];
-$port_label = ['true' => 'sim', 'false' => 'não', 'default' => 'outro', 'found' => 'achou', 'not_found' => 'não achou', 'else' => 'senão', 'next' => ''];
+$port_label = ['true' => 'sim', 'false' => 'não', 'default' => 'outro', 'found' => 'achou', 'not_found' => 'não achou', 'else' => 'senão', 'ok' => 'dentro', 'over' => 'passou', 'next' => ''];
 $field_label = [
 	'instrucao' => 'Instrução', 'urgency' => 'Urgência', 'impact' => 'Impacto', 'priority' => 'Prioridade',
 	'oper_group' => 'Grupo operador', 'operator' => 'Operador', 'contract' => 'Contrato'
@@ -140,6 +140,13 @@ else {
 					$parts[] = 'suprimir '.(int)$z['suppress_hours'].'h';
 				}
 				echo '<li><b>'.h($z['node'] ?? '').'</b>: '.h(implode(' · ', $parts)).'</li>';
+			}
+			echo '</ul>';
+		}
+		if (!empty($e['emails'])) {
+			echo '<div class="gd-small-title" style="margin-top:8px;">E-mail</div><ul class="gd-flow-res">';
+			foreach ((array)$e['emails'] as $m) {
+				echo '<li><b>'.h($m['subject'] ?? '').'</b> → '.h($m['to'] ?? '').(!empty($m['cc']) ? ' <span class="gd-muted">(cc '.h($m['cc']).')</span>' : '').'</li>';
 			}
 			echo '</ul>';
 		}
