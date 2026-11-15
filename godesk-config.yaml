@@ -1,9 +1,0 @@
-default:
-  urgency: "Baixa"
-  impact: "Sem impacto"
-  autoclose: false
-  tags:
-    contract: "DEFAULT_CONTRACT"
-    oper_group: "DEFAULT_OPER_GROUP_ID"
-    main_caller: "monitoramento@teltec.com.br"
-    secundary_caller: ""

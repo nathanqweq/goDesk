@@ -166,26 +166,11 @@ install_module() {
 }
 
 find_binary_candidate() {
+  # só o binário oficial — evita pegar um arquivo antigo que sobrou no dist
   if [ -f "$SRC_DIST/godesk" ]; then
     printf '%s\n' "$SRC_DIST/godesk"
     return 0
   fi
-
-  # tenta primeiro executaveis dentro de dist
-  local c
-  c="$(find "$SRC_DIST" -maxdepth 1 -type f -executable ! -name '*.yaml' ! -name '*.yml' ! -name '*.env' ! -name '*.json' | head -n 1 || true)"
-  if [ -n "$c" ]; then
-    printf '%s\n' "$c"
-    return 0
-  fi
-
-  # fallback: arquivo "maior" que nao seja config
-  c="$(find "$SRC_DIST" -maxdepth 1 -type f ! -name '*.yaml' ! -name '*.yml' ! -name '*.env' ! -name '*.json' -printf '%s %p\n' 2>/dev/null | sort -nr | head -n 1 | awk '{print $2}' || true)"
-  if [ -n "$c" ]; then
-    printf '%s\n' "$c"
-    return 0
-  fi
-
   return 1
 }
 

@@ -256,7 +256,7 @@ func Run(cfg config.RuntimeConfig) (err error) {
 			switch {
 			case len(to) == 0:
 				log.Printf("[email] WARN: send_email ativo sem destinatario TO (chamado=%q rule=%q)\n", created, p.RuleName)
-			case pol.TopDesk.OncePerDay && oncePerDaySeenToday(p.Trigger, p.HostID):
+			case pol.TopDesk.OncePerDay && oncePerDaySeenToday(p.Trigger, oncePerDayHost(p)):
 				recordMetric(cfg.MetricsFile, func(m *metrics.Snapshot) { m.EmailSkippedOncePerDay++ })
 				log.Printf("[email] SKIP (um por dia): chamado=%q trigger=%q host_id=%q já enviado hoje (rule=%q)\n",
 					created, p.Trigger, p.HostID, p.RuleName)
@@ -288,7 +288,7 @@ func Run(cfg config.RuntimeConfig) (err error) {
 					log.Printf("[email] OK: e-mail enviado com sucesso chamado=%q to=%v cc=%v subject=%q\n",
 						created, to, cc, subject)
 					if pol.TopDesk.OncePerDay {
-						oncePerDayRecord(p.Cliente, p.Trigger, p.Host, p.HostID)
+						oncePerDayRecord(p.Cliente, p.Trigger, p.Host, oncePerDayHost(p))
 					}
 				}
 			}

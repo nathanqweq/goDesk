@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"syscall"
 	"time"
 )
 
@@ -80,10 +79,10 @@ func Record(path string, fn func(*Snapshot)) (Snapshot, error) {
 	}
 	defer lf.Close()
 
-	if err := syscall.Flock(int(lf.Fd()), syscall.LOCK_EX); err != nil {
+	if err := lockFile(lf); err != nil {
 		return Snapshot{}, err
 	}
-	defer syscall.Flock(int(lf.Fd()), syscall.LOCK_UN)
+	defer unlockFile(lf)
 
 	snap, err := readFile(path)
 	if err != nil {

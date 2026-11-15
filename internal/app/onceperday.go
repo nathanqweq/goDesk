@@ -1,8 +1,11 @@
 package app
 
 import (
+	"strings"
 	"sync"
 	"time"
+
+	"godesk/internal/rawdata"
 )
 
 // OncePerDayEntry representa um alerta+host que já teve e-mail enviado hoje
@@ -51,7 +54,7 @@ func oncePerDayRecord(client, alert, host, hostID string) {
 		Client:     client,
 		Alert:      alert,
 		Host:       host,
-		HostID:     hostID,
+		HostID:     realHostID(hostID),
 		Day:        oncePerDayToday(),
 		RecordedAt: time.Now(),
 	}
@@ -86,4 +89,24 @@ func OncePerDayList() []OncePerDayEntry {
 		}
 	}
 	return out
+}
+
+// oncePerDayHost identifica o host na chave do "um por dia": host_id
+// quando o media type manda ({HOST.ID}), senão o nome do host — sem isso,
+// o mesmo alerta em hosts diferentes cairia na mesma chave e o primeiro
+// e-mail do dia seguraria o de todos os outros.
+func oncePerDayHost(p rawdata.Payload) string {
+	if id := strings.TrimSpace(p.HostID); id != "" {
+		return id
+	}
+	return "host:" + strings.ToLower(strings.TrimSpace(p.Host))
+}
+
+// realHostID devolve o host_id de verdade (vazio quando a chave caiu no
+// nome do host — ver oncePerDayHost).
+func realHostID(key string) string {
+	if strings.HasPrefix(key, "host:") {
+		return ""
+	}
+	return key
 }

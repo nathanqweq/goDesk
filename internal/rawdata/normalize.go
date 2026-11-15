@@ -38,10 +38,6 @@ func Normalize(p *Payload) {
 	p.Impact = clean(p.Impact)
 	p.Priority = clean(p.Priority)
 
-	// futuro
-	p.EntryType = clean(p.EntryType)
-	p.ProcessingStatus = clean(p.ProcessingStatus)
-
 	// normalização defensiva
 	if strings.EqualFold(p.SecundaryCaller, "null") {
 		p.SecundaryCaller = ""

@@ -3,6 +3,8 @@ package app
 import (
 	"testing"
 	"time"
+
+	"godesk/internal/rawdata"
 )
 
 func TestOncePerDaySeenTodayFalseWhenNotRecorded(t *testing.T) {
@@ -94,5 +96,23 @@ func TestOncePerDayListOnlyToday(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("OncePerDayList deveria incluir a entrada registrada hoje")
+	}
+}
+
+func TestOncePerDayHostFallsBackToHostName(t *testing.T) {
+	a := oncePerDayHost(rawdata.Payload{Host: "SW-A"})
+	b := oncePerDayHost(rawdata.Payload{Host: "SW-B"})
+	if a == b {
+		t.Fatalf("hosts diferentes sem host_id caíram na mesma chave: %q", a)
+	}
+	if got := oncePerDayHost(rawdata.Payload{Host: "SW-A", HostID: "10501"}); got != "10501" {
+		t.Fatalf("com host_id deveria usar o id, veio %q", got)
+	}
+	oncePerDayRecord("c", "Unavailable by ICMP ping", "SW-A", a)
+	if !oncePerDaySeenToday("Unavailable by ICMP ping", a) {
+		t.Fatal("SW-A deveria constar como enviado hoje")
+	}
+	if oncePerDaySeenToday("Unavailable by ICMP ping", b) {
+		t.Fatal("SW-B não pode ser bloqueado pelo e-mail do SW-A")
 	}
 }

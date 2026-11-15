@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -172,6 +173,23 @@ func ParsePolicies(data []byte) (PoliciesFile, error) {
 	}
 
 	return pf, nil
+}
+
+// CheckPoliciesShape rejeita um godesk-config.yaml que é YAML válido mas
+// não é um config do goDesk (ex.: "::: texto" vira um mapa com chave
+// estranha, que o ParsePolicies aceitaria em silêncio). Usado no envio pelo
+// /config — o carregamento em produção (LoadPolicies) continua tolerante.
+func CheckPoliciesShape(data []byte) error {
+	var root map[string]any
+	if err := yaml.Unmarshal(data, &root); err != nil {
+		return err
+	}
+	for _, k := range []string{"default", "clients", "rules"} {
+		if _, ok := root[k]; ok {
+			return nil
+		}
+	}
+	return fmt.Errorf("config sem default, clients ou rules na raiz")
 }
 
 // flattenRules resolve o formato "clientes + rules" para o

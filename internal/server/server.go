@@ -115,6 +115,9 @@ func handleAlert(opts config.ServiceConfig) http.HandlerFunc {
 
 func handleConfig(token, configFile string) http.HandlerFunc {
 	return handleYAMLFile(token, configFile, "config", func(b []byte) error {
+		if err := config.CheckPoliciesShape(b); err != nil {
+			return err
+		}
 		_, err := config.ParsePolicies(b)
 		return err
 	})
