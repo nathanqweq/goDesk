@@ -946,6 +946,48 @@
   line-height: 1.6;
 }
 .godesk-module .gd-flow-modal-body .gd-flow-branch { border-radius: 8px; padding: 8px 10px; }
+
+/* variáveis (clique para inserir): o Zabbix pinta todo <button> com texto
+   branco e altura fixa — aqui vira um chip legível */
+.godesk-module .gd-flow-vars {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #f4f6f9;
+  line-height: 1.4;
+}
+.godesk-module .gd-flow-vars .gd-muted { width: 100%; font-size: 11px; margin-bottom: 2px; }
+.godesk-module .gd-flow-vars .gd-flow-var {
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 3px 9px;
+  line-height: 1.4;
+  font-family: Consolas, "SFMono-Regular", Menlo, monospace;
+  font-size: 12px;
+  font-weight: normal;
+  color: #1f4b99;
+  background: #fff;
+  border: 1px solid #c9d6ea;
+  border-radius: 999px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background .1s, border-color .1s;
+}
+.godesk-module .gd-flow-vars .gd-flow-var:hover,
+.godesk-module .gd-flow-vars .gd-flow-var:focus-visible {
+  color: #fff;
+  background: #2f6fdf;
+  border-color: #2f6fdf;
+  outline: none;
+}
+[theme='dark-theme'] .godesk-module .gd-flow-vars { background: #1d2127; }
+[theme='dark-theme'] .godesk-module .gd-flow-vars .gd-flow-var { color: #9cc0ff; background: #262b33; border-color: #3d4a5e; }
+[theme='dark-theme'] .godesk-module .gd-flow-vars .gd-flow-var:hover { color: #fff; background: #2f6fdf; border-color: #2f6fdf; }
 .godesk-module .gd-flow-modal-body .gd-flow-group { border-radius: 6px; }
 
 /* seletor de blocos */
