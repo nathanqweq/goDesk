@@ -13,6 +13,8 @@ function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 echo '<div class="godesk-module">';
 echo '<div class="gd-wrap gd-wrap-wide">';
 
+require __DIR__.'/inc.nav.php';
+
 echo '<div class="gd-header">';
 echo '<div class="gd-title">'.h($data['title']).'</div>';
 echo '<div class="gd-subtitle">Somente leitura — o teste não altera nada.</div>';
@@ -22,13 +24,13 @@ if (!empty($data['error'])) {
 	echo '<div class="gd-banner gd-err"><b>Erro:</b> '.h($data['error']).'</div>';
 }
 
-echo '<div class="gd-card">';
-echo '<h2>🔀 Como ler</h2>';
+echo '<details class="gd-card gd-help" data-gd-help="flows.view">';
+echo '<summary>🔀 Como ler <span class="gd-help-hint">clique para abrir</span></summary>';
 echo '<div class="gd-muted">';
 echo 'Cada fluxo decide, na hora do alerta, como o chamado é aberto: <b>Condição</b> e <b>Switch</b> escolhem o caminho pelos dados do evento (severidade, tags, horário...), <b>Tabela</b> e <b>Definir campos</b> definem urgência, grupo e a <b>instrução</b> pro atendimento, <b>Atualizar chamado</b> escala um chamado já aberto quando o alerta volta, e <b>Fim</b> decide se abre ou não.<br>';
 echo 'Clique num bloco para ver os detalhes. Use <b>🧪 Testar</b> com um problema real para ver o caminho que o alerta faria.';
 echo '</div>';
-echo '</div>';
+echo '</details>';
 
 echo '<div class="gd-card" id="gd-flow-cals">';
 echo '<h2>📅 Calendários</h2>';
@@ -58,12 +60,5 @@ echo '<script type="application/json" id="gd-flow-data">'.json_encode([
 	'data' => $data['data'] ?? ['calendars' => [], 'flows' => []],
 	'readonly' => true
 ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_INVALID_UTF8_SUBSTITUTE).'</script>';
-
-if (!empty($data['can_edit'])) {
-	echo '<div class="gd-actions">';
-	echo '<a class="gd-btn" href="zabbix.php?action=godesk.flows.edit">✏️ Editar fluxos</a>';
-	echo '<a class="gd-btn" href="zabbix.php?action=godesk.flows.history">🕘 Histórico</a>';
-	echo '</div>';
-}
 
 echo '</div></div>';

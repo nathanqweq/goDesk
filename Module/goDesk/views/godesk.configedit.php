@@ -13,6 +13,8 @@ $rules = $data['rules'] ?? [];
 echo '<div class="godesk-module">';
 echo '<div class="gd-wrap">';
 
+require __DIR__.'/inc.nav.php';
+
 echo '<div class="gd-header">';
 echo '<div class="gd-title">'.h($data['title']).'</div>';
 echo '<div class="gd-subtitle"><b>Arquivo:</b> '.h($data['path'] ?? '').'</div>';
@@ -476,10 +478,9 @@ foreach ($rules as $c) {
 
 echo '</div>';
 
-echo '<div class="gd-actions">';
+echo '<div class="gd-actions gd-savebar">';
 echo '<button class="gd-btn gd-btn-primary" type="submit">💾 Salvar</button>';
 echo '<a class="gd-btn" href="zabbix.php?action=godesk.config.edit">↩ Recarregar</a>';
-echo '<a class="gd-btn" href="zabbix.php?action=godesk.config.view">👁️ Visualizar</a>';
 echo '</div>';
 
 echo '</div>';

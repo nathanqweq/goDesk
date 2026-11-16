@@ -300,7 +300,7 @@ class FlowsEdit extends CController {
 			$out['calendars'] = new \stdClass();
 		}
 		return "# goDesk — fluxos de decisão das rules (godesk-flows.yaml)\n".
-			"# Gerado pela página Alerts → goDesk → Fluxos. JSON é YAML válido.\n".
+			"# Gerado pela página goDesk → Fluxos. JSON é YAML válido.\n".
 			json_encode($out, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE)."\n";
 	}
 

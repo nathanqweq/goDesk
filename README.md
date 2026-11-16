@@ -54,7 +54,7 @@ sudo systemctl restart godesk
 
 ### 4. Habilitar o módulo no Zabbix
 
-No frontend do Zabbix: **Administration → General → Modules → Scan directory**, depois habilite o **goDesk**. O menu aparece em **Alerts → goDesk** (visualizar/editar config).
+No frontend do Zabbix: **Administration → General → Modules → Scan directory**, depois habilite o **goDesk**. O menu **goDesk** aparece como seção própria na barra lateral (depois de Reports), com um item por assunto: **Rules**, **Fluxos**, **Histórico de fluxos**, **Arquitetura** e **Dependências v1**. O Super admin abre as telas de edição; os demais usuários, as de visualização (e só veem Rules, Fluxos e Arquitetura). As mesmas abas aparecem no topo de cada página, e o admin tem o atalho **👁 Visualizar** / **✎ Editar**.
 
 ### 5. Apontar o Media Type do Zabbix
 
@@ -79,7 +79,7 @@ Com isso, o goDesk posta um card no canal (mesmo formato do media type *MS Teams
 
 Evita abrir um chamado por servidor quando o problema real é o switch ou firewall de que eles dependem. Não usa a dependência nativa de triggers do Zabbix e não exige trigger nova nem mudança no Media Type.
 
-1. Em **Alerts → goDesk → Dependências**, cadastre cada host dependente e os hosts pai dele:
+1. Em **goDesk → Dependências v1**, cadastre cada host dependente e os hosts pai dele:
    - **Modo**: *qualquer* não abre chamado se pelo menos um pai estiver em alerta. *Todos* só segura o chamado se todos os pais estiverem em alerta (para links e switches redundantes).
    - **Evento a observar** (por pai): nome do problema no pai. Aceita `*` como curinga, por exemplo `*Interface*down*`. Se ficar vazio, qualquer problema ativo do pai conta. Ao focar o campo, ele sugere as triggers do host pai.
    - **Exportar/Importar**: baixa ou carrega o `godesk-dependencies.yaml`. Importar **substitui** tudo, e um backup do arquivo anterior fica salvo. Na importação, o hostid é recalculado pelo nome do host, então o arquivo funciona entre ambientes diferentes.
@@ -97,13 +97,13 @@ Quando um alerta de uma rule com dependência chega para um host cadastrado e n�
 
 Roda **em paralelo** à dependência do item 8 (v1), sem alterá-la. Em vez de cadastrar pai por host, você desenha a arquitetura de cada localidade, e o goDesk decide quem é causa raiz.
 
-1. Em **Alerts → goDesk → Dependências v2 (arquitetura)**, crie uma localidade e preencha:
+1. Em **goDesk → Arquitetura**, crie uma localidade e preencha:
    - **Host de status** e **Evento de status** (ex: `UHCC - Core Status` / `Powerplant Down`). Com esse evento ativo, **nenhum host da localidade abre chamado**, só o próprio host de status.
    - **Root** (padrão `ZABBIX`): o ponto de entrada do monitoramento. Ligue-o aos equipamentos de entrada (os SDs).
    - **Evento de DOWN** (padrão `*Unavailable by ICMP ping*`): o problema que marca um host como caído.
    - **Hosts e links**: use **Importar hosts de um grupo** (o grupo raiz da usina) e desenhe os cabos no modo **🔗 Ligar**. Marque o rack de cada host.
 2. Use **🧪 Simular** para marcar hosts como DOWN (ou carregar o estado atual do Zabbix) e ver quem abriria chamado antes de ligar a v2.
-3. Em **Config (editar)**, escolha a **Versão da dependência** da rule (precisa estar com **Dependência** marcada):
+3. Em **goDesk → Rules**, escolha a **Versão da dependência** da rule (precisa estar com **Dependência** marcada):
    - **v1**: comportamento de sempre.
    - **shadow**: a v1 continua decidindo, e a v2 só registra no log o que teria feito (`[dependency-shadow] IGUAL|DIVERGE ...`) e conta divergências em `dependency_shadow_diverged_total`. Use para validar em produção sem risco.
    - **v2**: a v2 decide. Host fora de qualquer localidade da v2 cai na v1.
@@ -113,7 +113,7 @@ Como a v2 decide, na hora do alerta:
 - Depois a **topologia**: o host só abre chamado se ainda existir caminho do root até um vizinho dele passando apenas por hosts UP. Por isso a redundância é respeitada (um FW com perna nos dois membros do core só é segurado se os dois caírem), e o comentário no evento informa quem cortou o caminho e o rack.
 - Host sem links, host não encontrado no Zabbix ou erro de consulta: abre chamado (mesma regra de segurança da v1).
 
-**Visualização para o atendimento:** **Alerts → goDesk → Arquitetura (visualizar)** (`godesk.topology.view`) mostra as arquiteturas em modo somente leitura: carrega o estado atual do Zabbix ao abrir e permite simular quedas clicando nos hosts, sem poder editar ou salvar. Funciona para qualquer usuário logado cujo role tenha o módulo goDesk liberado (**Users → User roles → Access to modules**). As telas de edição continuam restritas ao Super admin e nem aparecem no menu dos demais. O estado atual respeita as permissões do usuário: um host que ele não enxerga no Zabbix aparece como UP.
+**Visualização para o atendimento:** **goDesk → Arquitetura** (para quem não é admin abre `godesk.topology.view`) mostra as arquiteturas em modo somente leitura: carrega o estado atual do Zabbix ao abrir e permite simular quedas clicando nos hosts, sem poder editar ou salvar. Funciona para qualquer usuário logado cujo role tenha o módulo goDesk liberado (**Users → User roles → Access to modules**). As telas de edição continuam restritas ao Super admin e nem aparecem no menu dos demais. O estado atual respeita as permissões do usuário: um host que ele não enxerga no Zabbix aparece como UP.
 
 As localidades ficam em `/etc/zabbix/godesk/godesk-dependencies-v2.yaml` (caminho alterável com `GODESK_DEPENDENCIES_V2_FILE`), sincronizado pelo `godesk-client dependencies-v2` → `POST /dependencies-v2`. Exportar/Importar funcionam como na v1. O estado da localidade é lido com 3 chamadas à API do Zabbix por alerta (`host.get`, `problem.get`, `trigger.get`), independente do número de hosts.
 
@@ -121,7 +121,7 @@ As localidades ficam em `/etc/zabbix/godesk/godesk-dependencies-v2.yaml` (caminh
 
 Em vez de criar uma rule nova para cada variação ("host crítico liga", "fora do horário liga sempre", "informativo não abre"), a rule aponta para um **fluxo**, e o fluxo decide na hora do alerta.
 
-1. Em **Alerts → goDesk → Fluxos**, crie um fluxo e monte os blocos:
+1. Em **goDesk → Fluxos**, crie um fluxo e monte os blocos:
    - **Condição** (sim/não), com regras E/OU sobre o evento. Regras podem ser agrupadas: `(tag = Critico OU grupo começa com Core/) E fora do horário` (até 3 níveis).
    - **Condição múltipla** (se / senão se / senão): vários ramos, cada um com suas regras, testados em ordem. O primeiro que valer escolhe a saída; se nenhum valer, sai pelo "senão".
    - **Transformar texto**: cria variáveis `{var.nome}` a partir de um campo, com estas operações: extrair por regex (por exemplo, a interface do nome do trigger), maiúsculas, minúsculas, substituir, aparar espaços ou valor padrão quando vier vazio. As variáveis valem nas condições e nos textos dos blocos seguintes.
@@ -139,7 +139,7 @@ Em vez de criar uma rule nova para cada variação ("host crítico liga", "fora 
    - **Fim**: abrir chamado, ou **não abrir** (só comenta no evento). Uma saída sem ligação também abre o chamado com o que já foi definido.
 2. Em **Calendários**, cadastre por exemplo `comercial` (seg a sex, 08:00–18:00, feriados). Nas condições, use `calendar.comercial` "é falso" para pegar o que está fora do horário.
 3. Use **🧪 Testar** com um problema real (ou valores digitados): a tela mostra o caminho, os campos definidos e se abre ou não. É a mesma decisão do goDesk.
-4. Em **Config (editar)**, preencha o **Fluxo** da rule e o **Modo do fluxo**:
+4. Em **goDesk → Rules**, preencha o **Fluxo** da rule e o **Modo do fluxo**:
    - **ativo**: o fluxo decide.
    - **shadow**: a rule fixa decide, e o fluxo só registra no log o que faria (`[flow-shadow] ... caminho: ... | definiria: ...`).
 
@@ -168,9 +168,9 @@ Nos textos, `{campo|json}` escapa o valor para dentro de uma string JSON (corpo 
 
 **Escalonamento** (bloco **Atualizar chamado**): configure na action do Zabbix passos que **reenviam** o alerta a cada X minutos. A cada reenvio com o chamado já aberto, o fluxo roda de novo e o bloco pode mudar urgência, impacto, prioridade, grupo operador ou operador, registrar uma nota (invisível para o solicitante) e avisar no Teams. Por padrão, cada bloco roda **uma vez por evento**; marque *repetir* para rodar a cada reenvio. Exemplo: Condição `event.age ≥ 30` E `event.acked_by_user` é falso → Atualizar chamado (urgência Crítica, grupo N2, Teams). Com `repeat_update` = não (bloco Definir campos), o goDesk para de registrar *"Recebemos novamente o alerta..."* no chamado a cada reenvio. O `event.acked_by_user` ignora o ack que o próprio goDesk faz ao abrir o chamado (identificado pelas mensagens "Chamado ...").
 
-**Histórico**: **Alerts → goDesk → Fluxos — histórico** mostra cada alerta que passou por um fluxo (ativo, shadow ou com erro): caminho, campos definidos, escalonamento, HTTP e o que o goDesk fez. Os dados ficam no servidor goDesk (`/var/lib/godesk/godesk-flows-history.jsonl`, últimas ~5000 execuções, alterável com `GODESK_FLOWS_HISTORY_FILE`) e chegam no módulo por `godesk-client flows-history` → `GET /flows/history`. Só Super admin. O estado por evento (reenvios e escalonamentos já feitos) fica em `/var/lib/godesk/godesk-flows-state.json` (`GODESK_FLOWS_STATE_FILE`) e é limpo depois de 7 dias.
+**Histórico**: **goDesk → Histórico de fluxos** mostra cada alerta que passou por um fluxo (ativo, shadow ou com erro): caminho, campos definidos, escalonamento, HTTP e o que o goDesk fez. Os dados ficam no servidor goDesk (`/var/lib/godesk/godesk-flows-history.jsonl`, últimas ~5000 execuções, alterável com `GODESK_FLOWS_HISTORY_FILE`) e chegam no módulo por `godesk-client flows-history` → `GET /flows/history`. Só Super admin. O estado por evento (reenvios e escalonamentos já feitos) fica em `/var/lib/godesk/godesk-flows-state.json` (`GODESK_FLOWS_STATE_FILE`) e é limpo depois de 7 dias.
 
-**Para o atendimento**: **Alerts → goDesk → Fluxos (visualizar)** mostra os fluxos em modo somente leitura, com o 🧪 Testar. Funciona para qualquer usuário cujo role tenha o módulo goDesk liberado, e o teste usa as permissões de host desse usuário.
+**Para o atendimento**: **goDesk → Fluxos** (para quem não é admin) mostra os fluxos em modo somente leitura, com o 🧪 Testar. Funciona para qualquer usuário cujo role tenha o módulo goDesk liberado, e o teste usa as permissões de host desse usuário.
 
 Regras do fluxo:
 - O que o fluxo define **sobrescreve** a rule, inclusive o que vier por tag do Zabbix. Um texto que resolve vazio não apaga o valor da rule.

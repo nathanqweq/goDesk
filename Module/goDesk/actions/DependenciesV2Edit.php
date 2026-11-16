@@ -289,7 +289,7 @@ class DependenciesV2Edit extends CController {
 	 */
 	private function emitYaml(array $sites): string {
 		$y = "# goDesk — dependência v2 (arquitetura por localidade)\n";
-		$y .= "# Gerado pela página Alerts → goDesk → Dependências v2.\n";
+		$y .= "# Gerado pela página goDesk → Arquitetura.\n";
 		if (!$sites) {
 			return $y."sites: []\n";
 		}

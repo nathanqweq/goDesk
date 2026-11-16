@@ -12,6 +12,8 @@ function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 echo '<div class="godesk-module">';
 echo '<div class="gd-wrap gd-wrap-wide">';
 
+require __DIR__.'/inc.nav.php';
+
 echo '<div class="gd-header">';
 echo '<div class="gd-title">'.h($data['title']).'</div>';
 echo '<div class="gd-subtitle"><b>Arquivo:</b> '.h($data['path'] ?? '').'</div>';
@@ -32,10 +34,10 @@ if (!empty($data['sync_error'])) {
 	echo '<div class="gd-banner gd-err"><b>Sincronização:</b> '.h($data['sync_error']).'</div>';
 }
 
-echo '<div class="gd-card">';
-echo '<h2>🔀 Como funciona</h2>';
+echo '<details class="gd-card gd-help" data-gd-help="flows">';
+echo '<summary>🔀 Como funciona <span class="gd-help-hint">clique para abrir</span></summary>';
 echo '<div class="gd-muted">';
-echo 'Em vez de uma rule para cada variação, a rule aponta para um <b>fluxo</b> (campo <i>Fluxo</i> em <a href="zabbix.php?action=godesk.config.edit">Config (editar)</a>) e o fluxo decide na hora do alerta.<br>';
+echo 'Em vez de uma rule para cada variação, a rule aponta para um <b>fluxo</b> (campo <i>Fluxo</i> em <a href="zabbix.php?action=godesk.config.edit">Rules</a>) e o fluxo decide na hora do alerta.<br>';
 echo '<b>Condição</b> (sim/não) e <b>Switch</b> (um caminho por valor) olham os dados do evento: severidade, grupos e tags do host, tags do evento, horário (calendários), se o chamado já existe...<br>';
 echo '<b>Definir campos</b> sobrescreve o que a rule definiria (urgência, grupo operador, Teams...) e a <b>instrução</b> pro atendimento — vai no chamado (invisível pro solicitante) e no Teams. Textos aceitam variáveis: <code>{host}</code>, <code>{host.name}</code>, <code>{trigger}</code>, <code>{severity}</code>, <code>{host.tag.Site}</code>...<br>';
 echo '<b>Tabela</b>: a primeira linha que bater com o campo (ex: grupo do host) define várias colunas de uma vez (grupo operador, contrato, canal do Teams...).<br>';
@@ -44,11 +46,11 @@ echo '<b>HTTP</b>: chama outro sistema depois de tratar o chamado (<code>{ticket
 echo '<b>Fim</b>: abrir chamado (padrão — saída sem ligação também abre) ou <b>não abrir</b> (só comenta no evento).<br>';
 echo 'Use <b>🧪 Testar</b> com um evento real antes de ativar. Na rule, o modo <b>shadow</b> roda o fluxo só no log (<code>[flow-shadow]</code>) sem mudar nada.';
 echo '</div>';
-echo '<div class="gd-actions">';
+echo '</details>';
+echo '<div class="gd-tools">';
 echo '<button class="gd-btn" type="button" data-gd-flow-export>⬇ Exportar</button>';
 echo '<button class="gd-btn" type="button" data-gd-flow-import>⬆ Importar</button>';
 echo '<input type="file" id="gd-flow-import-file" accept=".yaml,.yml,.json,text/yaml,application/json" style="display:none">';
-echo '</div>';
 echo '</div>';
 
 echo '<textarea id="gd-flow-export-text" style="display:none">'.h($data['raw'] ?? '').'</textarea>';
@@ -106,11 +108,9 @@ echo '<script type="application/json" id="gd-flow-data">'.json_encode([
 echo '<form method="post" id="gd-flow-form" action="zabbix.php?action=godesk.flows.edit">';
 echo '<input type="hidden" name="save" value="1">';
 echo '<textarea name="flows_json" id="gd-flow-json" style="display:none"></textarea>';
-echo '<div class="gd-actions">';
+echo '<div class="gd-actions gd-savebar">';
 echo '<button class="gd-btn gd-btn-primary" type="submit">💾 Salvar</button>';
 echo '<a class="gd-btn" href="zabbix.php?action=godesk.flows.edit">↩ Recarregar</a>';
-echo '<a class="gd-btn" href="zabbix.php?action=godesk.flows.history">🕘 Histórico</a>';
-echo '<a class="gd-btn" href="zabbix.php?action=godesk.config.edit">⚙️ Config (rules)</a>';
 echo '</div>';
 echo '</form>';
 

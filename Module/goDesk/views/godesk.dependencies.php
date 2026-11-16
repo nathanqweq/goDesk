@@ -11,6 +11,8 @@ $hosts = $data['hosts'] ?? [];
 echo '<div class="godesk-module">';
 echo '<div class="gd-wrap">';
 
+require __DIR__.'/inc.nav.php';
+
 echo '<div class="gd-header">';
 echo '<div class="gd-title">'.h($data['title']).'</div>';
 echo '<div class="gd-subtitle"><b>Arquivo:</b> '.h($data['path'] ?? '').'</div>';
@@ -35,19 +37,19 @@ if (!empty($data['sync_error'])) {
 	echo '<div class="gd-banner gd-err"><b>Sincronização:</b> '.h($data['sync_error']).'</div>';
 }
 
-echo '<div class="gd-card">';
-echo '<h2>🔗 Como funciona</h2>';
+echo '<details class="gd-card gd-help" data-gd-help="dependencies">';
+echo '<summary>🔗 Como funciona <span class="gd-help-hint">clique para abrir</span></summary>';
 echo '<div class="gd-muted">';
 echo 'Quando um alerta de uma rule com <b>dependency</b> ligada chega para um host cadastrado aqui, o goDesk consulta os problemas ativos dos hosts pai no Zabbix. ';
 echo 'Se o pai estiver em alerta, <b>o chamado não é aberto</b> e o goDesk comenta no evento do Zabbix (sem reconhecer o evento, então um escalonamento da Action pode reenviar o alerta depois).<br>';
 echo '<b>Modo qualquer</b>: basta um pai em alerta. <b>Modo todos</b>: só segura se todos os pais estiverem em alerta (links/switches redundantes).<br>';
 echo '<b>Evento a observar</b>: nome do problema no pai, aceita <code>*</code> como curinga. Vazio = qualquer problema do pai conta.';
 echo '</div>';
-echo '<div class="gd-actions">';
+echo '</details>';
+echo '<div class="gd-tools">';
 echo '<button class="gd-btn" type="button" data-gd-deps-export>⬇ Exportar</button>';
 echo '<button class="gd-btn" type="button" data-gd-deps-import>⬆ Importar</button>';
 echo '<input type="file" id="gd-deps-import-file" accept=".yaml,.yml,text/yaml" style="display:none">';
-echo '</div>';
 echo '</div>';
 
 // conteúdo salvo atual (o que o Exportar baixa — não inclui edições não salvas)
@@ -122,10 +124,9 @@ foreach ($deps as $i => $d) {
 echo '</div>';
 echo '</div>';
 
-echo '<div class="gd-actions">';
+echo '<div class="gd-actions gd-savebar">';
 echo '<button class="gd-btn gd-btn-primary" type="submit">💾 Salvar</button>';
 echo '<a class="gd-btn" href="zabbix.php?action=godesk.dependencies.edit">↩ Recarregar</a>';
-echo '<a class="gd-btn" href="zabbix.php?action=godesk.config.edit">⚙️ Config</a>';
 echo '</div>';
 
 echo '</form>';

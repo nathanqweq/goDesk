@@ -14,6 +14,8 @@ $rules = $config['rules'] ?? [];
 echo '<div class="godesk-module">';
 echo '<div class="gd-wrap">';
 
+require __DIR__.'/inc.nav.php';
+
 echo '<div class="gd-header">';
 echo '<div class="gd-title">'.h($data['title']).'</div>';
 echo '<div class="gd-subtitle"><b>Arquivo:</b> '.h($data['path'] ?? '').'</div>';

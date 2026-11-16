@@ -926,3 +926,20 @@
     initFilters();
   });
 })();
+
+// "Como funciona" recolhível (details.gd-help): lembra, por página, se o
+// usuário deixou aberto
+(function () {
+  "use strict";
+  function key(d) { return "gd-help-" + (d.getAttribute("data-gd-help") || ""); }
+  function init() {
+    document.querySelectorAll("details.gd-help[data-gd-help]").forEach((d) => {
+      try { if (window.localStorage.getItem(key(d)) === "1") d.open = true; } catch (e) { /* sem storage */ }
+      d.addEventListener("toggle", () => {
+        try { window.localStorage.setItem(key(d), d.open ? "1" : "0"); } catch (e) { /* sem storage */ }
+      });
+    });
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
+})();

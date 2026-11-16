@@ -19,6 +19,8 @@ $field_label = [
 echo '<div class="godesk-module">';
 echo '<div class="gd-wrap gd-wrap-wide">';
 
+require __DIR__.'/inc.nav.php';
+
 echo '<div class="gd-header">';
 echo '<div class="gd-title">'.h($data['title']).'</div>';
 echo '<div class="gd-subtitle">Cada alerta que passou por um fluxo (ativo ou shadow), mais recentes primeiro. <a href="zabbix.php?action=godesk.flows.edit">← Fluxos</a></div>';

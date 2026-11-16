@@ -11,6 +11,8 @@ $groups = $data['groups'] ?? [];
 echo '<div class="godesk-module">';
 echo '<div class="gd-wrap gd-wrap-wide">';
 
+require __DIR__.'/inc.nav.php';
+
 echo '<div class="gd-header">';
 echo '<div class="gd-title">'.h($data['title']).'</div>';
 echo '<div class="gd-subtitle"><b>Arquivo:</b> '.h($data['path'] ?? '').'</div>';
@@ -35,19 +37,19 @@ if (!empty($data['sync_error'])) {
 	echo '<div class="gd-banner gd-err"><b>Sincronização:</b> '.h($data['sync_error']).'</div>';
 }
 
-echo '<div class="gd-card">';
-echo '<h2>🧭 Como funciona</h2>';
+echo '<details class="gd-card gd-help" data-gd-help="topology">';
+echo '<summary>🧭 Como funciona <span class="gd-help-hint">clique para abrir</span></summary>';
 echo '<div class="gd-muted">';
 echo 'A v2 descreve a <b>arquitetura</b> de cada localidade e roda em paralelo à <a href="zabbix.php?action=godesk.dependencies.edit">v1</a>. Cada rule escolhe a versão em <a href="zabbix.php?action=godesk.config.edit">Config</a> (<b>v1</b>, <b>v2</b> ou <b>shadow</b>: a v1 decide e a v2 só registra no log o que faria — <code>[dependency-shadow]</code>).<br>';
 echo '<b>1. Status da localidade</b>: com o evento de status ativo (ex: <i>Powerplant Down</i>), nenhum host da localidade abre chamado — só o host de status.<br>';
 echo '<b>2. Topologia</b>: um host só abre chamado se ainda existir caminho do root (Zabbix) até um vizinho dele passando apenas por hosts UP. Hosts DOWN = com o <i>evento de DOWN</i> ativo (padrão: ping).<br>';
 echo 'Use <b>Simular</b> para marcar hosts como DOWN e ver quais abririam chamado antes de salvar.';
 echo '</div>';
-echo '<div class="gd-actions">';
+echo '</details>';
+echo '<div class="gd-tools">';
 echo '<button class="gd-btn" type="button" data-gd-topo-export>⬇ Exportar YAML</button>';
 echo '<button class="gd-btn" type="button" data-gd-topo-import>⬆ Importar YAML</button>';
 echo '<input type="file" id="gd-topo-import-file" accept=".yaml,.yml,text/yaml" style="display:none">';
-echo '</div>';
 echo '</div>';
 
 echo '<textarea id="gd-topo-export-yaml" style="display:none">'.h($data['raw'] ?? '').'</textarea>';
@@ -125,11 +127,9 @@ echo '<script type="application/json" id="gd-topo-data">'.json_encode([
 echo '<form method="post" id="gd-topo-form" action="zabbix.php?action=godesk.topology.edit">';
 echo '<input type="hidden" name="save" value="1">';
 echo '<textarea name="topology_json" id="gd-topo-json" style="display:none"></textarea>';
-echo '<div class="gd-actions">';
+echo '<div class="gd-actions gd-savebar">';
 echo '<button class="gd-btn gd-btn-primary" type="submit">💾 Salvar</button>';
 echo '<a class="gd-btn" href="zabbix.php?action=godesk.topology.edit">↩ Recarregar</a>';
-echo '<a class="gd-btn" href="zabbix.php?action=godesk.dependencies.edit">🔗 Dependências v1</a>';
-echo '<a class="gd-btn" href="zabbix.php?action=godesk.config.edit">⚙️ Config</a>';
 echo '</div>';
 echo '</form>';
 

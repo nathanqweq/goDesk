@@ -2,7 +2,7 @@
 /**
  * goDesk - Zabbix Frontend Module
  *
- * Registra itens de menu e inicializa o módulo.
+ * Registra o menu e inicializa o módulo.
  */
 
 namespace Modules\GoDesk;
@@ -14,28 +14,59 @@ use CMenuItem;
 
 class Module extends CModule {
 	public function init(): void {
-		// telas de edição só aparecem pro Super admin (as actions já
-		// recusam os demais); o atendimento vê só as de visualização
+		// Uma entrada por assunto: o Super admin abre a tela de edição e os
+		// demais a de visualização (as actions de edição já recusam quem não
+		// é admin). Na página, as abas (views/inc.nav.php) seguem a mesma regra.
 		$admin = (\CWebUser::getType() == USER_TYPE_SUPER_ADMIN);
 
 		$items = [
-			(new CMenuItem(_('Config (visualizar)')))->setAction('godesk.config.view'),
-			(new CMenuItem(_('Arquitetura (visualizar)')))->setAction('godesk.topology.view'),
-			(new CMenuItem(_('Fluxos (visualizar)')))->setAction('godesk.flows.view')
+			(new CMenuItem(_('Rules')))
+				->setAction($admin ? 'godesk.config.edit' : 'godesk.config.view')
+				->setAliases($admin ? ['godesk.config.view', 'godesk.config.validate'] : []),
+			(new CMenuItem(_('Fluxos')))
+				->setAction($admin ? 'godesk.flows.edit' : 'godesk.flows.view')
+				->setAliases($admin ? ['godesk.flows.view'] : [])
 		];
 		if ($admin) {
-			$items[] = (new CMenuItem(_('Config (editar)')))->setAction('godesk.config.edit');
-			$items[] = (new CMenuItem(_('Fluxos')))->setAction('godesk.flows.edit');
-			$items[] = (new CMenuItem(_('Fluxos — histórico')))->setAction('godesk.flows.history');
-			$items[] = (new CMenuItem(_('Dependências')))->setAction('godesk.dependencies.edit');
-			$items[] = (new CMenuItem(_('Dependências v2 (arquitetura)')))->setAction('godesk.topology.edit');
+			$items[] = (new CMenuItem(_('Histórico de fluxos')))->setAction('godesk.flows.history');
+		}
+		$items[] = (new CMenuItem(_('Arquitetura')))
+			->setAction($admin ? 'godesk.topology.edit' : 'godesk.topology.view')
+			->setAliases($admin ? ['godesk.topology.view'] : []);
+		if ($admin) {
+			$items[] = (new CMenuItem(_('Dependências v1')))
+				->setAction('godesk.dependencies.edit')
+				->setAliases(['godesk.dependencies.triggers']);
 		}
 
-		APP::Component()->get('menu.main')
-			->findOrAdd(_('Alerts'))
-			->getSubmenu()
-			->insertAfter(_('Scripts'),
-				(new CMenuItem(_('goDesk')))->setSubMenu(new CMenu($items))
-			);
+		$menu = (new CMenuItem('goDesk'))->setSubMenu(new CMenu($items));
+		if (method_exists($menu, 'setId')) {
+			$menu->setId('godesk');
+		}
+		$icon = self::icon();
+		if ($icon !== null) {
+			$menu->setIcon($icon);
+		}
+
+		// seção própria na barra lateral, logo depois de Reports (que existe
+		// pra todos os tipos de usuário — Alerts só existe pro admin)
+		$main = APP::Component()->get('menu.main');
+		if (method_exists($main, 'find') && $main->find(_('Reports')) !== null) {
+			$main->insertAfter(_('Reports'), $menu);
+		}
+		else {
+			$main->add($menu);
+		}
+	}
+
+	// ícone do menu: as constantes mudam entre versões do Zabbix, então usa a
+	// primeira que existir (sem nenhuma, o item fica sem ícone)
+	private static function icon(): ?string {
+		foreach (['ZBX_ICON_ENVELOPE_FILLED', 'ZBX_ICON_ALERTS', 'ZBX_ICON_BELL', 'ZBX_ICON_REPORTS'] as $c) {
+			if (defined($c)) {
+				return constant($c);
+			}
+		}
+		return null;
 	}
 }

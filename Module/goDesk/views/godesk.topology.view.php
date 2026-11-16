@@ -13,6 +13,8 @@ function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 echo '<div class="godesk-module">';
 echo '<div class="gd-wrap gd-wrap-wide">';
 
+require __DIR__.'/inc.nav.php';
+
 echo '<div class="gd-header">';
 echo '<div class="gd-title">'.h($data['title']).'</div>';
 echo '<div class="gd-subtitle">Somente leitura — a simulação não altera nada.</div>';
@@ -22,15 +24,15 @@ if (!empty($data['error'])) {
 	echo '<div class="gd-banner gd-err"><b>Erro:</b> '.h($data['error']).'</div>';
 }
 
-echo '<div class="gd-card">';
-echo '<h2>🧭 Como ler</h2>';
+echo '<details class="gd-card gd-help" data-gd-help="topology.view">';
+echo '<summary>🧭 Como ler <span class="gd-help-hint">clique para abrir</span></summary>';
 echo '<div class="gd-muted">';
 echo 'Cada localidade mostra por onde o Zabbix enxerga os equipamentos (a partir do <b>root</b>). Quando algo cai, o goDesk decide quem abre chamado:<br>';
 echo '<b>1. Status da localidade</b>: com o evento de status ativo (ex: <i>Powerplant Down</i>), só o host de status abre chamado — os demais ficam segurados.<br>';
 echo '<b>2. Topologia</b>: um host DOWN só abre chamado se ainda houver caminho do root até um vizinho dele por hosts UP. Se o caminho foi cortado por outro equipamento DOWN, ele fica segurado (é consequência).<br>';
 echo 'Ao abrir, a página carrega o <b>estado atual do Zabbix</b>. Clique nos hosts para simular outras quedas.';
 echo '</div>';
-echo '</div>';
+echo '</details>';
 
 echo '<div class="gd-card" id="gd-topo">';
 
@@ -61,11 +63,5 @@ echo '<script type="application/json" id="gd-topo-data">'.json_encode([
 	'defaults' => $data['defaults'] ?? [],
 	'readonly' => true
 ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT).'</script>';
-
-if (!empty($data['can_edit'])) {
-	echo '<div class="gd-actions">';
-	echo '<a class="gd-btn" href="zabbix.php?action=godesk.topology.edit">✏️ Editar arquitetura</a>';
-	echo '</div>';
-}
 
 echo '</div></div>';
