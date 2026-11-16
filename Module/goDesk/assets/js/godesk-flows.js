@@ -41,6 +41,35 @@
     end: { icon: "■", name: "Fim" },
   };
 
+  // seletor de blocos (＋ Adicionar bloco): categorias e descrição curta
+  const PALETTE = [
+    { title: "Decidir", items: [
+      ["if", "sim / não a partir de regras (E / OU, grupos)"],
+      ["switch", "um caminho por valor de um campo"],
+      ["branch", "se / senão se / senão, em ordem"],
+      ["limit", "no máximo N eventos numa janela de horas"],
+    ] },
+    { title: "Dados", items: [
+      ["set", "sobrescreve campos da rule e a instrução"],
+      ["table", "primeira linha que bater define várias colunas"],
+      ["transform", "monta variáveis (minúsculas, regex, padrão…)"],
+      ["subflow", "executa outro fluxo e volta"],
+    ] },
+    { title: "Ações", items: [
+      ["update", "escalonamento: muda o chamado no reenvio"],
+      ["note", "texto na descrição ou ação do chamado"],
+      ["zabbix", "comenta, reconhece ou muda severidade no evento"],
+      ["email", "envia um e-mail"],
+      ["http", "chama outro sistema depois do chamado"],
+    ] },
+    { title: "Finalizar e organizar", items: [
+      ["end", "abre ou não abre o chamado"],
+      ["comment", "nota solta no desenho (não executa)"],
+    ] },
+  ];
+  // blocos com editor largo (tabelas, regras aninhadas)
+  const WIDE_TYPES = new Set(["if", "branch", "table", "set", "update", "transform", "http", "email"]);
+
   const OPS = [
     ["eq", "igual a"], ["neq", "diferente de"],
     ["contains", "contém"], ["not_contains", "não contém"],
@@ -1111,6 +1140,7 @@
     const path = testPath();
 
     const links = el("g", { class: "gd-flow-links" }, svg);
+    let linkDel = null;
     fl.links.forEach((l, i) => {
       const a = nodeOf(fl, l.from), b = nodeOf(fl, l.to);
       if (!a || !b) return;
@@ -1122,6 +1152,13 @@
       if (onPath) cls += " is-path";
       el("path", { d, class: cls, "marker-end": `url(#${onPath ? "gd-flow-arrow-path" : "gd-flow-arrow"})` }, links);
       el("path", { d, class: "gd-flow-link-hit", "data-link": i }, links);
+      if (!S.readonly && S.sel && S.sel.type === "link" && S.sel.idx === i) {
+        // botão ✕ no meio da curva (bezier em t=0,5) pra remover a ligação
+        const dy = Math.max(40, Math.abs(b.y - p.y) / 2);
+        const mx = (p.x + 3 * p.x + 3 * b.x + b.x) / 8;
+        const my = (p.y + 3 * (p.y + dy) + 3 * (b.y - dy) + (b.y - 6)) / 8;
+        linkDel = { x: mx, y: my };
+      }
     });
 
     const nodes = el("g", { class: "gd-flow-nodes" }, svg);
@@ -1135,7 +1172,10 @@
       const g = el("g", { class: cls, transform: `translate(${n.x},${n.y})`, "data-node": n.id }, nodes);
       el("rect", { x: -w / 2, y: 0, width: w, height: h, rx: n.type === "start" || n.type === "end" ? 14 : 8, class: "gd-flow-box" }, g);
       el("rect", { x: -w / 2, y: 0, width: w, height: HEAD_H, rx: 8, class: "gd-flow-head" }, g);
-      el("text", { x: -w / 2 + 10, y: 17, class: "gd-flow-title" }, g).textContent = trunc(`${TYPES[n.type] ? TYPES[n.type].icon : "?"} ${n.label || (TYPES[n.type] ? TYPES[n.type].name : n.type)}`, Math.floor(w / 7.4));
+      el("rect", { x: -w / 2 + 1, y: HEAD_H - 1, width: w - 2, height: 1, class: "gd-flow-head-line" }, g);
+      el("circle", { cx: -w / 2 + 15, cy: HEAD_H / 2, r: 9, class: "gd-flow-badge" }, g);
+      el("text", { x: -w / 2 + 15, y: HEAD_H / 2 + 3.5, "text-anchor": "middle", class: "gd-flow-badge-t" }, g).textContent = TYPES[n.type] ? TYPES[n.type].icon : "?";
+      el("text", { x: -w / 2 + 30, y: 17, class: "gd-flow-title" }, g).textContent = trunc(n.label || (TYPES[n.type] ? TYPES[n.type].name : n.type), Math.floor((w - 36) / 7));
       summary(fl, n).forEach((line, i) => {
         el("text", { x: -w / 2 + 10, y: HEAD_H + 15 + i * LINE_H, class: "gd-flow-line" }, g).textContent = line;
       });
@@ -1151,6 +1191,13 @@
         el("circle", { cx: px, cy: h, r: 7, class: "gd-flow-port-out" + (linked ? " is-linked" : ""), "data-node": n.id, "data-port": p.port }, g);
       });
     });
+
+    if (linkDel) {
+      const del = el("g", { class: "gd-flow-link-del", transform: `translate(${linkDel.x},${linkDel.y})`, "data-gd-flow": "link-remove" }, svg);
+      el("title", {}, del).textContent = "Remover ligação";
+      el("circle", { r: 11 }, del);
+      el("text", { y: 4, "text-anchor": "middle" }, del).textContent = "✕";
+    }
 
     if (S.linking) {
       el("path", { d: curve(S.linking.x1, S.linking.y1, S.linking.x2, S.linking.y2), class: "gd-flow-link is-temp", id: "gd-flow-temp" }, svg);
@@ -1228,43 +1275,42 @@
   function renderSide() {
     const box = $("gd-flow-side");
     const fl = flow();
-    if (!fl) { box.innerHTML = ""; return; }
+    renderIssues();
+    const n = fl && S.sel && S.sel.type === "node" ? nodeOf(fl, S.sel.id) : null;
+    const showFlow = fl && S.sel && S.sel.type === "flow";
+    const open = !!(S.modal && (n || showFlow));
+    const modal = $("gd-flow-modal");
+    if (modal) {
+      modal.hidden = !open;
+      const dlg = modal.querySelector(".gd-flow-modal-dialog");
+      if (dlg) dlg.className = "gd-flow-modal-dialog" + (n && WIDE_TYPES.has(n.type) ? " is-wide" : "");
+    }
+    if (!open) {
+      // fechado: não deixa campos "fantasmas" de outro bloco no DOM
+      if (box.innerHTML) box.innerHTML = "";
+      return;
+    }
 
-    if (S.sel && S.sel.type === "link" && fl.links[S.sel.idx]) {
-      const l = fl.links[S.sel.idx];
-      const a = nodeOf(fl, l.from), b = nodeOf(fl, l.to);
-      const lab = (ports(a || {}).find((p) => lc(p.port) === lc(linkPort(l))) || {}).label;
-      box.innerHTML = `<div class="gd-small-title">Ligação</div>
-        <div><b>${escapeHtml(a ? a.label || a.id : l.from)}</b>${lab ? ` [${escapeHtml(lab)}]` : ""} → <b>${escapeHtml(b ? b.label || b.id : l.to)}</b></div>
-        <div class="gd-actions"><button type="button" class="gd-btn gd-btn-danger" data-gd-flow="link-remove">Remover ligação</button></div>`;
+    if (showFlow) {
+      const errs = S.readonly ? [] : validate().filter((e) => e.indexOf(`Fluxo ${fl.name.trim() || "#"}`) === 0 || e.indexOf("Calendário") === 0);
+      box.innerHTML = `${modalHead("flow", "⚙", "Propriedades do fluxo", fl.name)}
+        <div class="gd-flow-modal-body">
+        <div class="gd-field"><label>Nome <span class="gd-muted">(é o que a rule usa no campo Fluxo)</span></label><input type="text" data-gd-flow-prop="name" value="${escapeHtml(fl.name)}"></div>
+        <div class="gd-field" style="margin-top:10px;"><label>Descrição</label><textarea rows="3" data-gd-flow-prop="description">${escapeHtml(fl.description)}</textarea></div>
+        <div class="gd-flow-stats"><span><b>${fl.nodes.length}</b> blocos</span><span><b>${fl.links.length}</b> ligações</span></div>
+        ${errs.length ? `<div class="gd-banner gd-err" style="margin-top:10px;"><b>Corrija antes de salvar:</b><br>${errs.map(escapeHtml).join("<br>")}</div>` : ""}
+        <div class="gd-flow-help">
+          <div><b>Arraste</b> os blocos pelo cartão; para ligar, arraste da <b>bolinha de saída</b> até outro bloco — soltando no vazio, escolhe o bloco novo já ligado.</div>
+          <div><b>Duplo clique</b> no fundo adiciona um bloco ali. Clique num bloco para configurar; numa ligação para remover (✕). <kbd>Delete</kbd> remove o selecionado, <kbd>Esc</kbd> fecha.</div>
+          <div>Saída sem ligação = <b>abre o chamado</b> com o que já foi definido.</div>
+        </div>
+        </div>
+        ${S.readonly ? "" : '<div class="gd-flow-modal-foot"><span class="gd-flow-sep"></span><button type="button" class="gd-btn gd-btn-primary" data-gd-modal-close>Concluir</button></div>'}`;
       if (S.readonly) lockSide(box);
       return;
     }
 
-    const n = S.sel && S.sel.type === "node" ? nodeOf(fl, S.sel.id) : null;
-    if (!n && S.readonly) {
-      box.innerHTML = `<div class="gd-small-title">${escapeHtml(fl.name)}</div>
-        ${fl.description ? `<div style="white-space:pre-wrap">${escapeHtml(fl.description)}</div>` : '<div class="gd-muted">Sem descrição.</div>'}
-        <div class="gd-muted" style="margin-top:10px;">Clique num bloco para ver os detalhes. Com o 🧪 Testar aberto, o caminho do alerta fica destacado em verde.</div>`;
-      return;
-    }
-    if (!n) {
-      const errs = validate().filter((e) => e.indexOf(`Fluxo ${fl.name.trim() || "#"}`) === 0 || e.indexOf("Calendário") === 0);
-      box.innerHTML = `<div class="gd-small-title">Fluxo</div>
-        <div class="gd-field"><label>Nome <span class="gd-muted">(é o que a rule usa no campo Fluxo)</span></label><input type="text" data-gd-flow-prop="name" value="${escapeHtml(fl.name)}"></div>
-        <div class="gd-field" style="margin-top:8px;"><label>Descrição</label><textarea rows="2" data-gd-flow-prop="description">${escapeHtml(fl.description)}</textarea></div>
-        <div class="gd-muted" style="margin-top:8px;">${fl.nodes.length} blocos · ${fl.links.length} ligações</div>
-        ${errs.length ? `<div class="gd-banner gd-err" style="margin-top:8px;">${errs.map(escapeHtml).join("<br>")}</div>` : ""}
-        <div class="gd-muted" style="margin-top:10px;">
-          <b>Arraste</b> os blocos. Para ligar, arraste da <b>bolinha de saída</b> (embaixo do bloco) até outro bloco.<br>
-          Clique num bloco para editar; numa ligação para remover. <kbd>Delete</kbd> remove o selecionado.<br>
-          Com um bloco selecionado, “Adicionar” já liga o novo bloco na primeira saída livre.<br>
-          Saída sem ligação = <b>abre o chamado</b> com o que já foi definido.
-        </div>`;
-      return;
-    }
-
-    let html = `<div class="gd-small-title">${TYPES[n.type].icon} ${TYPES[n.type].name} <span class="gd-muted">(${escapeHtml(n.id)})</span></div>`;
+    let html = modalHead(n.type, TYPES[n.type].icon, TYPES[n.type].name, n.id) + '<div class="gd-flow-modal-body">';
     if (n.type !== "start") {
       html += `<div class="gd-field"><label>Título</label><input type="text" data-gd-node-prop="label" value="${escapeHtml(n.label)}" placeholder="${escapeHtml(TYPES[n.type].name)}"></div>`;
     }
@@ -1458,11 +1504,131 @@
       html += '<div class="gd-muted">Executa <b>depois</b> que o goDesk trata o chamado (só no modo ativo, não em shadow) e não muda o caminho do fluxo. <code>{ticket.number}</code> vira o número do chamado. Use <code>{campo|json}</code> dentro de JSON e <code>{campo|url}</code> na URL. Com corpo e sem Content-Type, vai <code>application/json</code>. O resultado aparece no Histórico.</div>';
     }
 
+    html += "</div>";
+    html += '<div class="gd-flow-modal-foot gd-flow-edit-only">';
     if (n.type !== "start") {
-      html += '<div class="gd-actions gd-flow-edit-only"><button type="button" class="gd-btn gd-btn-danger" data-gd-flow="node-remove">Remover bloco</button></div>';
+      html += '<button type="button" class="gd-btn gd-btn-danger" data-gd-flow="node-remove">🗑 Remover</button>';
+      html += '<button type="button" class="gd-btn" data-gd-flow="node-dup">⧉ Duplicar</button>';
     }
+    html += '<span class="gd-flow-sep"></span>';
+    if (ports(n).some((p) => !linkFrom(fl, n.id, p.port))) {
+      html += '<button type="button" class="gd-btn" data-gd-flow="node-next" title="adiciona um bloco ligado na primeira saída livre">＋ Próximo bloco</button>';
+    }
+    html += '<button type="button" class="gd-btn gd-btn-primary" data-gd-modal-close>Concluir</button></div>';
     box.innerHTML = html;
     if (S.readonly) lockSide(box);
+  }
+
+  function modalHead(type, icon, name, sub) {
+    return `<div class="gd-flow-modal-head gd-flow-t-${escapeHtml(type)}">
+      <span class="gd-flow-modal-icon">${escapeHtml(icon)}</span>
+      <div class="gd-flow-modal-titles"><div class="gd-flow-modal-title">${escapeHtml(name)}</div>
+      <div class="gd-flow-modal-sub">${escapeHtml(sub || "")}</div></div></div>`;
+  }
+
+  // selo "⚠ N problemas" na barra (abre as propriedades do fluxo)
+  function renderIssues() {
+    const box = $("gd-flow-issues");
+    if (!box || S.readonly) return;
+    const fl = flow();
+    const errs = fl ? validate().filter((e) => e.indexOf(`Fluxo ${fl.name.trim() || "#"}`) === 0 || e.indexOf("Calendário") === 0) : [];
+    box.innerHTML = errs.length
+      ? `<button type="button" class="gd-btn gd-flow-issues" data-gd-flow="flow-props" title="${escapeHtml(errs.join("\n"))}">⚠ ${errs.length} ${errs.length === 1 ? "problema" : "problemas"}</button>`
+      : '<span class="gd-flow-ok">✓ sem problemas</span>';
+  }
+
+  // ---------- modal / seletor de blocos ----------
+
+  function openModal(sel) { S.sel = sel; S.modal = true; closePicker(); renderCanvas(); renderSide(); }
+  function closeModal() {
+    if (!S.modal) return;
+    S.modal = false;
+    renderSide();
+  }
+
+  function buildPicker() {
+    const root = $("gd-flow");
+    if (!root || S.readonly || $("gd-flow-picker")) return;
+    const p = document.createElement("div");
+    p.id = "gd-flow-picker";
+    p.className = "gd-flow-picker";
+    p.hidden = true;
+    p.innerHTML = `<div class="gd-flow-modal-backdrop" data-gd-picker-close></div>
+      <div class="gd-flow-picker-panel" role="dialog" aria-label="Adicionar bloco">
+        <div class="gd-flow-picker-head"><input type="text" id="gd-flow-picker-q" placeholder="Buscar bloco… (ex: tabela, e-mail, horário)" autocomplete="off">
+        <button type="button" class="gd-flow-modal-x" data-gd-picker-close title="Fechar (Esc)">✕</button></div>
+        <div class="gd-flow-picker-hint" id="gd-flow-picker-hint"></div>
+        <div class="gd-flow-picker-list">${PALETTE.map((g) => `<div class="gd-flow-picker-group" data-group>
+          <div class="gd-flow-picker-gtitle">${escapeHtml(g.title)}</div>
+          <div class="gd-flow-picker-items">${g.items.map(([t, desc]) => `<button type="button" class="gd-flow-picker-item gd-flow-t-${t}" data-gd-flow-add="${t}" data-q="${escapeHtml(lc(TYPES[t].name + " " + desc + " " + g.title))}">
+            <span class="gd-flow-modal-icon">${escapeHtml(TYPES[t].icon)}</span>
+            <span><b>${escapeHtml(TYPES[t].name)}</b><small>${escapeHtml(desc)}</small></span></button>`).join("")}</div></div>`).join("")}</div>
+      </div>`;
+    root.appendChild(p);
+    const q = $("gd-flow-picker-q");
+    q.addEventListener("input", () => filterPicker(q.value));
+    q.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const first = p.querySelector(".gd-flow-picker-item:not([hidden])");
+        if (first) first.click();
+      }
+    });
+  }
+
+  function filterPicker(text) {
+    const p = $("gd-flow-picker");
+    if (!p) return;
+    const words = lc(text).split(/\s+/).filter(Boolean);
+    p.querySelectorAll(".gd-flow-picker-item").forEach((b) => { b.hidden = !words.every((w) => b.dataset.q.indexOf(w) >= 0); });
+    p.querySelectorAll("[data-group]").forEach((g) => { g.hidden = !g.querySelector(".gd-flow-picker-item:not([hidden])"); });
+  }
+
+  // abre o seletor; "at" = posição no desenho, "from" = saída que liga no bloco novo
+  function openPicker(at, from) {
+    if (S.readonly) return;
+    buildPicker();
+    const p = $("gd-flow-picker");
+    if (!p) return;
+    S.addAt = at || null;
+    S.pending = from || null;
+    if (S.modal) { S.modal = false; renderSide(); }
+    const fl = flow();
+    if (!from && !at && fl && S.sel && S.sel.type === "node") {
+      // botão da barra com um bloco selecionado: liga na primeira saída livre dele (addBlock)
+      const sn = nodeOf(fl, S.sel.id);
+      const free = sn ? ports(sn).find((x) => !linkFrom(fl, sn.id, x.port)) : null;
+      if (free) from = { id: sn.id, port: free.port, hintOnly: true };
+    }
+    const src = from && fl ? nodeOf(fl, from.id) : null;
+    const lab = src ? (ports(src).find((x) => lc(x.port) === lc(from.port)) || {}).label : "";
+    if (from && from.hintOnly) S.pending = null;
+    $("gd-flow-picker-hint").innerHTML = src
+      ? `O bloco novo será ligado em <b>${escapeHtml(src.label || TYPES[src.type].name)}</b>${lab ? ` → <b>${escapeHtml(lab)}</b>` : ""}.`
+      : "";
+    p.hidden = false;
+    const q = $("gd-flow-picker-q");
+    q.value = "";
+    filterPicker("");
+    q.focus();
+  }
+
+  function closePicker() {
+    const p = $("gd-flow-picker");
+    if (p && !p.hidden) p.hidden = true;
+    S.addAt = null;
+    S.pending = null;
+  }
+
+  function duplicateNode(fl, n) {
+    const copy = JSON.parse(JSON.stringify(n));
+    copy.id = newId(fl, n.type);
+    copy.label = (n.label || TYPES[n.type].name) + " (cópia)";
+    copy.x = n.x + 40;
+    copy.y = n.y + 40;
+    fl.nodes.push(copy);
+    dirty();
+    return copy;
   }
 
   // somente leitura: o painel mostra os detalhes, mas nada é editável
@@ -1619,6 +1785,7 @@
   function onPointerDown(e) {
     const fl = flow();
     if (!fl) return;
+    if (e.target.closest(".gd-flow-link-del")) return; // o click remove a ligação
     const port = S.readonly ? null : e.target.closest(".gd-flow-port-out");
     if (port) {
       const n = nodeOf(fl, port.getAttribute("data-node"));
@@ -1641,10 +1808,12 @@
     const hit = e.target.closest(".gd-flow-link-hit");
     if (hit) {
       S.sel = { type: "link", idx: +hit.getAttribute("data-link") };
+      S.modal = false;
       renderCanvas(); renderSide();
       return;
     }
     S.sel = null;
+    S.modal = false;
     renderCanvas(); renderSide();
   }
 
@@ -1687,12 +1856,16 @@
         }
       }
       renderCanvas(); renderSide(); renderTest();
+      // soltou no vazio (longe da saída): escolhe o bloco novo, já ligado
+      if (!g && fl && Math.hypot(L.x2 - L.x1, L.y2 - L.y1) > 40) {
+        openPicker({ x: L.x2, y: L.y2 }, { id: L.from, port: L.port });
+      }
       return;
     }
     if (!S.drag) return;
     const d = S.drag;
     S.drag = null;
-    if (!d.moved) S.sel = { type: "node", id: d.id };
+    if (!d.moved) { openModal({ type: "node", id: d.id }); return; }
     renderCanvas(); renderSide();
   }
 
@@ -1724,6 +1897,7 @@
       dirty();
     }
     S.sel = null;
+    S.modal = false;
     renderCanvas(); renderSide(); renderTest();
   }
 
@@ -1734,7 +1908,18 @@
     let pos = freeSpot(fl);
     let from = null;
     const sel = S.sel && S.sel.type === "node" ? nodeOf(fl, S.sel.id) : null;
-    if (sel && type !== "comment") {
+    const pending = S.pending && nodeOf(fl, S.pending.id) ? S.pending : null;
+    const at = S.addAt;
+    closePicker();
+    if (pending && type !== "comment") {
+      // saída arrastada até o vazio: liga ali mesmo
+      from = { id: pending.id, port: pending.port };
+      if (at) pos = { x: Math.max(NODE_W / 2 + 10, Math.round(at.x / 5) * 5), y: Math.max(6, Math.round(at.y / 5) * 5) };
+    }
+    else if (at) {
+      pos = { x: Math.max(NODE_W / 2 + 10, Math.round(at.x / 5) * 5), y: Math.max(6, Math.round(at.y / 5) * 5) };
+    }
+    else if (sel && type !== "comment") {
       const free = ports(sel).find((p) => !linkFrom(fl, sel.id, p.port));
       if (free) {
         from = { id: sel.id, port: free.port };
@@ -1746,6 +1931,7 @@
     fl.nodes.push(n);
     if (from) setLink(fl, from.id, from.port, n.id);
     S.sel = { type: "node", id: n.id };
+    S.modal = true;
     dirty();
     renderCanvas(); renderSide(); renderTest();
   }
@@ -1895,7 +2081,24 @@
       recentLoaded: false,
       lastVarTarget: null,
       readonly: !!payload.readonly,
+      modal: false,
+      addAt: null,
+      pending: null,
     };
+
+    // o painel do bloco vira um modal: #gd-flow-side é movido pra dentro dele
+    const side = $("gd-flow-side");
+    if (side && !$("gd-flow-modal")) {
+      const m = document.createElement("div");
+      m.id = "gd-flow-modal";
+      m.className = "gd-flow-modal";
+      m.hidden = true;
+      m.innerHTML = '<div class="gd-flow-modal-backdrop" data-gd-modal-close></div>'
+        + '<div class="gd-flow-modal-dialog" role="dialog" aria-modal="true"><button type="button" class="gd-flow-modal-x" data-gd-modal-close title="Fechar (Esc)">✕</button></div>';
+      side.parentNode.removeChild(side);
+      m.querySelector(".gd-flow-modal-dialog").appendChild(side);
+      box.appendChild(m);
+    }
     if (S.readonly) {
       S.testOpen = true;
       const nowIn = testInput("now");
@@ -1914,7 +2117,34 @@
 
     const root = document.querySelector(".godesk-module");
 
+    svg.addEventListener("dblclick", (e) => {
+      if (S.readonly || !flow()) return;
+      if (e.target.closest(".gd-flow-node, .gd-flow-link-hit, .gd-flow-link-del")) return;
+      openPicker(svgPoint(e), null);
+    });
+
     root.addEventListener("click", (e) => {
+      if (e.target.closest("[data-gd-modal-close]")) { closeModal(); return; }
+      if (e.target.closest("[data-gd-picker-close]")) { closePicker(); return; }
+      const fa = e.target.closest("[data-gd-flow]");
+      if (fa && !S.readonly) {
+        const f0 = flow();
+        const sel0 = f0 && S.sel && S.sel.type === "node" ? nodeOf(f0, S.sel.id) : null;
+        const k = fa.dataset.gdFlow;
+        if (k === "picker") { openPicker(null, null); return; }
+        if (k === "flow-props" && f0) { openModal({ type: "flow" }); return; }
+        if (k === "node-dup" && sel0 && sel0.type !== "start") { openModal({ type: "node", id: duplicateNode(f0, sel0).id }); renderTest(); return; }
+        if (k === "node-next" && sel0) {
+          const free = ports(sel0).find((p) => !linkFrom(f0, sel0.id, p.port));
+          if (free) {
+            const pp = portPos(f0, sel0, free.port);
+            openPicker({ x: pp.x, y: pp.y + 60 }, { id: sel0.id, port: free.port });
+          }
+          return;
+        }
+      }
+      else if (fa && fa.dataset.gdFlow === "flow-props" && flow()) { openModal({ type: "flow" }); return; }
+
       const add = e.target.closest("[data-gd-flow-add]");
       if (add) { addBlock(add.dataset.gdFlowAdd); return; }
 
@@ -2221,6 +2451,12 @@
     $("gd-flow-test-eventid").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); loadEvent(e.target.value); } });
 
     document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        const pk = $("gd-flow-picker");
+        if (pk && !pk.hidden) { e.preventDefault(); closePicker(); return; }
+        if (S.modal) { e.preventDefault(); closeModal(); return; }
+        return;
+      }
       if (e.key !== "Delete" && e.key !== "Backspace") return;
       const t = document.activeElement;
       if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;

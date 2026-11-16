@@ -757,3 +757,261 @@
 [theme='dark-theme'] .godesk-module .gd-flow-t-email .gd-flow-head { fill: #4e3a26; }
 [theme='dark-theme'] .godesk-module .gd-flow-t-comment .gd-flow-box { fill: #4a4520; stroke: #8a7d2c; }
 [theme='dark-theme'] .godesk-module .gd-flow-t-comment .gd-flow-head { fill: #5c5524; }
+
+/* =========================================================
+   Fluxos: editor com modal, seletor de blocos e cartões
+========================================================= */
+.godesk-module .gd-flow-t-start   { --gd-c: #2f6fdf; }
+.godesk-module .gd-flow-t-if      { --gd-c: #d9932b; }
+.godesk-module .gd-flow-t-switch  { --gd-c: #8a5cd6; }
+.godesk-module .gd-flow-t-branch  { --gd-c: #c39a1c; }
+.godesk-module .gd-flow-t-limit   { --gd-c: #4a74c4; }
+.godesk-module .gd-flow-t-set     { --gd-c: #2e9e5b; }
+.godesk-module .gd-flow-t-table   { --gd-c: #2a9db5; }
+.godesk-module .gd-flow-t-transform { --gd-c: #7d9a3a; }
+.godesk-module .gd-flow-t-subflow { --gd-c: #2a9a8f; }
+.godesk-module .gd-flow-t-update  { --gd-c: #e07b39; }
+.godesk-module .gd-flow-t-note    { --gd-c: #c058b0; }
+.godesk-module .gd-flow-t-zabbix  { --gd-c: #d6533f; }
+.godesk-module .gd-flow-t-email   { --gd-c: #b07a45; }
+.godesk-module .gd-flow-t-http    { --gd-c: #5b62d6; }
+.godesk-module .gd-flow-t-end     { --gd-c: #6b7686; }
+.godesk-module .gd-flow-t-comment { --gd-c: #c9a227; }
+.godesk-module .gd-flow-t-flow    { --gd-c: #4b5563; }
+
+/* barra */
+.godesk-module .gd-flow-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+.godesk-module .gd-flow-toolbar .gd-btn { padding: 8px 14px; border-radius: 8px; }
+.godesk-module .gd-flow-add-btn { font-weight: 600; }
+.godesk-module .gd-flow-tip { font-size: 11px; }
+.godesk-module .gd-flow-issues { background: #fff1e0; border-color: #f2c38b; color: #8a4a00; }
+.godesk-module .gd-flow-ok { font-size: 12px; color: #2e9e5b; }
+
+/* canvas em largura total (o painel lateral virou modal) */
+.godesk-module .gd-flow-main { display: block; margin-top: 12px; }
+.godesk-module .gd-flow-canvas-wrap {
+  height: 76vh;
+  max-height: none;
+  border-radius: 12px;
+  border-color: #e1e5eb;
+  background-color: #f7f8fa;
+  background-image: radial-gradient(circle, #d3d8df 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+/* cartões no desenho */
+.godesk-module .gd-flow-box {
+  fill: #fff;
+  stroke: #d5dbe3;
+  stroke-width: 1;
+  filter: drop-shadow(0 1px 2px rgba(16, 24, 40, .10)) drop-shadow(0 4px 10px rgba(16, 24, 40, .06));
+}
+.godesk-module .gd-flow-node:hover .gd-flow-box { stroke: #b4bfcd; }
+.godesk-module .gd-flow-head-line { fill: rgba(16, 24, 40, .06); }
+.godesk-module .gd-flow-badge { fill: var(--gd-c, #6b7686); }
+.godesk-module .gd-flow-badge-t { font-size: 10px; font-weight: 700; fill: #fff; pointer-events: none; }
+.godesk-module .gd-flow-title { font-size: 12.5px; font-weight: 600; }
+.godesk-module .gd-flow-node.is-selected .gd-flow-box { stroke: var(--gd-c, #2f6fdf); stroke-width: 2.5; }
+.godesk-module .gd-flow-node.is-path .gd-flow-box { stroke: #2e9e5b; stroke-width: 3; }
+.godesk-module .gd-flow-port-out { stroke: var(--gd-c, #2f6fdf); }
+.godesk-module .gd-flow-port-out.is-linked { fill: var(--gd-c, #2f6fdf); }
+.godesk-module .gd-flow-link { stroke: #a3adbb; }
+.godesk-module .gd-flow-link-del { cursor: pointer; }
+.godesk-module .gd-flow-link-del circle { fill: #fff; stroke: #d6533f; stroke-width: 1.5; filter: drop-shadow(0 1px 3px rgba(0, 0, 0, .2)); }
+.godesk-module .gd-flow-link-del text { font-size: 11px; font-weight: 700; fill: #d6533f; pointer-events: none; }
+.godesk-module .gd-flow-link-del:hover circle { fill: #d6533f; }
+.godesk-module .gd-flow-link-del:hover text { fill: #fff; }
+
+/* modal do bloco e seletor */
+.godesk-module .gd-flow-modal,
+.godesk-module .gd-flow-picker {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.godesk-module .gd-flow-picker { align-items: flex-start; padding-top: 10vh; }
+.godesk-module .gd-flow-modal[hidden],
+.godesk-module .gd-flow-picker[hidden],
+.godesk-module .gd-flow-picker [hidden] { display: none !important; }
+.godesk-module .gd-flow-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, .45);
+  backdrop-filter: blur(2px);
+  animation: gd-flow-fade .12s ease-out;
+}
+.godesk-module .gd-flow-modal-dialog,
+.godesk-module .gd-flow-picker-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, .28), 0 2px 8px rgba(15, 23, 42, .12);
+  animation: gd-flow-pop .14s ease-out;
+}
+.godesk-module .gd-flow-modal-dialog { width: min(620px, 94vw); max-height: 88vh; }
+.godesk-module .gd-flow-modal-dialog.is-wide { width: min(920px, 96vw); }
+@keyframes gd-flow-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes gd-flow-pop { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
+
+.godesk-module .gd-flow-modal-dialog .gd-flow-side {
+  width: auto;
+  flex: 1 1 auto;
+  max-height: none;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+}
+.godesk-module .gd-flow-modal-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 56px 14px 20px;
+  border-bottom: 1px solid #edf0f3;
+  border-top: 4px solid var(--gd-c, #6b7686);
+  border-radius: 14px 14px 0 0;
+}
+.godesk-module .gd-flow-modal-icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--gd-c, #6b7686);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+}
+.godesk-module .gd-flow-modal-title { font-size: 16px; font-weight: 700; }
+.godesk-module .gd-flow-modal-sub { font-size: 11px; opacity: .6; font-family: monospace; }
+.godesk-module .gd-flow-modal-body { flex: 1 1 auto; overflow: auto; padding: 16px 20px 18px; }
+.godesk-module .gd-flow-modal-body .gd-small-title { margin-top: 14px; }
+.godesk-module .gd-flow-modal-body .gd-field label { font-weight: 600; }
+.godesk-module .gd-flow-modal-body input[type="text"],
+.godesk-module .gd-flow-modal-body input[type="number"],
+.godesk-module .gd-flow-modal-body select,
+.godesk-module .gd-flow-modal-body textarea { border-radius: 6px; }
+.godesk-module .gd-flow-modal-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid #edf0f3;
+  background: #fafbfc;
+  border-radius: 0 0 14px 14px;
+}
+.godesk-module .gd-flow-modal-foot .gd-btn { padding: 8px 14px; border-radius: 8px; }
+.godesk-module .gd-flow-modal-x {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 1;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font-size: 15px;
+  cursor: pointer;
+  opacity: .6;
+}
+.godesk-module .gd-flow-modal-x:hover { background: rgba(0, 0, 0, .06); opacity: 1; }
+.godesk-module .gd-flow-stats { display: flex; gap: 16px; margin-top: 12px; font-size: 12px; opacity: .8; }
+.godesk-module .gd-flow-help {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #f4f6f9;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.godesk-module .gd-flow-modal-body .gd-flow-branch { border-radius: 8px; padding: 8px 10px; }
+.godesk-module .gd-flow-modal-body .gd-flow-group { border-radius: 6px; }
+
+/* seletor de blocos */
+.godesk-module .gd-flow-picker-panel { width: min(680px, 94vw); max-height: 76vh; overflow: hidden; }
+.godesk-module .gd-flow-picker-head { position: relative; padding: 14px 56px 10px 16px; border-bottom: 1px solid #edf0f3; }
+.godesk-module .gd-flow-picker-head input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  font-size: 14px;
+  border-radius: 8px;
+}
+.godesk-module .gd-flow-picker-head .gd-flow-modal-x { top: 16px; }
+.godesk-module .gd-flow-picker-hint { padding: 0 16px; font-size: 12px; }
+.godesk-module .gd-flow-picker-hint:not(:empty) { padding: 8px 16px; background: #eef4ff; }
+.godesk-module .gd-flow-picker-list { overflow: auto; padding: 6px 16px 16px; }
+.godesk-module .gd-flow-picker-gtitle {
+  margin: 12px 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  opacity: .55;
+}
+.godesk-module .gd-flow-picker-items { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.godesk-module .gd-flow-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  text-align: left;
+  background: #fff;
+  border: 1px solid #e3e7ec;
+  border-radius: 10px;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color .1s, box-shadow .1s, transform .1s;
+}
+.godesk-module .gd-flow-picker-item:hover,
+.godesk-module .gd-flow-picker-item:focus-visible {
+  border-color: var(--gd-c, #2f6fdf);
+  box-shadow: 0 2px 10px rgba(16, 24, 40, .08);
+  transform: translateY(-1px);
+  outline: none;
+}
+.godesk-module .gd-flow-picker-item b { display: block; font-size: 13px; }
+.godesk-module .gd-flow-picker-item small { display: block; font-size: 11px; opacity: .65; margin-top: 2px; }
+@media (max-width: 640px) {
+  .godesk-module .gd-flow-picker-items { grid-template-columns: 1fr; }
+  .godesk-module .gd-flow-tip { display: none; }
+}
+
+/* tema escuro */
+[theme='dark-theme'] .godesk-module .gd-flow-canvas-wrap {
+  background-color: #1d2127;
+  border-color: #333a44;
+  background-image: radial-gradient(circle, #343b46 1px, transparent 1px);
+}
+[theme='dark-theme'] .godesk-module .gd-flow-box { fill: #262b33; stroke: #3d4552; }
+[theme='dark-theme'] .godesk-module .gd-flow-head-line { fill: rgba(255, 255, 255, .06); }
+[theme='dark-theme'] .godesk-module .gd-flow-link-del circle { fill: #262b33; }
+[theme='dark-theme'] .godesk-module .gd-flow-modal-dialog,
+[theme='dark-theme'] .godesk-module .gd-flow-picker-panel { background: #22262d; color: #e8e8e8; }
+[theme='dark-theme'] .godesk-module .gd-flow-modal-head,
+[theme='dark-theme'] .godesk-module .gd-flow-picker-head { border-bottom-color: #343b46; }
+[theme='dark-theme'] .godesk-module .gd-flow-modal-foot { background: #1d2127; border-top-color: #343b46; }
+[theme='dark-theme'] .godesk-module .gd-flow-modal-x:hover { background: rgba(255, 255, 255, .08); }
+[theme='dark-theme'] .godesk-module .gd-flow-help { background: #1d2127; }
+[theme='dark-theme'] .godesk-module .gd-flow-picker-item { background: #262b33; border-color: #3a414c; }
+[theme='dark-theme'] .godesk-module .gd-flow-picker-hint:not(:empty) { background: #1f2a3d; }
+[theme='dark-theme'] .godesk-module .gd-flow-issues { background: #4a3214; border-color: #7a5420; color: #f5d2a0; }
